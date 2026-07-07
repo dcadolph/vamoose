@@ -1,0 +1,29 @@
+# Compiled binary
+/vamoose
+vamoose.exe
+
+# Build and release output
+/dist/
+/bin/
+/build/
+
+# Go test, coverage, and binary outputs
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+profile.out
+
+# IDE and editor scratch
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS detritus
+.DS_Store
+Thumbs.db
+
+# Local Claude scratch
+.claude/
