@@ -93,3 +93,22 @@ func TestProviderGetHoldNotFound(t *testing.T) {
 		t.Fatal("GetHold: want error, got nil")
 	}
 }
+
+func TestProviderDeleteHold(t *testing.T) {
+	t.Parallel()
+	var gotMethod, gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	p := NewProvider(staticToken, WithBaseURL(srv.URL))
+	if err := p.DeleteHold(context.Background(), "evt123"); err != nil {
+		t.Fatalf("DeleteHold: %v", err)
+	}
+	if gotMethod != http.MethodDelete || gotPath != "/me/events/evt123" {
+		t.Errorf("request = %s %s, want DELETE /me/events/evt123", gotMethod, gotPath)
+	}
+}
