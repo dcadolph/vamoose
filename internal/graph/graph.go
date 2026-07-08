@@ -139,7 +139,7 @@ func (p *Provider) UpdateHold(ctx context.Context, h calendar.Hold) (calendar.Ho
 	}
 	patch := graphEvent{
 		Subject:           h.Subject,
-		ShowAs:            string(h.ShowAs),
+		ShowAs:            showAsToGraph(h.ShowAs),
 		ResponseRequested: true,
 		Attendees:         toGraphAttendees(h.Attendees),
 	}
@@ -148,6 +148,12 @@ func (p *Provider) UpdateHold(ctx context.Context, h calendar.Hold) (calendar.Ho
 		return calendar.Hold{}, err
 	}
 	return fromGraphEvent(ev), nil
+}
+
+// DeleteHold cancels the event and notifies its attendees. Graph sends
+// cancellations to attendees automatically on delete, so no send flag is needed.
+func (p *Provider) DeleteHold(ctx context.Context, id string) error {
+	return p.do(ctx, http.MethodDelete, "/me/events/"+url.PathEscape(id), nil, nil)
 }
 
 // do executes a Graph request, encoding in as JSON and decoding into out.

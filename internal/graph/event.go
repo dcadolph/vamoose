@@ -92,7 +92,7 @@ func (p *Provider) toGraphEvent(h calendar.Hold) graphEvent {
 	ev := graphEvent{
 		Subject:           h.Subject,
 		IsAllDay:          h.AllDay,
-		ShowAs:            string(h.ShowAs),
+		ShowAs:            showAsToGraph(h.ShowAs),
 		ResponseRequested: true,
 		Start:             &graphDateTime{DateTime: formatTime(h.Start, h.AllDay), TimeZone: p.timeZone},
 		End:               &graphDateTime{DateTime: formatTime(h.End, h.AllDay), TimeZone: p.timeZone},
@@ -113,7 +113,7 @@ func toGraphAttendees(in []calendar.Attendee) []graphAttendee {
 	for _, a := range in {
 		out = append(out, graphAttendee{
 			EmailAddress: graphEmailAddress{Address: a.Person.Email, Name: a.Person.Name},
-			Type:         string(a.Role),
+			Type:         roleToGraph(a.Role),
 		})
 	}
 	return out
@@ -134,7 +134,7 @@ func fromGraphEvent(ev graphEvent) calendar.Hold {
 		ID:      ev.ID,
 		Subject: ev.Subject,
 		AllDay:  ev.IsAllDay,
-		ShowAs:  calendar.ShowAs(ev.ShowAs),
+		ShowAs:  showAsFromGraph(ev.ShowAs),
 	}
 	if ev.Body != nil {
 		h.Body = ev.Body.Content
@@ -142,13 +142,75 @@ func fromGraphEvent(ev graphEvent) calendar.Hold {
 	for _, a := range ev.Attendees {
 		att := calendar.Attendee{
 			Person:   calendar.Person{Name: a.EmailAddress.Name, Email: a.EmailAddress.Address},
-			Role:     calendar.Role(a.Type),
+			Role:     roleFromGraph(a.Type),
 			Response: calendar.ResponseNone,
 		}
-		if a.Status != nil && a.Status.Response != "" {
-			att.Response = calendar.Response(a.Status.Response)
+		if a.Status != nil {
+			att.Response = responseFromGraph(a.Status.Response)
 		}
 		h.Attendees = append(h.Attendees, att)
 	}
 	return h
+}
+
+// roleToGraph maps a neutral attendee role to a Graph attendee type, defaulting
+// to required so an unset role never silently drops approval.
+func roleToGraph(r calendar.Role) string {
+	if r == calendar.RoleOptional {
+		return "optional"
+	}
+	return "required"
+}
+
+// roleFromGraph maps a Graph attendee type to a neutral attendee role.
+func roleFromGraph(t string) calendar.Role {
+	if t == "optional" {
+		return calendar.RoleOptional
+	}
+	return calendar.RoleRequired
+}
+
+// showAsToGraph maps a neutral free/busy status to a Graph showAs value.
+func showAsToGraph(s calendar.ShowAs) string {
+	switch s {
+	case calendar.ShowFree:
+		return "free"
+	case calendar.ShowTentative:
+		return "tentative"
+	case calendar.ShowOOF:
+		return "oof"
+	default:
+		return "busy"
+	}
+}
+
+// showAsFromGraph maps a Graph showAs value to a neutral free/busy status.
+func showAsFromGraph(s string) calendar.ShowAs {
+	switch s {
+	case "free":
+		return calendar.ShowFree
+	case "tentative":
+		return calendar.ShowTentative
+	case "oof":
+		return calendar.ShowOOF
+	default:
+		return calendar.ShowBusy
+	}
+}
+
+// responseFromGraph maps a Graph attendee response to a neutral response. The
+// organizer counts as accepted; unrecognized values map to no response.
+func responseFromGraph(s string) calendar.Response {
+	switch s {
+	case "notResponded":
+		return calendar.ResponseNotResponded
+	case "tentativelyAccepted":
+		return calendar.ResponseTentative
+	case "accepted", "organizer":
+		return calendar.ResponseAccepted
+	case "declined":
+		return calendar.ResponseDeclined
+	default:
+		return calendar.ResponseNone
+	}
 }

@@ -122,4 +122,6 @@ type Provider interface {
 	GetHold(ctx context.Context, id string) (Hold, error)
 	// UpdateHold patches an existing hold and sends updates to attendees.
 	UpdateHold(ctx context.Context, hold Hold) (Hold, error)
+	// DeleteHold cancels the hold and notifies its attendees.
+	DeleteHold(ctx context.Context, id string) error
 }
