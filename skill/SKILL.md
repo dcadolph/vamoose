@@ -4,7 +4,7 @@ description: >-
   Book time off without the busywork. Prompts for your dates and subject, creates
   a calendar hold shown as free, invites your manager to approve it, then fans the
   event out to your team as optional attendees once approved. Backs onto Microsoft
-  365, Outlook, and Teams via Microsoft Graph. Trigger when the user wants to
+  365, Outlook, and Teams via Microsoft Graph, or Google Calendar. Trigger when the user wants to
   request vacation, set an out-of-office hold, or route time off for manager
   approval.
 ---
@@ -72,5 +72,7 @@ calendar dates and read them back before running anything.
 - The hold is shown as free, so it never blocks anyone's calendar.
 - The manager is a required attendee; their acceptance is the approval.
 - Team members are added as optional attendees.
+- Two backends: `--provider graph` (default) or `--provider google`. Google has no
+  directory, so on Google pass `--manager` and set the team with `vamoose team set`.
 - Report command output plainly. On an error, surface the exact message rather
   than retrying blindly.

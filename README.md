@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/vamoose-logo.png" alt="vamoose" width="240">
+  <img src="assets/vamoose-banner.png" alt="vamoose" width="100%">
 </p>
 
 <h1 align="center">vamoose</h1>
@@ -8,11 +8,10 @@
 
 The moose does the paperwork. You go to the beach.
 
-> **Status: early work in progress. Not ready for use.**
-> The Microsoft Graph flow is written and unit-tested against a mock server, but
-> nothing has been run against a real Microsoft 365, Outlook, or Teams tenant.
-> Manager and team lookups, invite sending, and approval detection are unproven
-> live. Do not use this for real time-off requests yet.
+> **Status: v0.1.0, early.**
+> The whole flow runs live on Google Calendar: sign-in, request, manager approval,
+> team promote, quick actions, and the watch daemon. The Microsoft Graph path is
+> unit-tested but hasn't been run against a live Microsoft 365 tenant yet.
 
 Booking time off by hand is a chore: block the dates, ping your manager, wait for
 a nod, then re-send the event to the team so nobody schedules over you. vamoose
@@ -27,11 +26,13 @@ runs that whole loop from one command.
 3. `vamoose promote` adds your whole **team as optional attendees** and resends,
    so everyone sees you are out without their calendars getting blocked.
 
-The first backend is Microsoft Graph, which covers Outlook, Microsoft 365, and
-Teams calendars through one API. The provider is an interface, so Google Calendar
-and others can slot in behind the same three commands.
+Two backends ship behind one provider interface: Microsoft Graph (Outlook,
+Microsoft 365, and Teams) and Google Calendar. Pick one with `--provider` or the
+`VAMOOSE_PROVIDER` environment variable; the three commands work the same on both.
 
 ## Setup
+
+### Microsoft 365 / Outlook
 
 vamoose talks to Microsoft Graph as you, using the OAuth device-code flow.
 
@@ -54,6 +55,21 @@ The first command opens a device-code prompt. Tokens are cached under your user
 config directory and refreshed automatically after that. Run `vamoose whoami`
 first to confirm auth and directory access before creating any holds.
 
+### Google Calendar
+
+For `--provider google`, create an OAuth **desktop app** client in the Google Cloud
+console, enable the Google Calendar API, and export its credentials:
+
+```sh
+export VAMOOSE_PROVIDER=google
+export VAMOOSE_GOOGLE_CLIENT_ID=<oauth-desktop-client-id>
+export VAMOOSE_GOOGLE_CLIENT_SECRET=<oauth-desktop-client-secret>
+```
+
+The first command opens your browser for consent on a local loopback address, then
+caches and refreshes tokens after that. Google Calendar has no directory, so pass
+your approver with `--manager` and set your team with `vamoose team set`.
+
 ## Usage
 
 ```sh
@@ -63,19 +79,45 @@ vamoose whoami
 # Create the hold and invite your manager. Manager is resolved from the directory.
 vamoose request --start 2026-07-20 --end 2026-07-24 --subject "Out: beach week"
 
+# Or request time off from a plain-language phrase.
+vamoose off next week --subject "Out: beach week"
+
 # See whether your manager has approved.
 vamoose check
 
 # Once approved, fan out to the team as optional attendees.
 vamoose promote
 
+# Changed plans? Cancel the hold and notify everyone.
+vamoose cancel
+
 # Or let check promote the moment approval lands.
 vamoose check --promote
+
+# Hands-off: watch for approval and let the daemon auto-promote in the background.
+vamoose off next week --watch
+vamoose daemon
+
+# Run the daemon unattended (prints a launchd or systemd manifest to install).
+vamoose service
 ```
 
 Times accept `YYYY-MM-DD` for all-day holds or RFC3339 for partial days. Pass
 `--manager you@work.com` to skip directory lookup, or `--dry-run` on request to
-preview without sending.
+preview without sending. `off` also accepts explicit `--start`/`--end`.
+
+## Quick actions
+
+Not everything needs approval:
+
+```sh
+# Block yourself out of office over a range, no approval or fanout.
+vamoose away --start 2026-07-20 --end 2026-07-24
+
+# Create a quick event, optionally inviting others.
+vamoose event --start 2026-07-20T15:00:00Z --end 2026-07-20T15:30:00Z \
+  --subject "1:1" --attendees boss@work.com
+```
 
 ## Defining your team
 
@@ -93,15 +135,25 @@ The list is stored as JSON under your user config directory
 (`team.json`). When it is set, `promote` and `whoami` use it; when it is absent,
 they fall back to the directory.
 
+## Claude (MCP)
+
+`vamoose mcp` speaks the Model Context Protocol over stdio, exposing the commands as
+tools so Claude can book time off for you. Point an MCP client at the binary:
+
+```json
+{ "mcpServers": { "vamoose": { "command": "vamoose", "args": ["mcp"] } } }
+```
+
+Authenticate once first with `vamoose whoami`; the server reuses the cached token.
+
 ## Roadmap
 
 - Auto-promote via Graph change-notification webhooks instead of polling.
 - Store tokens in the OS keychain rather than a config file.
 - Set the scheduled out-of-office auto-reply for the vacation window.
-- Google Calendar provider behind the same interface.
 - Harden the CLI and auth with cobra and MSAL.
 
 ## Status
 
-Early. The Graph flow is wired end to end and unit tested; treat it as a working
-first slice, not a finished product.
+v0.1.0. Runs live on Google Calendar end to end. The Microsoft Graph path is
+unit-tested but hasn't hit a live tenant yet.
