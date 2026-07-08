@@ -8,6 +8,12 @@
 
 The moose does the paperwork. You go to the beach.
 
+> **Status: early work in progress. Not ready for use.**
+> The Microsoft Graph flow is written and unit-tested against a mock server, but
+> nothing has been run against a real Microsoft 365, Outlook, or Teams tenant.
+> Manager and team lookups, invite sending, and approval detection are unproven
+> live. Do not use this for real time-off requests yet.
+
 Booking time off by hand is a chore: block the dates, ping your manager, wait for
 a nod, then re-send the event to the team so nobody schedules over you. vamoose
 runs that whole loop from one command.
