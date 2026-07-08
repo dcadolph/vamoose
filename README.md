@@ -45,11 +45,15 @@ export VAMOOSE_TIMEZONE=America/Chicago
 ```
 
 The first command opens a device-code prompt. Tokens are cached under your user
-config directory and refreshed automatically after that.
+config directory and refreshed automatically after that. Run `vamoose whoami`
+first to confirm auth and directory access before creating any holds.
 
 ## Usage
 
 ```sh
+# Confirm auth and directory access work in your tenant.
+vamoose whoami
+
 # Create the hold and invite your manager. Manager is resolved from the directory.
 vamoose request --start 2026-07-20 --end 2026-07-24 --subject "Out: beach week"
 
@@ -66,6 +70,22 @@ vamoose check --promote
 Times accept `YYYY-MM-DD` for all-day holds or RFC3339 for partial days. Pass
 `--manager you@work.com` to skip directory lookup, or `--dry-run` on request to
 preview without sending.
+
+## Defining your team
+
+By default `promote` derives your team from the directory: your manager's direct
+reports, minus you. That assumption breaks if you are the manager, your team is a
+distribution list, or the directory is sparse. Set an explicit team instead:
+
+```sh
+vamoose team set alex@work.com jordan@work.com sam@work.com
+vamoose team list     # show the current team
+vamoose team clear    # revert to the directory
+```
+
+The list is stored as JSON under your user config directory
+(`team.json`). When it is set, `promote` and `whoami` use it; when it is absent,
+they fall back to the directory.
 
 ## Roadmap
 

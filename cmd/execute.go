@@ -24,6 +24,10 @@ func Execute(args []string) int {
 		return run(runCheck(ctx, rest))
 	case "promote":
 		return run(runPromote(ctx, rest))
+	case "whoami":
+		return run(runWhoami(ctx, rest))
+	case "team":
+		return run(runTeam(ctx, rest))
 	case "version", "-v", "--version":
 		fmt.Fprintln(os.Stdout, versionString())
 		return codeOK

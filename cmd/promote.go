@@ -42,7 +42,7 @@ func runPromote(ctx context.Context, args []string) error {
 
 // promoteHold adds the signed-in user's team as optional attendees and resends.
 func promoteHold(ctx context.Context, prov calendar.Provider, hold calendar.Hold) error {
-	team, err := prov.Team(ctx)
+	team, source, err := resolveTeam(ctx, prov)
 	if err != nil {
 		return fmt.Errorf("resolve team: %w", err)
 	}
@@ -70,6 +70,6 @@ func promoteHold(ctx context.Context, prov calendar.Provider, hold calendar.Hold
 	if _, err := prov.UpdateHold(ctx, hold); err != nil {
 		return fmt.Errorf("update hold: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, "Added %d team member(s) as optional. Everyone notified.\n", added)
+	fmt.Fprintf(os.Stdout, "Added %d team member(s) as optional from %s. Everyone notified.\n", added, source)
 	return nil
 }

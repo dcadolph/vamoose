@@ -27,6 +27,8 @@ Commands:
   request   Create a vacation hold and invite your manager to approve it.
   check     Show whether your manager has approved the hold.
   promote   Add your team as optional attendees once approved.
+  whoami    Print the signed-in user, manager, and resolved team.
+  team      Show or set your default team: team [list|set <email...>|clear].
   version   Print the vamoose version.
 
 Run "vamoose <command> -h" for command flags.
