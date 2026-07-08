@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -14,22 +15,23 @@ import (
 func runPromote(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("promote", flag.ContinueOnError)
 	var (
-		id     = fs.String("id", "", "Hold id; defaults to the most recent hold")
-		tzFlag = fs.String("tz", "", "IANA time zone")
-		force  = fs.Bool("force", false, "Promote even if the manager has not approved")
+		id       = fs.String("id", "", "Hold id; defaults to the most recent hold")
+		provider = fs.String("provider", "", "Calendar provider for an explicit --id; overrides VAMOOSE_PROVIDER")
+		tzFlag   = fs.String("tz", "", "IANA time zone")
+		force    = fs.Bool("force", false, "Promote even if the manager has not approved")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	holdID, err := resolveHoldID(*id)
+	ref, err := resolveHold(*id, *provider)
 	if err != nil {
 		return err
 	}
-	prov, err := newProvider(resolveTimeZone(*tzFlag))
+	prov, err := newProvider(ref.Provider, resolveTimeZone(*tzFlag))
 	if err != nil {
 		return err
 	}
-	hold, err := prov.GetHold(ctx, holdID)
+	hold, err := prov.GetHold(ctx, ref.ID)
 	if err != nil {
 		return fmt.Errorf("get hold: %w", err)
 	}
@@ -43,6 +45,9 @@ func runPromote(ctx context.Context, args []string) error {
 // promoteHold adds the signed-in user's team as optional attendees and resends.
 func promoteHold(ctx context.Context, prov calendar.Provider, hold calendar.Hold) error {
 	team, source, err := resolveTeam(ctx, prov)
+	if errors.Is(err, calendar.ErrNoDirectory) {
+		return fmt.Errorf("no directory for this provider; set your team with vamoose team set")
+	}
 	if err != nil {
 		return fmt.Errorf("resolve team: %w", err)
 	}

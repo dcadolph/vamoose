@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -14,13 +15,15 @@ import (
 func runRequest(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("request", flag.ContinueOnError)
 	var (
-		start   = fs.String("start", "", "Departure date/time, RFC3339 or YYYY-MM-DD (required)")
-		end     = fs.String("end", "", "Return date/time, RFC3339 or YYYY-MM-DD (required)")
-		subject = fs.String("subject", "", "Event subject (required)")
-		body    = fs.String("body", "", "Event description")
-		manager = fs.String("manager", "", "Manager email; resolved from the directory when empty")
-		tzFlag  = fs.String("tz", "", "IANA time zone for event times")
-		dryRun  = fs.Bool("dry-run", false, "Print what would be sent without calling the calendar")
+		start    = fs.String("start", "", "Departure date/time, RFC3339 or YYYY-MM-DD (required)")
+		end      = fs.String("end", "", "Return date/time, RFC3339 or YYYY-MM-DD (required)")
+		subject  = fs.String("subject", "", "Event subject (required)")
+		body     = fs.String("body", "", "Event description")
+		manager  = fs.String("manager", "", "Manager email; resolved from the directory when empty")
+		provider = fs.String("provider", "", "Calendar provider; overrides VAMOOSE_PROVIDER (default graph)")
+		tzFlag   = fs.String("tz", "", "IANA time zone for event times")
+		dryRun   = fs.Bool("dry-run", false, "Print what would be sent without calling the calendar")
+		watch    = fs.Bool("watch", false, "Add the hold to the daemon watch list for auto-promote on approval")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -29,31 +32,63 @@ func runRequest(ctx context.Context, args []string) error {
 		fs.Usage()
 		return fmt.Errorf("request: --start, --end, and --subject are required")
 	}
-
-	startAt, startAllDay, err := parseWhen(*start)
+	startAt, endAt, allDay, err := parseWindow(*start, *end)
 	if err != nil {
-		return fmt.Errorf("parse start: %w", err)
+		return fmt.Errorf("request: %w", err)
 	}
-	endAt, endAllDay, err := parseWhen(*end)
-	if err != nil {
-		return fmt.Errorf("parse end: %w", err)
-	}
-	allDay := startAllDay && endAllDay
-	if allDay {
-		endAt = endAt.AddDate(0, 0, 1) // Graph's all-day end is exclusive.
-	}
-	if !endAt.After(startAt) {
-		return fmt.Errorf("request: end must be after start")
-	}
+	return createHold(ctx, holdRequest{
+		Provider: *provider,
+		TZ:       *tzFlag,
+		Subject:  *subject,
+		Body:     *body,
+		Manager:  *manager,
+		Start:    startAt,
+		End:      endAt,
+		AllDay:   allDay,
+		DryRun:   *dryRun,
+		Watch:    *watch,
+	})
+}
 
-	prov, err := newProvider(resolveTimeZone(*tzFlag))
+// holdRequest describes a vacation hold to create and how to route it.
+type holdRequest struct {
+	// Provider is the selected calendar provider, empty for the default.
+	Provider string
+	// TZ is the IANA time zone flag value, empty for the configured default.
+	TZ string
+	// Subject is the event title.
+	Subject string
+	// Body is the event description.
+	Body string
+	// Manager is the approver email; resolved from the directory when empty.
+	Manager string
+	// Start is the departure time.
+	Start time.Time
+	// End is the return time, exclusive for all-day holds.
+	End time.Time
+	// AllDay marks a full-day hold.
+	AllDay bool
+	// DryRun prints the intended action without calling the calendar.
+	DryRun bool
+	// Watch adds the created hold to the daemon watch list.
+	Watch bool
+}
+
+// createHold resolves the manager, creates the hold shown as free, caches it,
+// and optionally enqueues it for the daemon to auto-promote.
+func createHold(ctx context.Context, req holdRequest) error {
+	providerName := resolveProvider(req.Provider)
+	prov, err := newProvider(providerName, resolveTimeZone(req.TZ))
 	if err != nil {
 		return err
 	}
 
-	mgr := calendar.Person{Email: *manager}
+	mgr := calendar.Person{Email: req.Manager}
 	if mgr.Email == "" {
 		resolved, merr := prov.Manager(ctx)
+		if errors.Is(merr, calendar.ErrNoManager) {
+			return fmt.Errorf("no manager in the directory; pass --manager")
+		}
 		if merr != nil {
 			return fmt.Errorf("resolve manager: %w", merr)
 		}
@@ -61,20 +96,20 @@ func runRequest(ctx context.Context, args []string) error {
 	}
 
 	hold := calendar.Hold{
-		Subject: *subject,
-		Body:    *body,
-		Start:   startAt,
-		End:     endAt,
-		AllDay:  allDay,
+		Subject: req.Subject,
+		Body:    req.Body,
+		Start:   req.Start,
+		End:     req.End,
+		AllDay:  req.AllDay,
 		ShowAs:  calendar.ShowFree,
 		Attendees: []calendar.Attendee{
 			{Person: mgr, Role: calendar.RoleRequired},
 		},
 	}
 
-	if *dryRun {
+	if req.DryRun {
 		fmt.Fprintf(os.Stdout, "would create hold %q %s -> %s, inviting %s\n",
-			hold.Subject, startAt.Format(time.RFC3339), endAt.Format(time.RFC3339), mgr.Email)
+			hold.Subject, req.Start.Format(time.RFC3339), req.End.Format(time.RFC3339), mgr.Email)
 		return nil
 	}
 
@@ -82,22 +117,16 @@ func runRequest(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("create hold: %w", err)
 	}
-	if err := saveState(state{LastHoldID: created.ID}); err != nil {
+	if err := saveState(state{LastHold: holdRef{Provider: providerName, ID: created.ID}}); err != nil {
 		return fmt.Errorf("save state: %w", err)
 	}
 	fmt.Fprintf(os.Stdout, "Hold created and sent to %s for approval.\nHold id: %s\nCheck status with: vamoose check\n",
 		mgr.Email, created.ID)
+	if req.Watch {
+		if err := addWatch(watchItem{Provider: providerName, HoldID: created.ID, AutoPromote: true, Subject: created.Subject}); err != nil {
+			return fmt.Errorf("add watch: %w", err)
+		}
+		fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to auto-promote when approved.")
+	}
 	return nil
-}
-
-// parseWhen parses an RFC3339 timestamp or a YYYY-MM-DD date. A bare date is
-// treated as all-day and returns true.
-func parseWhen(s string) (time.Time, bool, error) {
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, false, nil
-	}
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return t, true, nil
-	}
-	return time.Time{}, false, fmt.Errorf("unrecognized time %q", s)
 }

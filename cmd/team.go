@@ -160,7 +160,7 @@ func runTeamList(ctx context.Context) error {
 		}
 		return nil
 	}
-	prov, err := newProvider(resolveTimeZone(""))
+	prov, err := newProvider(resolveProvider(""), resolveTimeZone(""))
 	if err != nil {
 		return err
 	}

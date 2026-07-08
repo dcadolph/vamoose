@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 
@@ -11,8 +12,16 @@ import (
 
 // runWhoami prints the signed-in user, their manager, and the resolved team.
 // It is the fastest way to confirm auth and directory access work in a tenant.
-func runWhoami(ctx context.Context, _ []string) error {
-	prov, err := newProvider(resolveTimeZone(""))
+func runWhoami(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("whoami", flag.ContinueOnError)
+	var (
+		provider = fs.String("provider", "", "Calendar provider; overrides VAMOOSE_PROVIDER (default graph)")
+		tzFlag   = fs.String("tz", "", "IANA time zone")
+	)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	prov, err := newProvider(resolveProvider(*provider), resolveTimeZone(*tzFlag))
 	if err != nil {
 		return err
 	}
@@ -34,7 +43,11 @@ func runWhoami(ctx context.Context, _ []string) error {
 	}
 
 	team, source, err := resolveTeam(ctx, prov)
-	if err != nil {
+	switch {
+	case errors.Is(err, calendar.ErrNoDirectory):
+		fmt.Fprintln(os.Stdout, "team:    no directory for this provider; set one with vamoose team set")
+		return nil
+	case err != nil:
 		return fmt.Errorf("resolve team: %w", err)
 	}
 	fmt.Fprintf(os.Stdout, "team:    %d (%s)\n", len(team), source)
