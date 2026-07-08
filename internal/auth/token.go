@@ -41,13 +41,18 @@ type FileStore struct {
 	path string
 }
 
-// NewFileStore returns a FileStore at the default vamoose config path.
-func NewFileStore() (*FileStore, error) {
+// NewFileStore returns a FileStore for the given provider name under the user
+// config directory. An empty name uses the shared default token file.
+func NewFileStore(name string) (*FileStore, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
 	}
-	return &FileStore{path: filepath.Join(dir, "vamoose", "token.json")}, nil
+	file := "token.json"
+	if name != "" {
+		file = "token-" + name + ".json"
+	}
+	return &FileStore{path: filepath.Join(dir, "vamoose", file)}, nil
 }
 
 // Load reads the token file. A missing file yields a zero Token and no error.
