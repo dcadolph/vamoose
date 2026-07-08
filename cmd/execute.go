@@ -20,10 +20,24 @@ func Execute(args []string) int {
 	switch sub {
 	case "request":
 		return run(runRequest(ctx, rest))
+	case "off":
+		return run(runOff(ctx, rest))
 	case "check":
 		return run(runCheck(ctx, rest))
 	case "promote":
 		return run(runPromote(ctx, rest))
+	case "cancel":
+		return run(runCancel(ctx, rest))
+	case "away":
+		return run(runAway(ctx, rest))
+	case "event":
+		return run(runEvent(ctx, rest))
+	case "daemon":
+		return run(runDaemon(ctx, rest))
+	case "service":
+		return run(runService(ctx, rest))
+	case "mcp":
+		return run(runMCP(ctx, rest))
 	case "whoami":
 		return run(runWhoami(ctx, rest))
 	case "team":
