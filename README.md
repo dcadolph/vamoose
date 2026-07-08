@@ -1,6 +1,12 @@
-# vamoose
+<p align="center">
+  <img src="assets/vamoose-logo.png" alt="vamoose" width="240">
+</p>
 
-Vacation holds, minus the tedium.
+<h1 align="center">vamoose</h1>
+
+<p align="center">Vacation holds, minus the tedium.</p>
+
+The moose does the paperwork. You go to the beach.
 
 Booking time off by hand is a chore: block the dates, ping your manager, wait for
 a nod, then re-send the event to the team so nobody schedules over you. vamoose
