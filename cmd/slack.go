@@ -63,6 +63,13 @@ func runSlack(ctx context.Context, args []string) error {
 		if id, sec := os.Getenv("VAMOOSE_GOOGLE_CLIENT_ID"), os.Getenv("VAMOOSE_GOOGLE_CLIENT_SECRET"); id != "" && sec != "" {
 			linkers = append(linkers, newGoogleLinker(id, sec))
 		}
+		if id, sec := os.Getenv("VAMOOSE_CLIENT_ID"), os.Getenv("VAMOOSE_GRAPH_CLIENT_SECRET"); id != "" && sec != "" {
+			tenant := os.Getenv("VAMOOSE_TENANT")
+			if tenant == "" {
+				tenant = "organizations"
+			}
+			linkers = append(linkers, newGraphLinker(tenant, id, sec))
+		}
 		if len(linkers) == 0 {
 			return fmt.Errorf("per-user mode needs a provider configured, for example VAMOOSE_GOOGLE_CLIENT_ID and VAMOOSE_GOOGLE_CLIENT_SECRET")
 		}

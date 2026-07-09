@@ -40,6 +40,11 @@ type Authenticator struct {
 	client *http.Client
 	// prompt receives human-readable device-code instructions.
 	prompt io.Writer
+	// clientSecret is the confidential-client secret, set to enable the server-side
+	// web authorization-code flow.
+	clientSecret string
+	// host is the identity platform base URL, overridable for tests.
+	host string
 }
 
 // Option configures an Authenticator.
@@ -53,6 +58,15 @@ func WithPrompt(w io.Writer) Option { return func(a *Authenticator) { a.prompt =
 
 // WithScopes overrides the default delegated scopes.
 func WithScopes(scopes ...string) Option { return func(a *Authenticator) { a.scopes = scopes } }
+
+// WithClientSecret sets the confidential-client secret, enabling the server-side
+// web authorization-code flow used by WebAuthCodeURL and ExchangeCode.
+func WithClientSecret(secret string) Option {
+	return func(a *Authenticator) { a.clientSecret = secret }
+}
+
+// WithBaseURL overrides the identity platform base URL, for tests.
+func WithBaseURL(u string) Option { return func(a *Authenticator) { a.host = u } }
 
 // NewAuthenticator returns an Authenticator for the given tenant and client id.
 // It panics if tenant, clientID, or store is missing, signaling developer error.
@@ -70,6 +84,7 @@ func NewAuthenticator(tenant, clientID string, store TokenStore, opts ...Option)
 		store:    store,
 		client:   &http.Client{Timeout: 30 * time.Second},
 		prompt:   io.Discard,
+		host:     authHost,
 	}
 	for _, o := range opts {
 		o(a)
@@ -206,6 +221,9 @@ func (a *Authenticator) refresh(ctx context.Context, refreshToken string) (Token
 		"refresh_token": {refreshToken},
 		"scope":         {strings.Join(a.scopes, " ")},
 	}
+	if a.clientSecret != "" {
+		form.Set("client_secret", a.clientSecret)
+	}
 	var tr tokenResponse
 	if err := a.postForm(ctx, a.tokenEndpoint(), form, &tr); err != nil {
 		return Token{}, err
@@ -218,6 +236,48 @@ func (a *Authenticator) refresh(ctx context.Context, refreshToken string) (Token
 		t.RefreshToken = refreshToken
 	}
 	return t, nil
+}
+
+// WebAuthCodeURL builds the authorization-code consent URL for a server-side web
+// flow. offline_access is among the default scopes, so the exchange returns a
+// refresh token. state carries the caller's anti-forgery and routing value.
+func (a *Authenticator) WebAuthCodeURL(redirectURI, state string) string {
+	q := url.Values{
+		"client_id":     {a.clientID},
+		"response_type": {"code"},
+		"redirect_uri":  {redirectURI},
+		"response_mode": {"query"},
+		"scope":         {strings.Join(a.scopes, " ")},
+		"state":         {state},
+	}
+	return a.authorizeEndpoint() + "?" + q.Encode()
+}
+
+// ExchangeCode trades a web-flow authorization code for tokens using the
+// confidential client secret. redirectURI must match the one used to obtain the code.
+func (a *Authenticator) ExchangeCode(ctx context.Context, code, redirectURI string) (Token, error) {
+	form := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {a.clientID},
+		"client_secret": {a.clientSecret},
+		"code":          {code},
+		"redirect_uri":  {redirectURI},
+		"scope":         {strings.Join(a.scopes, " ")},
+	}
+	var tr tokenResponse
+	if err := a.postForm(ctx, a.tokenEndpoint(), form, &tr); err != nil {
+		return Token{}, err
+	}
+	if tr.Error != "" {
+		return Token{}, fmt.Errorf("%w: %s: %s", ErrToken, tr.Error, tr.ErrorDescription)
+	}
+	return tokenFrom(tr), nil
+}
+
+// Refresh exchanges a refresh token for a fresh access token, including the client
+// secret when set. The Slack server uses it to run a command as a linked user.
+func (a *Authenticator) Refresh(ctx context.Context, refreshToken string) (Token, error) {
+	return a.refresh(ctx, refreshToken)
 }
 
 // postForm posts a URL-encoded form and decodes the JSON response into out.
@@ -241,12 +301,17 @@ func (a *Authenticator) postForm(ctx context.Context, endpoint string, form url.
 
 // tokenEndpoint is the tenant's OAuth token URL.
 func (a *Authenticator) tokenEndpoint() string {
-	return fmt.Sprintf("%s/%s/oauth2/v2.0/token", authHost, a.tenant)
+	return fmt.Sprintf("%s/%s/oauth2/v2.0/token", a.host, a.tenant)
 }
 
 // deviceEndpoint is the tenant's device authorization URL.
 func (a *Authenticator) deviceEndpoint() string {
-	return fmt.Sprintf("%s/%s/oauth2/v2.0/devicecode", authHost, a.tenant)
+	return fmt.Sprintf("%s/%s/oauth2/v2.0/devicecode", a.host, a.tenant)
+}
+
+// authorizeEndpoint is the tenant's OAuth authorization URL.
+func (a *Authenticator) authorizeEndpoint() string {
+	return fmt.Sprintf("%s/%s/oauth2/v2.0/authorize", a.host, a.tenant)
 }
 
 // tokenFrom builds a Token from a token response, stamping the expiry.

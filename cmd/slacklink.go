@@ -61,3 +61,45 @@ func (l *googleLinker) RunEnv(ctx context.Context, link slack.UserLink) ([]strin
 		"VAMOOSE_GOOGLE_ACCESS_TOKEN=" + tok.AccessToken,
 	}, nil
 }
+
+// graphLinker links a Slack user's Microsoft 365 calendar through a server-side web
+// OAuth flow and mints a fresh access token for each command that user runs.
+type graphLinker struct {
+	// auth drives the Graph web OAuth flow and token refresh.
+	auth *auth.Authenticator
+}
+
+// newGraphLinker builds a Graph linker from a confidential web-client registration.
+func newGraphLinker(tenant, clientID, clientSecret string) *graphLinker {
+	return &graphLinker{auth: auth.NewAuthenticator(tenant, clientID, noopTokenStore{}, auth.WithClientSecret(clientSecret))}
+}
+
+// Provider returns the calendar provider name.
+func (l *graphLinker) Provider() string { return defaultProvider }
+
+// AuthURL returns the Microsoft consent URL for the web flow.
+func (l *graphLinker) AuthURL(state, redirectURI string) string {
+	return l.auth.WebAuthCodeURL(redirectURI, state)
+}
+
+// Exchange trades the callback code for a link holding the user's refresh token.
+func (l *graphLinker) Exchange(ctx context.Context, code, redirectURI string) (slack.UserLink, error) {
+	tok, err := l.auth.ExchangeCode(ctx, code, redirectURI)
+	if err != nil {
+		return slack.UserLink{}, err
+	}
+	return slack.UserLink{Provider: defaultProvider, RefreshToken: tok.RefreshToken}, nil
+}
+
+// RunEnv refreshes the user's access token and returns the environment that runs a
+// vamoose subcommand as that Microsoft 365 user.
+func (l *graphLinker) RunEnv(ctx context.Context, link slack.UserLink) ([]string, error) {
+	tok, err := l.auth.Refresh(ctx, link.RefreshToken)
+	if err != nil {
+		return nil, err
+	}
+	return []string{
+		"VAMOOSE_PROVIDER=" + defaultProvider,
+		"VAMOOSE_GRAPH_ACCESS_TOKEN=" + tok.AccessToken,
+	}, nil
+}
