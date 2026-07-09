@@ -20,6 +20,8 @@ wait for a nod, then re-send the event to the team so nobody schedules over you.
 vamoose turns those chores into **workflows** it runs for you and advances in the
 background. Time off is the flagship workflow, and you can define your own.
 
+<p align="center"><img src="assets/vamoose-demo.gif" alt="vamoose demo" width="100%"></p>
+
 ## How it works
 
 1. `vamoose request` creates a calendar event over your dates, shown as **free**
@@ -201,6 +203,14 @@ tools so Claude can book time off for you. Point an MCP client at the binary:
 ```
 
 Authenticate once first with `vamoose whoami`; the server reuses the cached token.
+
+## Docs
+
+- [Command reference](cmd/README.md): every command and its flags.
+- [Workflows](docs/workflows.md): built-in and custom workflows.
+- [Providers](docs/providers.md): Microsoft Graph and Google Calendar setup.
+- [Claude](docs/claude.md): the MCP server and the skill.
+- [Architecture](docs/architecture.md): surfaces, core, and adapters.
 
 ## Roadmap
 

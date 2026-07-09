@@ -1,0 +1,21 @@
+<p align="center"><img src="../assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
+
+# Architecture
+
+vamoose is built in layers with hard boundaries.
+
+## Surfaces
+
+Thin clients with no business logic: the CLI, the MCP server (`vamoose mcp`), and the Claude skill. A surface parses input and calls the core.
+
+## Core
+
+The request lifecycle, the workflow engine, and state. `internal/workflow` holds the workflow model, validation, and built-in templates. The command layer runs a workflow's steps, and the daemon advances a watched run when the manager responds. All logic lives here.
+
+## Adapters
+
+Calendar backends behind one `Provider` interface in `internal/calendar`: Microsoft Graph and Google Calendar, each mapping its own values to a neutral model at the boundary. A registry selects one by name, so a new backend is one package and one registration.
+
+## Zero dependency
+
+vamoose uses only the Go standard library. Workflows are JSON, the daemon logs with the standard `log` package, and the MCP server speaks JSON-RPC by hand. Adding a third-party dependency is a deliberate decision, not a default.
