@@ -4,7 +4,7 @@
 
 <h1 align="center">vamoose</h1>
 
-<p align="center">Vacation holds, minus the tedium.</p>
+<p align="center">Time off, minus the tedium.</p>
 
 The moose does the paperwork. You go to the beach.
 

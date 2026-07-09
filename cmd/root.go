@@ -12,7 +12,7 @@ const moose = `
           ( o  o )
            \  --  /          V A M O O S E
            /|    |\
-          ( |    | )         vacation holds, minus the tedium
+          ( |    | )         time off, minus the tedium
             \\  //
              ""  ""
 `
