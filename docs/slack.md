@@ -37,6 +37,20 @@ cloudflared tunnel --url http://localhost:8080
 # or: ngrok http 8080
 ```
 
+## Distributable install (Add to Slack)
+
+To let any workspace add vamoose, set the app's OAuth credentials and a public URL:
+
+```sh
+export VAMOOSE_SLACK_CLIENT_ID=<client-id>
+export VAMOOSE_SLACK_CLIENT_SECRET=<client-secret>
+export VAMOOSE_SLACK_PUBLIC_URL=https://<your-host>
+```
+
+In the Slack app under **OAuth & Permissions**, set the redirect URL to `https://<your-host>/slack/oauth/callback` and the bot scopes to `commands` and `chat:write`. Then point people at `https://<your-host>/slack/install`, or an "Add to Slack" button linking there. Each install stores that workspace's bot token.
+
+Without these variables, the server runs single-workspace as above.
+
 ## Scope
 
-The server drives one backend account, so v1 is your personal bridge. Per-user calendars, an "Add to Slack" install flow, and hosting are the later multi-tenant phase.
+The install flow makes vamoose installable to any workspace, but the server still drives one backend account, so for now every workspace shares that calendar. Per-user calendar linking, where each Slack user connects their own calendar, is the next multi-tenant step, along with hosting.

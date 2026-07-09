@@ -53,6 +53,18 @@ type Server struct {
 	maxSkew time.Duration
 	// runTimeout bounds a single subcommand run.
 	runTimeout time.Duration
+	// clientID and clientSecret are the Slack app OAuth credentials, set to enable
+	// the "Add to Slack" install flow.
+	clientID     string
+	clientSecret string
+	// publicURL is the server's public base URL, used to build the OAuth redirect.
+	publicURL string
+	// tokens stores per-workspace bot tokens from installs.
+	tokens TokenStore
+	// oauthBaseURL is the Slack API root for OAuth, overridable in tests.
+	oauthBaseURL string
+	// states holds short-lived OAuth CSRF state tokens.
+	states *stateStore
 }
 
 // Option configures a Server.
@@ -80,12 +92,28 @@ func NewServer(signingSecret string, run Runner, opts ...Option) *Server {
 		now:           time.Now,
 		maxSkew:       5 * time.Minute,
 		runTimeout:    60 * time.Second,
+		oauthBaseURL:  "https://slack.com/api",
 	}
 	for _, o := range opts {
 		o(s)
 	}
+	s.states = newStateStore(s.now)
 	return s
 }
+
+// WithOAuth enables the "Add to Slack" install flow with the app credentials, the
+// server's public base URL, and a store for per-workspace bot tokens.
+func WithOAuth(clientID, clientSecret, publicURL string, store TokenStore) Option {
+	return func(s *Server) {
+		s.clientID = clientID
+		s.clientSecret = clientSecret
+		s.publicURL = publicURL
+		s.tokens = store
+	}
+}
+
+// WithOAuthBaseURL overrides the Slack OAuth API root, for tests.
+func WithOAuthBaseURL(u string) Option { return func(s *Server) { s.oauthBaseURL = u } }
 
 // Handler returns the HTTP handler serving the Slack endpoints.
 func (s *Server) Handler() http.Handler {
@@ -96,6 +124,10 @@ func (s *Server) Handler() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "ok")
 	})
+	if s.clientID != "" {
+		mux.HandleFunc("GET /slack/install", s.handleInstall)
+		mux.HandleFunc("GET /slack/oauth/callback", s.handleOAuthCallback)
+	}
 	return mux
 }
 

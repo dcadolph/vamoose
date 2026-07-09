@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -35,9 +36,19 @@ func runSlack(ctx context.Context, args []string) error {
 		out, err := exec.CommandContext(ctx, exe, args...).CombinedOutput()
 		return string(out), err
 	}
-	srv := slack.NewServer(secret, runner)
-
 	logger := log.New(os.Stderr, "vamoose slack: ", log.LstdFlags)
+
+	var opts []slack.Option
+	if id, sec, pub := os.Getenv("VAMOOSE_SLACK_CLIENT_ID"), os.Getenv("VAMOOSE_SLACK_CLIENT_SECRET"), os.Getenv("VAMOOSE_SLACK_PUBLIC_URL"); id != "" && sec != "" && pub != "" {
+		store, serr := slackTokenStore()
+		if serr != nil {
+			return fmt.Errorf("slack token store: %w", serr)
+		}
+		opts = append(opts, slack.WithOAuth(id, sec, pub, store))
+		logger.Printf("install flow enabled: %s/slack/install", pub)
+	}
+	srv := slack.NewServer(secret, runner, opts...)
+
 	httpSrv := &http.Server{Addr: *addr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
@@ -55,4 +66,14 @@ func runSlack(ctx context.Context, args []string) error {
 	}
 	logger.Println("stopped")
 	return nil
+}
+
+// slackTokenStore returns a file-backed store for per-workspace bot tokens under the
+// user config directory.
+func slackTokenStore() (*slack.FileStore, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	return slack.NewFileStore(filepath.Join(dir, "vamoose", "slack-tokens.json")), nil
 }
