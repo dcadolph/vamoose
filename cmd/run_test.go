@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -172,6 +174,46 @@ func TestRunWorkflowDryRun(t *testing.T) {
 	}
 	if s, _ := loadState(); s.LastHold.ID != "" {
 		t.Error("dry run wrote state")
+	}
+}
+
+// TestStartedMessage confirms the created-hold summary reads by action, not by the
+// workflow name, and names the approver for an approval workflow.
+func TestStartedMessage(t *testing.T) {
+	t.Parallel()
+	held := calendar.Hold{ID: "e1", Attendees: []calendar.Attendee{
+		{Person: calendar.Person{Email: "boss@x.com"}, Role: calendar.RoleRequired},
+	}}
+	tests := []struct {
+		Name         string
+		Workflow     workflow.Workflow
+		Hold         calendar.Hold
+		WantContains string
+	}{{ // Test 0: pto names the approver.
+		Name: "pto", Workflow: loadTestWorkflow(t, "pto"), Hold: held,
+		WantContains: "sent to boss@x.com for approval",
+	}, { // Test 1: notify-only just reports the hold.
+		Name: "notify-only", Workflow: loadTestWorkflow(t, "notify-only"), Hold: held,
+		WantContains: "Hold created. Hold id: e1",
+	}, { // Test 2: away reads as out of office.
+		Name: "away", Workflow: loadTestWorkflow(t, "away"), Hold: calendar.Hold{ID: "e2"},
+		WantContains: "Marked out of office",
+	}, { // Test 3: an event workflow reads as an event.
+		Name:     "event",
+		Workflow: workflow.Workflow{Name: "ev", Steps: []workflow.Step{{Verb: workflow.VerbEvent}}},
+		Hold:     calendar.Hold{ID: "e3"}, WantContains: "Event created. Id: e3",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			got := startedMessage(test.Workflow, test.Hold)
+			if strings.Contains(got, "pto") || strings.Contains(got, "Started") {
+				t.Errorf("%s: message leaks workflow name or 'Started': %q", test.Name, got)
+			}
+			if !strings.Contains(got, test.WantContains) {
+				t.Errorf("%s: message = %q, want it to contain %q", test.Name, got, test.WantContains)
+			}
+		})
 	}
 }
 

@@ -160,7 +160,7 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	if err := saveState(state{LastHold: holdRef{Provider: providerName, ID: created.ID}}); err != nil {
 		return fmt.Errorf("save state: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, "Started %q. Hold id: %s\n", wf.Name, created.ID)
+	fmt.Fprintln(os.Stdout, startedMessage(wf, created))
 
 	return runSteps(ctx, prov, providerName, wf, 1, created, opt.Watch)
 }
@@ -233,6 +233,24 @@ func defaultSubject(wf workflow.Workflow) string {
 		return ""
 	}
 	return "Out of office"
+}
+
+// startedMessage summarizes a created hold by the action its workflow took, so the
+// line reads naturally whether the user ran a workflow by name or through request,
+// off, or away.
+func startedMessage(wf workflow.Workflow, hold calendar.Hold) string {
+	switch wf.Steps[0].Verb {
+	case workflow.VerbAway:
+		return fmt.Sprintf("Marked out of office. Hold id: %s", hold.ID)
+	case workflow.VerbEvent:
+		return fmt.Sprintf("Event created. Id: %s", hold.ID)
+	default:
+		if wf.Has(workflow.VerbApprove) {
+			return fmt.Sprintf("Hold created and sent to %s for approval. Hold id: %s",
+				managerAttendee(hold).Person.Email, hold.ID)
+		}
+		return fmt.Sprintf("Hold created. Hold id: %s", hold.ID)
+	}
 }
 
 // previewWorkflow prints the plan a dry run would carry out.
