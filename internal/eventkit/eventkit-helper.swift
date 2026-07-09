@@ -2,10 +2,12 @@
 // EventKit. iCloud does not report attendee accept/decline over CalDAV, but the
 // Apple-synced local copy does, so this recovers approval detection on a Mac.
 //
-// Build:  swiftc -O internal/eventkit/eventkit-helper.swift -o vamoose-eventkit
+// Build:  make eventkit   (embeds Info.plist so macOS shows the access prompt)
 // Usage:  vamoose-eventkit status <ical-uid>   ->  JSON on stdout
 //
-// The first run prompts for calendar access. Grant it once.
+// The first run prompts for calendar access. Grant it once. The embedded
+// Info.plist carries NSCalendarsFullAccessUsageDescription; without it macOS 14+
+// denies calendar access without prompting.
 import EventKit
 import Foundation
 
