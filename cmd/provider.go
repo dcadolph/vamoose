@@ -62,7 +62,7 @@ func newGraphProvider(s calendar.Settings) (calendar.Provider, error) {
 	if tenant == "" {
 		tenant = "organizations"
 	}
-	store, err := auth.NewFileStore(defaultProvider)
+	store, err := auth.NewStore(defaultProvider)
 	if err != nil {
 		return nil, fmt.Errorf("token store: %w", err)
 	}
@@ -87,7 +87,7 @@ func newGoogleProvider(s calendar.Settings) (calendar.Provider, error) {
 	if clientSecret == "" {
 		return nil, fmt.Errorf("VAMOOSE_GOOGLE_CLIENT_SECRET not set: export the OAuth desktop client secret")
 	}
-	store, err := auth.NewFileStore(providerGoogle)
+	store, err := auth.NewStore(providerGoogle)
 	if err != nil {
 		return nil, fmt.Errorf("token store: %w", err)
 	}

@@ -18,4 +18,4 @@ Calendar backends behind one `Provider` interface in `internal/calendar`: Micros
 
 ## Dependencies
 
-vamoose is standard-library only, with one exception: the CalDAV backend uses `emersion/go-webdav` and `emersion/go-ical`, because hand-rolling iCalendar against iCloud is error-prone. Everything else stays stdlib. Workflows are JSON, the daemon logs with the standard `log` package, and the MCP server speaks JSON-RPC by hand. Adding a dependency is a deliberate decision, not a default.
+vamoose is standard-library only, with two exceptions: the CalDAV backend uses `emersion/go-webdav` and `emersion/go-ical` (hand-rolling iCalendar against iCloud is error-prone), and token storage uses `zalando/go-keyring` for the OS keychain (falling back to a config file where the keychain is unavailable). Everything else stays stdlib. Workflows are JSON, the daemon logs with the standard `log` package, and the MCP server speaks JSON-RPC by hand. Adding a dependency is a deliberate decision, not a default.
