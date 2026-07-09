@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,8 +33,10 @@ func runSlack(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolve executable: %w", err)
 	}
-	runner := func(ctx context.Context, args []string) (string, error) {
-		out, err := exec.CommandContext(ctx, exe, args...).CombinedOutput()
+	runner := func(ctx context.Context, args, env []string) (string, error) {
+		cmd := exec.CommandContext(ctx, exe, args...)
+		cmd.Env = mergeEnv(os.Environ(), env)
+		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}
 	logger := log.New(os.Stderr, "vamoose slack: ", log.LstdFlags)
@@ -76,4 +79,38 @@ func slackTokenStore() (*slack.FileStore, error) {
 		return nil, err
 	}
 	return slack.NewFileStore(filepath.Join(dir, "vamoose", "slack-tokens.json")), nil
+}
+
+// perUserEnvKeys are the environment variables the Slack server injects per user.
+// They are stripped from the inherited environment so the injected values win, since
+// duplicate keys are resolved inconsistently across platforms.
+var perUserEnvKeys = []string{
+	"VAMOOSE_PROVIDER",
+	"VAMOOSE_GOOGLE_ACCESS_TOKEN",
+	"VAMOOSE_GRAPH_ACCESS_TOKEN",
+	"VAMOOSE_ICLOUD_USERNAME",
+	"VAMOOSE_ICLOUD_APP_PASSWORD",
+	"VAMOOSE_ICLOUD_CALENDAR",
+}
+
+// mergeEnv returns base with any per-user keys removed, followed by inject, so the
+// injected per-user credentials take effect regardless of the server's environment.
+func mergeEnv(base, inject []string) []string {
+	if len(inject) == 0 {
+		return base
+	}
+	out := make([]string, 0, len(base)+len(inject))
+	for _, kv := range base {
+		drop := false
+		for _, key := range perUserEnvKeys {
+			if strings.HasPrefix(kv, key+"=") {
+				drop = true
+				break
+			}
+		}
+		if !drop {
+			out = append(out, kv)
+		}
+	}
+	return append(out, inject...)
 }

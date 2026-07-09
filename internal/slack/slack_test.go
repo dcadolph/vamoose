@@ -24,7 +24,7 @@ func sign(secret, ts string, body []byte) string {
 }
 
 // noopRunner is a Runner that returns nothing, for building a Server in tests.
-func noopRunner(context.Context, []string) (string, error) { return "", nil }
+func noopRunner(context.Context, []string, []string) (string, error) { return "", nil }
 
 // captureServer returns a test server that sends each posted body to the channel.
 func captureServer(t *testing.T) (*httptest.Server, <-chan []byte) {
@@ -137,11 +137,11 @@ func TestHoldID(t *testing.T) {
 func TestApprovalButtons(t *testing.T) {
 	t.Parallel()
 	srv, ch := captureServer(t)
-	runner := func(context.Context, []string) (string, error) {
+	runner := func(context.Context, []string, []string) (string, error) {
 		return "Hold created and sent to boss@x.com for approval.\nHold id: EVT1", nil
 	}
 	s := NewServer("shh", runner)
-	s.runCommand(srv.URL, []string{"off", "next", "week"})
+	s.runCommand(srv.URL, []string{"off", "next", "week"}, nil)
 	body := <-ch
 	if !bytes.Contains(body, []byte(`"value":"EVT1"`)) {
 		t.Errorf("button value EVT1 missing: %s", body)
@@ -170,7 +170,7 @@ func TestActionRuns(t *testing.T) {
 			t.Parallel()
 			srv, ch := captureServer(t)
 			var gotArgs []string
-			runner := func(_ context.Context, args []string) (string, error) {
+			runner := func(_ context.Context, args, _ []string) (string, error) {
 				gotArgs = args
 				return "done", nil
 			}
@@ -203,7 +203,7 @@ func TestActionError(t *testing.T) {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
 			t.Parallel()
 			srv, ch := captureServer(t)
-			runner := func(context.Context, []string) (string, error) {
+			runner := func(context.Context, []string, []string) (string, error) {
 				return "boom", fmt.Errorf("exit status 1")
 			}
 			s := NewServer("shh", runner)

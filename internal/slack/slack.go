@@ -14,11 +14,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -36,8 +38,10 @@ const (
 // holdIDRe extracts a hold id from vamoose command output.
 var holdIDRe = regexp.MustCompile(`(?i)hold id:\s*(\S+)`)
 
-// Runner executes a vamoose subcommand and returns its combined output.
-type Runner func(ctx context.Context, args []string) (string, error)
+// Runner executes a vamoose subcommand with extra environment and returns its
+// combined output. env carries the per-user credentials the server injects so a
+// command runs as the invoking Slack user; it is nil in single-tenant mode.
+type Runner func(ctx context.Context, args, env []string) (string, error)
 
 // Server serves the vamoose Slack endpoints: slash commands and interactivity.
 type Server struct {
@@ -65,6 +69,13 @@ type Server struct {
 	oauthBaseURL string
 	// states holds short-lived OAuth CSRF state tokens.
 	states *stateStore
+	// links stores each Slack user's linked calendar. When set, the server runs in
+	// per-user mode: commands run as the invoking user's own calendar.
+	links UserLinkStore
+	// linkers maps a provider name to its per-user linker.
+	linkers map[string]Linker
+	// linkStates holds pending per-user OAuth links across the redirect.
+	linkStates *linkStateStore
 }
 
 // Option configures a Server.
@@ -98,7 +109,21 @@ func NewServer(signingSecret string, run Runner, opts ...Option) *Server {
 		o(s)
 	}
 	s.states = newStateStore(s.now)
+	s.linkStates = newLinkStateStore(s.now)
 	return s
+}
+
+// WithLinkers turns on per-user mode: each Slack user links their own calendar and
+// commands run as that user. links persists the links; each linker handles one
+// provider's OAuth or credential flow.
+func WithLinkers(links UserLinkStore, linkers ...Linker) Option {
+	return func(s *Server) {
+		s.links = links
+		s.linkers = make(map[string]Linker, len(linkers))
+		for _, l := range linkers {
+			s.linkers[l.Provider()] = l
+		}
+	}
 }
 
 // WithOAuth enables the "Add to Slack" install flow with the app credentials, the
@@ -128,6 +153,9 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /slack/install", s.handleInstall)
 		mux.HandleFunc("GET /slack/oauth/callback", s.handleOAuthCallback)
 	}
+	if len(s.linkers) > 0 {
+		mux.HandleFunc("GET /slack/link/callback", s.handleLinkCallback)
+	}
 	return mux
 }
 
@@ -154,16 +182,31 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, "ephemeral", "Usage: /vamoose <command>, for example /vamoose off next week")
 		return
 	}
+	// In per-user mode, link and unlink are served here, and every other command
+	// runs as the invoking user's linked calendar.
+	if s.links != nil {
+		switch args[0] {
+		case "link":
+			s.handleLink(w, form, args)
+			return
+		case "unlink":
+			s.handleUnlink(w, form)
+			return
+		}
+		writeMessage(w, "ephemeral", "Running `vamoose "+text+"` ...")
+		go s.runAsUser(form.Get("response_url"), form.Get("team_id"), form.Get("user_id"), args)
+		return
+	}
 	writeMessage(w, "ephemeral", "Running `vamoose "+text+"` ...")
-	go s.runCommand(form.Get("response_url"), args)
+	go s.runCommand(form.Get("response_url"), args, nil)
 }
 
 // runCommand runs a slash subcommand and posts the result. When the output shows a
 // hold awaiting approval, it posts Approve and Decline buttons instead of plain text.
-func (s *Server) runCommand(responseURL string, args []string) {
+func (s *Server) runCommand(responseURL string, args, env []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
 	defer cancel()
-	out, err := s.run(ctx, args)
+	out, err := s.run(ctx, args, env)
 	if err != nil {
 		s.post(responseURL, map[string]any{
 			"response_type": "ephemeral",
@@ -228,7 +271,7 @@ func (s *Server) runAction(responseURL, actionID, holdID string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
 	defer cancel()
-	out, err := s.run(ctx, args)
+	out, err := s.run(ctx, args, nil)
 	text := done + ".\n" + codeBlock(out)
 	if err != nil {
 		text = "Could not " + verb + ": " + err.Error() + "\n" + codeBlock(out)
@@ -381,4 +424,121 @@ func tokenize(text string) ([]string, error) {
 		args = append(args, cur.String())
 	}
 	return args, nil
+}
+
+// runAsUser resolves the invoking user's linked calendar into injected environment
+// and runs the command as that user, or asks them to link first.
+func (s *Server) runAsUser(responseURL, team, user string, args []string) {
+	link, err := s.links.GetLink(team, user)
+	if errors.Is(err, ErrNotLinked) {
+		s.post(responseURL, map[string]any{
+			"response_type": "ephemeral",
+			"text":          "Link a calendar first: `/vamoose link " + s.aProvider() + "`",
+		})
+		return
+	}
+	if err != nil {
+		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Could not read your link: " + err.Error()})
+		return
+	}
+	linker, ok := s.linkers[link.Provider]
+	if !ok {
+		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "No linker configured for " + link.Provider})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
+	defer cancel()
+	env, err := linker.RunEnv(ctx, link)
+	if err != nil {
+		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Could not authorize your calendar: " + err.Error()})
+		return
+	}
+	s.runCommand(responseURL, args, env)
+}
+
+// handleLink starts linking the invoking user's calendar for the named provider.
+func (s *Server) handleLink(w http.ResponseWriter, form url.Values, args []string) {
+	if len(args) < 2 {
+		writeMessage(w, "ephemeral", "Usage: /vamoose link <"+strings.Join(s.providerNames(), "|")+">")
+		return
+	}
+	provider := args[1]
+	linker, ok := s.linkers[provider]
+	if !ok {
+		writeMessage(w, "ephemeral", "Unknown provider "+provider+". Options: "+strings.Join(s.providerNames(), ", "))
+		return
+	}
+	state := s.linkStates.issue(form.Get("team_id"), form.Get("user_id"), provider)
+	authURL := linker.AuthURL(state, s.linkRedirectURI())
+	if authURL == "" {
+		writeMessage(w, "ephemeral", provider+" cannot be linked from a slash command yet.")
+		return
+	}
+	writeMessage(w, "ephemeral", "Link your "+provider+" calendar: "+authURL)
+}
+
+// handleUnlink removes the invoking user's linked calendar.
+func (s *Server) handleUnlink(w http.ResponseWriter, form url.Values) {
+	if err := s.links.DeleteLink(form.Get("team_id"), form.Get("user_id")); err != nil {
+		writeMessage(w, "ephemeral", "Could not unlink: "+err.Error())
+		return
+	}
+	writeMessage(w, "ephemeral", "Unlinked your calendar.")
+}
+
+// handleLinkCallback completes a per-user OAuth link and stores the credentials.
+func (s *Server) handleLinkCallback(w http.ResponseWriter, r *http.Request) {
+	st, ok := s.linkStates.consume(r.URL.Query().Get("state"))
+	if !ok {
+		http.Error(w, "invalid or expired link request", http.StatusBadRequest)
+		return
+	}
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		http.Error(w, "missing code", http.StatusBadRequest)
+		return
+	}
+	linker, ok := s.linkers[st.provider]
+	if !ok {
+		http.Error(w, "unknown provider", http.StatusBadRequest)
+		return
+	}
+	link, err := linker.Exchange(r.Context(), code, s.linkRedirectURI())
+	if err != nil {
+		http.Error(w, "link exchange failed", http.StatusBadGateway)
+		return
+	}
+	if err := s.links.SaveLink(st.team, st.user, link); err != nil {
+		http.Error(w, "could not save link", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte("Your " + st.provider + " calendar is linked. You can close this tab."))
+}
+
+// linkRedirectURI is the OAuth callback URL for per-user linking.
+func (s *Server) linkRedirectURI() string {
+	return strings.TrimRight(s.publicURL, "/") + "/slack/link/callback"
+}
+
+// aProvider returns a provider name to suggest when a user has not linked, favoring
+// google when it is configured.
+func (s *Server) aProvider() string {
+	if _, ok := s.linkers["google"]; ok {
+		return "google"
+	}
+	for name := range s.linkers {
+		return name
+	}
+	return "google"
+}
+
+// providerNames returns the configured provider names, sorted.
+func (s *Server) providerNames() []string {
+	names := make([]string, 0, len(s.linkers))
+	for name := range s.linkers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
