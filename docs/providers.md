@@ -2,7 +2,7 @@
 
 # Providers
 
-vamoose talks to a calendar backend through one `Provider` interface. Two ship today: Microsoft Graph and Google Calendar. Select one with `--provider` or `VAMOOSE_PROVIDER` (default `graph`). Both run the same commands.
+vamoose talks to a calendar backend through one `Provider` interface. Three ship today: Microsoft Graph, Google Calendar, and Apple iCloud. Select one with `--provider` or `VAMOOSE_PROVIDER` (default `graph`). They run the same commands.
 
 ## Microsoft Graph (Outlook, Microsoft 365, Teams)
 
@@ -33,6 +33,20 @@ export VAMOOSE_GOOGLE_CLIENT_SECRET=<oauth-desktop-client-secret>
 The first command opens your browser for consent on a local loopback address, then caches and refreshes tokens.
 
 Google Calendar has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`. Add the signing-in account under Google Auth Platform, Audience, Test users, or consent is denied.
+
+## Apple iCloud (CalDAV)
+
+Use `--provider icloud`. iCloud speaks CalDAV. Create an app-specific password at [appleid.apple.com](https://appleid.apple.com) (your Apple ID must have two-factor auth on), then export:
+
+```sh
+export VAMOOSE_PROVIDER=icloud
+export VAMOOSE_ICLOUD_USERNAME=you@icloud.com
+export VAMOOSE_ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+```
+
+Set a target calendar with `VAMOOSE_ICLOUD_CALENDAR="Home"`. The default is the first calendar that accepts events. Like Google, iCloud has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`.
+
+**Approval is manual on iCloud.** iCloud creates the hold and emails the manager the invite, but it does not report the manager's accept or decline back over CalDAV, so `check` and the daemon cannot detect approval. Use iCloud for holds, away, events, and notify, and run `vamoose promote` by hand once you know the manager accepted. If you need automatic approval detection, use Google or Graph.
 
 ## Tokens
 

@@ -14,8 +14,8 @@ The request lifecycle, the workflow engine, and state. `internal/workflow` holds
 
 ## Adapters
 
-Calendar backends behind one `Provider` interface in `internal/calendar`: Microsoft Graph and Google Calendar, each mapping its own values to a neutral model at the boundary. A registry selects one by name, so a new backend is one package and one registration.
+Calendar backends behind one `Provider` interface in `internal/calendar`: Microsoft Graph, Google Calendar, and Apple iCloud over CalDAV, each mapping its own values to a neutral model at the boundary. A registry selects one by name, so a new backend is one package and one registration.
 
-## Zero dependency
+## Dependencies
 
-vamoose uses only the Go standard library. Workflows are JSON, the daemon logs with the standard `log` package, and the MCP server speaks JSON-RPC by hand. Adding a third-party dependency is a deliberate decision, not a default.
+vamoose is standard-library only, with one exception: the CalDAV backend uses `emersion/go-webdav` and `emersion/go-ical`, because hand-rolling iCalendar against iCloud is error-prone. Everything else stays stdlib. Workflows are JSON, the daemon logs with the standard `log` package, and the MCP server speaks JSON-RPC by hand. Adding a dependency is a deliberate decision, not a default.

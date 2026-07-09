@@ -35,9 +35,12 @@ These three steps are the built-in **pto** workflow, and `request`, `check`, and
 `promote` are fronts over its steps. vamoose runs other workflows too, and you can
 define your own. See [Workflows](#workflows).
 
-Two backends ship behind one provider interface: Microsoft Graph (Outlook,
-Microsoft 365, and Teams) and Google Calendar. Pick one with `--provider` or the
-`VAMOOSE_PROVIDER` environment variable, and every command works the same on both.
+Three backends ship behind one provider interface: Microsoft Graph (Outlook,
+Microsoft 365, and Teams), Google Calendar, and Apple iCloud (via CalDAV). Pick one
+with `--provider` or the `VAMOOSE_PROVIDER` environment variable, and every command
+works the same across them. Approval detection is the one exception: iCloud sends
+invites but does not report accept/decline over CalDAV, so on iCloud you promote by
+hand. See [providers](docs/providers.md).
 
 ## Why not just calendar rules?
 
