@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"path/filepath"
 	"testing"
 
@@ -147,6 +149,31 @@ func TestAdvanceRunBranching(t *testing.T) {
 	}
 	if declined.updated != nil {
 		t.Error("declined branch should not notify the team")
+	}
+}
+
+// TestPollAllPrune confirms a hold whose provider cannot be built is kept by
+// default and dropped with prune. It cannot run in parallel because it isolates
+// the config directory.
+func TestPollAllPrune(t *testing.T) {
+	isolateConfig(t)
+	item := watchItem{Provider: "no-such-provider", HoldID: "h1", Workflow: "pto", Step: 1, Subject: "vet"}
+	if err := saveWatches([]watchItem{item}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	logger := log.New(io.Discard, "", 0)
+	warned := map[string]bool{}
+
+	// Without prune the unbuildable hold is kept.
+	pollAll(context.Background(), logger, false, warned)
+	if got, _ := loadWatches(); len(got) != 1 {
+		t.Fatalf("kept = %d, want 1 without prune", len(got))
+	}
+
+	// With prune the unbuildable hold is dropped.
+	pollAll(context.Background(), logger, true, warned)
+	if got, _ := loadWatches(); len(got) != 0 {
+		t.Errorf("after prune = %d, want 0", len(got))
 	}
 }
 

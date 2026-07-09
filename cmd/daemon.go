@@ -42,6 +42,7 @@ func runDaemon(ctx context.Context, args []string) error {
 	var (
 		interval = fs.Duration("interval", defaultInterval, "Polling interval")
 		once     = fs.Bool("once", false, "Poll once and exit")
+		prune    = fs.Bool("prune", false, "Drop watched holds whose provider cannot be built")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -60,8 +61,9 @@ func runDaemon(ctx context.Context, args []string) error {
 	}
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
+	warned := make(map[string]bool)
 	for {
-		pollAll(ctx, logger)
+		pollAll(ctx, logger, *prune, warned)
 		if *once {
 			return nil
 		}
@@ -75,8 +77,10 @@ func runDaemon(ctx context.Context, args []string) error {
 }
 
 // pollAll advances every watched hold once, rewriting the watch list to drop the
-// holds that reached a terminal state.
-func pollAll(ctx context.Context, logger *log.Logger) {
+// holds that reached a terminal state. A hold whose provider cannot be built is
+// dropped when prune is set, otherwise kept and warned about once per item (tracked
+// in warned), so an unconfigured provider does not spam the log every poll.
+func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[string]bool) {
 	watches, err := loadWatches()
 	if err != nil {
 		logger.Printf("load watches: %v", err)
@@ -90,7 +94,15 @@ func pollAll(ctx context.Context, logger *log.Logger) {
 	for _, w := range watches {
 		prov, perr := newProvider(w.Provider, resolveTimeZone(""))
 		if perr != nil {
-			logger.Printf("%s: %v", label(w), perr)
+			if prune {
+				logger.Printf("%s: dropping, provider not configured: %v", label(w), perr)
+				continue
+			}
+			key := w.Provider + ":" + w.HoldID
+			if !warned[key] {
+				logger.Printf("%s: provider not configured, keeping in the watch list (use --prune to drop): %v", label(w), perr)
+				warned[key] = true
+			}
 			remaining = append(remaining, w)
 			continue
 		}
