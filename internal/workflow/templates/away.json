@@ -1,0 +1,7 @@
+{
+  "name": "away",
+  "description": "Mark yourself out of office over a date range.",
+  "steps": [
+    { "verb": "away", "showAs": "oof" }
+  ]
+}

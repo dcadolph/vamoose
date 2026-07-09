@@ -1,0 +1,8 @@
+{
+  "name": "notify-only",
+  "description": "Tell the team you are off with no approval step.",
+  "steps": [
+    { "verb": "hold", "showAs": "free" },
+    { "verb": "notify", "team": "optional" }
+  ]
+}

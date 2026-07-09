@@ -18,18 +18,30 @@ type mockProvider struct {
 	getErr error
 	// team is returned by Team for the promote path.
 	team []calendar.Person
+	// mgr is returned by Manager.
+	mgr calendar.Person
+	// mgrErr is returned by Manager when set.
+	mgrErr error
+	// created records the last hold passed to CreateHold.
+	created *calendar.Hold
 	// updated records the last hold passed to UpdateHold.
 	updated *calendar.Hold
+	// deleted records the last id passed to DeleteHold.
+	deleted string
 }
 
 func (m *mockProvider) Me(context.Context) (calendar.Person, error) { return calendar.Person{}, nil }
 func (m *mockProvider) Manager(context.Context) (calendar.Person, error) {
-	return calendar.Person{}, nil
+	return m.mgr, m.mgrErr
 }
 func (m *mockProvider) Team(context.Context) ([]calendar.Person, error) { return m.team, nil }
 
-func (m *mockProvider) CreateHold(context.Context, calendar.Hold) (calendar.Hold, error) {
-	return calendar.Hold{}, nil
+func (m *mockProvider) CreateHold(_ context.Context, h calendar.Hold) (calendar.Hold, error) {
+	if h.ID == "" {
+		h.ID = "created-id"
+	}
+	m.created = &h
+	return h, nil
 }
 
 func (m *mockProvider) GetHold(context.Context, string) (calendar.Hold, error) {
@@ -41,7 +53,10 @@ func (m *mockProvider) UpdateHold(_ context.Context, h calendar.Hold) (calendar.
 	return h, nil
 }
 
-func (m *mockProvider) DeleteHold(context.Context, string) error { return nil }
+func (m *mockProvider) DeleteHold(_ context.Context, id string) error {
+	m.deleted = id
+	return nil
+}
 
 // managerHold builds a hold whose required attendee carries the given response.
 func managerHold(resp calendar.Response) calendar.Hold {

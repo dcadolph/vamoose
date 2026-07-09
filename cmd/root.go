@@ -24,6 +24,8 @@ func usage(w io.Writer) {
 Usage: vamoose <command> [flags]
 
 Commands:
+  run       Run a workflow, e.g. "run pto next week" (see workflows).
+  workflows List the available workflows, built-in and user-defined.
   request   Create a vacation hold and invite your manager to approve it.
   off       Request time off from a date phrase, e.g. "off next week".
   check     Show whether your manager has approved the hold.

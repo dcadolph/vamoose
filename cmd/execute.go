@@ -18,6 +18,10 @@ func Execute(args []string) int {
 	ctx := context.Background()
 	sub, rest := args[0], args[1:]
 	switch sub {
+	case "run":
+		return run(runRun(ctx, rest))
+	case "workflows":
+		return run(runWorkflows(ctx, rest))
 	case "request":
 		return run(runRequest(ctx, rest))
 	case "off":

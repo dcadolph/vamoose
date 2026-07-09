@@ -39,6 +39,23 @@ func parseWindow(start, end string) (startAt, endAt time.Time, allDay bool, err 
 	return startAt, endAt, allDay, nil
 }
 
+// resolveWindow turns explicit start and end flags or a date phrase into a time
+// window. Explicit dates win over the phrase; a phrase yields an all-day window.
+func resolveWindow(start, end, phrase string) (startAt, endAt time.Time, allDay bool, err error) {
+	switch {
+	case start != "" && end != "":
+		return parseWindow(start, end)
+	case phrase != "":
+		startAt, endAt, err = resolveRelative(time.Now(), phrase)
+		if err != nil {
+			return time.Time{}, time.Time{}, false, err
+		}
+		return startAt, endAt, true, nil
+	default:
+		return time.Time{}, time.Time{}, false, fmt.Errorf("give a date phrase (e.g. \"next week\") or --start and --end")
+	}
+}
+
 // weekdays maps lowercase weekday names to their time.Weekday.
 var weekdays = map[string]time.Weekday{
 	"sunday":    time.Sunday,

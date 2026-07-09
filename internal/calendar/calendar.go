@@ -22,6 +22,16 @@ const (
 	ShowOOF ShowAs = "oof"
 )
 
+// Valid reports whether s is a recognized free/busy status.
+func (s ShowAs) Valid() bool {
+	switch s {
+	case ShowFree, ShowTentative, ShowBusy, ShowOOF:
+		return true
+	default:
+		return false
+	}
+}
+
 // Response is an attendee's reply to an invite.
 type Response string
 
@@ -49,6 +59,16 @@ const (
 	// carry this role so the hold never blocks their calendars.
 	RoleOptional Role = "optional"
 )
+
+// Valid reports whether r is a recognized attendee role.
+func (r Role) Valid() bool {
+	switch r {
+	case RoleRequired, RoleOptional:
+		return true
+	default:
+		return false
+	}
+}
 
 // Person identifies a user by display name and email address.
 type Person struct {

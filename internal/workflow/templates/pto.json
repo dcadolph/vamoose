@@ -1,0 +1,9 @@
+{
+  "name": "pto",
+  "description": "Time-off hold shown free, manager approves, then the team is notified.",
+  "steps": [
+    { "verb": "hold", "showAs": "free" },
+    { "verb": "approve", "manager": true },
+    { "verb": "notify", "team": "optional" }
+  ]
+}

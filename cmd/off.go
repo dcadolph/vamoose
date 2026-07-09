@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 )
 
 // runOff creates a time-off hold from a natural date phrase or explicit dates,
@@ -34,26 +33,13 @@ func runOff(ctx context.Context, args []string) error {
 		phrase = strings.Join(fs.Args(), " ")
 	}
 
-	var (
-		startAt, endAt time.Time
-		allDay         bool
-		err            error
-	)
-	switch {
-	case *start != "" && *end != "":
-		if startAt, endAt, allDay, err = parseWindow(*start, *end); err != nil {
-			return fmt.Errorf("off: %w", err)
-		}
-	case phrase != "":
-		if startAt, endAt, err = resolveRelative(time.Now(), phrase); err != nil {
-			return fmt.Errorf("off: %w", err)
-		}
-		allDay = true
+	startAt, endAt, allDay, err := resolveWindow(*start, *end, phrase)
+	if err != nil {
+		return fmt.Errorf("off: %w", err)
+	}
+	if *start == "" && *end == "" {
 		fmt.Fprintf(os.Stdout, "Reading %q as %s through %s.\n",
 			phrase, startAt.Format("Mon 2006-01-02"), endAt.AddDate(0, 0, -1).Format("Mon 2006-01-02"))
-	default:
-		fs.Usage()
-		return fmt.Errorf("off: give a date phrase (e.g. \"next week\") or --start and --end")
 	}
 
 	return createHold(ctx, holdRequest{

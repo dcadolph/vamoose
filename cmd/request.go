@@ -83,16 +83,9 @@ func createHold(ctx context.Context, req holdRequest) error {
 		return err
 	}
 
-	mgr := calendar.Person{Email: req.Manager}
-	if mgr.Email == "" {
-		resolved, merr := prov.Manager(ctx)
-		if errors.Is(merr, calendar.ErrNoManager) {
-			return fmt.Errorf("no manager in the directory; pass --manager")
-		}
-		if merr != nil {
-			return fmt.Errorf("resolve manager: %w", merr)
-		}
-		mgr = resolved
+	mgr, err := resolveManager(ctx, prov, req.Manager)
+	if err != nil {
+		return err
 	}
 
 	hold := calendar.Hold{
@@ -129,4 +122,20 @@ func createHold(ctx context.Context, req holdRequest) error {
 		fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to auto-promote when approved.")
 	}
 	return nil
+}
+
+// resolveManager returns the approver: the explicit email when given, otherwise the
+// manager from the provider directory.
+func resolveManager(ctx context.Context, prov calendar.Provider, email string) (calendar.Person, error) {
+	if email != "" {
+		return calendar.Person{Email: email}, nil
+	}
+	mgr, err := prov.Manager(ctx)
+	if errors.Is(err, calendar.ErrNoManager) {
+		return calendar.Person{}, fmt.Errorf("no manager in the directory; pass --manager")
+	}
+	if err != nil {
+		return calendar.Person{}, fmt.Errorf("resolve manager: %w", err)
+	}
+	return mgr, nil
 }
