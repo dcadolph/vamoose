@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/dcadolph/vamoose/internal/auth"
+	"github.com/dcadolph/vamoose/internal/caldav"
 	"github.com/dcadolph/vamoose/internal/calendar"
 	"github.com/dcadolph/vamoose/internal/google"
 	"github.com/dcadolph/vamoose/internal/googleauth"
@@ -19,6 +20,8 @@ const (
 	envProvider = "VAMOOSE_PROVIDER"
 	// providerGoogle is the Google Calendar provider name.
 	providerGoogle = "google"
+	// providerICloud is the Apple iCloud CalDAV provider name.
+	providerICloud = "icloud"
 )
 
 // newRegistry returns a provider registry with the built-in providers registered.
@@ -26,6 +29,7 @@ func newRegistry() *calendar.Registry {
 	r := calendar.NewRegistry()
 	r.Register(defaultProvider, newGraphProvider)
 	r.Register(providerGoogle, newGoogleProvider)
+	r.Register(providerICloud, newICloudProvider)
 	return r
 }
 
@@ -94,6 +98,23 @@ func newGoogleProvider(s calendar.Settings) (calendar.Provider, error) {
 		return tok.AccessToken, nil
 	}
 	return google.NewProvider(google.TokenSource(source), google.WithTimeZone(s.TimeZone)), nil
+}
+
+// newICloudProvider builds an Apple iCloud CalDAV provider from environment settings.
+func newICloudProvider(s calendar.Settings) (calendar.Provider, error) {
+	user := os.Getenv("VAMOOSE_ICLOUD_USERNAME")
+	if user == "" {
+		return nil, fmt.Errorf("VAMOOSE_ICLOUD_USERNAME not set: your Apple ID email")
+	}
+	pass := os.Getenv("VAMOOSE_ICLOUD_APP_PASSWORD")
+	if pass == "" {
+		return nil, fmt.Errorf("VAMOOSE_ICLOUD_APP_PASSWORD not set: create an app-specific password at appleid.apple.com")
+	}
+	opts := []caldav.Option{caldav.WithTimeZone(s.TimeZone)}
+	if name := os.Getenv("VAMOOSE_ICLOUD_CALENDAR"); name != "" {
+		opts = append(opts, caldav.WithCalendarName(name))
+	}
+	return caldav.NewProvider("https://caldav.icloud.com", user, pass, opts...)
 }
 
 // resolveTimeZone returns the configured IANA zone, defaulting to UTC.

@@ -46,10 +46,16 @@ Setup (Microsoft 365 / Outlook):
   VAMOOSE_CLIENT_ID   Entra application (client) id (required)
   VAMOOSE_TENANT      Entra tenant id or "organizations" (default: organizations)
   VAMOOSE_TIMEZONE    IANA time zone for event times (default: UTC)
-  VAMOOSE_PROVIDER    Calendar provider name: graph or google (default: graph)
+  VAMOOSE_PROVIDER    Calendar provider name: graph, google, or icloud (default: graph)
 
 Setup (Google Calendar, --provider google):
   VAMOOSE_GOOGLE_CLIENT_ID      OAuth desktop client id
   VAMOOSE_GOOGLE_CLIENT_SECRET  OAuth desktop client secret
+
+Setup (Apple iCloud, --provider icloud):
+  VAMOOSE_ICLOUD_USERNAME      Apple ID email
+  VAMOOSE_ICLOUD_APP_PASSWORD  App-specific password (appleid.apple.com)
+  VAMOOSE_ICLOUD_CALENDAR      Target calendar name (optional; default: first)
+  Note: iCloud sends invites but does not report approvals; promote by hand.
 `)
 }
