@@ -8,6 +8,7 @@ import (
 	"log"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
@@ -149,6 +150,36 @@ func TestAdvanceRunBranching(t *testing.T) {
 	}
 	if declined.updated != nil {
 		t.Error("declined branch should not notify the team")
+	}
+}
+
+// TestAdvanceRunTimeout confirms an approve step's timeout runs the expired branch
+// once the deadline passes, and holds otherwise. It isolates HOME to load the
+// built-in workflow, so it does not run in parallel.
+func TestAdvanceRunTimeout(t *testing.T) {
+	isolateConfig(t)
+	const wf = "pto-cancel-on-timeout" // approve at step 1, timeout 72h, expired -> cancel
+
+	// Past the timeout with a pending manager: the expired branch cancels the hold.
+	pending := managerHold(calendar.ResponseNotResponded)
+	pending.ID = "id"
+	expired := &mockProvider{hold: pending}
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: wf, Step: 1, CreatedAt: time.Now().Add(-100 * time.Hour)}
+	if res, err := advanceRun(context.Background(), expired, item); res != pollExpired || err != nil {
+		t.Errorf("expired res = %v, err = %v; want pollExpired, nil", res, err)
+	}
+	if expired.deleted == "" {
+		t.Error("expired branch should cancel the hold")
+	}
+
+	// Within the timeout: still pending, nothing canceled.
+	fresh := &mockProvider{hold: managerHold(calendar.ResponseNotResponded)}
+	recent := watchItem{Provider: "graph", HoldID: "id", Workflow: wf, Step: 1, CreatedAt: time.Now().Add(-time.Hour)}
+	if res, _ := advanceRun(context.Background(), fresh, recent); res != pollPending {
+		t.Errorf("recent res = %v, want pollPending", res)
+	}
+	if fresh.deleted != "" {
+		t.Error("within the timeout nothing should be canceled")
 	}
 }
 

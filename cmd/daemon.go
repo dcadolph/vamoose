@@ -31,6 +31,8 @@ const (
 	pollApproved
 	// pollDeclined means the manager declined.
 	pollDeclined
+	// pollExpired means the approve step's timeout elapsed and the expired branch ran.
+	pollExpired
 	// pollFailed means the poll or promotion errored.
 	pollFailed
 )
@@ -111,6 +113,8 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 			logger.Printf("%s: approved and advanced", label(w))
 		case pollDeclined:
 			logger.Printf("%s: declined; no longer watching", label(w))
+		case pollExpired:
+			logger.Printf("%s: expired; ran the timeout branch", label(w))
 		case pollPending:
 			logger.Printf("%s: waiting on the manager", label(w))
 			remaining = append(remaining, w)
@@ -160,6 +164,17 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 		}
 		return pollDeclined, nil
 	default:
+		if item.Step >= 0 && item.Step < len(wf.Steps) {
+			step := wf.Steps[item.Step]
+			if d := step.ParsedTimeout(); d > 0 && !item.CreatedAt.IsZero() && time.Since(item.CreatedAt) > d {
+				if target, ok := step.On[workflow.OutcomeExpired]; ok && target != "end" {
+					if err := runSteps(ctx, prov, item.Provider, wf, wf.StepIndex(target), hold, false); err != nil {
+						return pollFailed, err
+					}
+				}
+				return pollExpired, nil
+			}
+		}
 		return pollPending, nil
 	}
 }

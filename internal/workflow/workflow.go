@@ -9,6 +9,7 @@ package workflow
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
@@ -19,6 +20,9 @@ const (
 	OutcomeAccepted = "accepted"
 	// OutcomeDeclined is the branch key for the manager declining.
 	OutcomeDeclined = "declined"
+	// OutcomeExpired is the branch key for the approver not responding before the
+	// step's timeout elapses.
+	OutcomeExpired = "expired"
 )
 
 // Verb is a single action a workflow step performs. Each maps to a vamoose command.
@@ -82,6 +86,10 @@ type Step struct {
 	On map[string]string `json:"on,omitempty"`
 	// Next overrides the step to run after this one: a step id or "end".
 	Next string `json:"next,omitempty"`
+	// Timeout, on an approve step, is how long to wait for the approver before the
+	// expired branch runs, as a Go duration such as "72h". It requires an expired
+	// branch in On.
+	Timeout string `json:"timeout,omitempty"`
 	// ShowAs overrides the free/busy status for creating steps. Empty uses the verb
 	// default: free for hold and event, out of office for away.
 	ShowAs calendar.ShowAs `json:"showAs,omitempty"`
@@ -92,6 +100,20 @@ type Step struct {
 	Team calendar.Role `json:"team,omitempty"`
 	// Subject overrides the event title for a note or event step.
 	Subject string `json:"subject,omitempty"`
+}
+
+// ParsedTimeout returns the approve step's timeout as a duration, or zero when it is
+// unset. Validate rejects an unparseable timeout, so a nonzero return here means the
+// step waits that long before its expired branch runs.
+func (s Step) ParsedTimeout() time.Duration {
+	if s.Timeout == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(s.Timeout)
+	if err != nil {
+		return 0
+	}
+	return d
 }
 
 // Workflow is a named sequence of steps forming a small graph.
@@ -141,9 +163,23 @@ func (w Workflow) Validate() error {
 			return fmt.Errorf("%w: step %d: only an approve step may branch with on", ErrInvalid, i)
 		}
 		for outcome := range s.On {
-			if outcome != OutcomeAccepted && outcome != OutcomeDeclined {
+			if outcome != OutcomeAccepted && outcome != OutcomeDeclined && outcome != OutcomeExpired {
 				return fmt.Errorf("%w: step %d: invalid branch outcome %q", ErrInvalid, i, outcome)
 			}
+		}
+		if s.Timeout != "" {
+			if s.Verb != VerbApprove {
+				return fmt.Errorf("%w: step %d: only an approve step may set a timeout", ErrInvalid, i)
+			}
+			if _, err := time.ParseDuration(s.Timeout); err != nil {
+				return fmt.Errorf("%w: step %d: invalid timeout %q", ErrInvalid, i, s.Timeout)
+			}
+			if _, ok := s.On[OutcomeExpired]; !ok {
+				return fmt.Errorf("%w: step %d: a timeout needs an expired branch", ErrInvalid, i)
+			}
+		}
+		if _, ok := s.On[OutcomeExpired]; ok && s.Timeout == "" {
+			return fmt.Errorf("%w: step %d: an expired branch needs a timeout", ErrInvalid, i)
 		}
 		if s.Verb.Creates() {
 			creators++

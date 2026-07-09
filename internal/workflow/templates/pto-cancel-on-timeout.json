@@ -1,0 +1,11 @@
+{
+  "name": "pto-cancel-on-timeout",
+  "description": "Time off: notify the team on approval; cancel the hold if the manager does not respond in 72h.",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "approval", "verb": "approve", "manager": true, "timeout": "72h",
+      "on": { "accepted": "notify", "expired": "expired" } },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" },
+    { "id": "expired", "verb": "cancel", "next": "end" }
+  ]
+}

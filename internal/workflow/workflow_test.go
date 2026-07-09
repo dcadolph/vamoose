@@ -222,3 +222,30 @@ func TestNext(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateTimeout covers the approve-step timeout and expired-branch rules.
+func TestValidateTimeout(t *testing.T) {
+	t.Parallel()
+	hold := Step{ID: "hold", Verb: VerbHold}
+	tests := []struct {
+		Approve Step
+		WantErr bool
+	}{{ // Test 0: A valid timeout with an expired branch passes.
+		Approve: Step{ID: "a", Verb: VerbApprove, Timeout: "72h", On: map[string]string{"accepted": "end", "expired": "end"}},
+	}, { // Test 1: A timeout without an expired branch fails.
+		Approve: Step{ID: "a", Verb: VerbApprove, Timeout: "72h", On: map[string]string{"accepted": "end"}}, WantErr: true,
+	}, { // Test 2: An expired branch without a timeout fails.
+		Approve: Step{ID: "a", Verb: VerbApprove, On: map[string]string{"expired": "end"}}, WantErr: true,
+	}, { // Test 3: An unparseable timeout fails.
+		Approve: Step{ID: "a", Verb: VerbApprove, Timeout: "soon", On: map[string]string{"expired": "end"}}, WantErr: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			wf := Workflow{Name: "t", Steps: []Step{hold, test.Approve}}
+			if err := wf.Validate(); (err != nil) != test.WantErr {
+				t.Errorf("Validate err = %v, wantErr %v", err, test.WantErr)
+			}
+		})
+	}
+}

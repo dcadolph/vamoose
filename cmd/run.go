@@ -229,11 +229,12 @@ func gateOnApproval(providerName string, wf workflow.Workflow, stepIdx int, hold
 		return nil
 	}
 	if err := addWatch(watchItem{
-		Provider: providerName,
-		HoldID:   hold.ID,
-		Workflow: wf.Name,
-		Step:     stepIdx,
-		Subject:  hold.Subject,
+		Provider:  providerName,
+		HoldID:    hold.ID,
+		Workflow:  wf.Name,
+		Step:      stepIdx,
+		Subject:   hold.Subject,
+		CreatedAt: time.Now(),
 	}); err != nil {
 		return fmt.Errorf("add watch: %w", err)
 	}

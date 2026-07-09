@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // watchItem is a workflow run the daemon advances when the manager responds.
@@ -19,6 +20,9 @@ type watchItem struct {
 	Step int `json:"step"`
 	// Subject is the hold title, kept for readable logs.
 	Subject string `json:"subject,omitempty"`
+	// CreatedAt is when the watch was enqueued, used to time an approve step's
+	// timeout so the daemon can run the expired branch.
+	CreatedAt time.Time `json:"created_at,omitempty"`
 }
 
 // watchPath returns the watch-list file location: VAMOOSE_WATCH_FILE when set,
