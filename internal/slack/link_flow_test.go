@@ -186,3 +186,39 @@ func TestRunActionAsOwner(t *testing.T) {
 		t.Errorf("env = %v, want the owner's google token", gotEnv)
 	}
 }
+
+// TestPollUsersRunsDaemonPerUser confirms PollUsers runs the daemon once per linked
+// user with their credentials and watch file injected.
+func TestPollUsersRunsDaemonPerUser(t *testing.T) {
+	t.Parallel()
+	store := NewUserLinkFileStore(filepath.Join(t.TempDir(), "l.json"))
+	if err := store.SaveLink("T1", "U1", UserLink{Provider: "google", RefreshToken: "rt"}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	fl := fakeLinker{provider: "google", env: []string{"VAMOOSE_PROVIDER=google", "VAMOOSE_GOOGLE_ACCESS_TOKEN=at"}}
+	var gotArgs, gotEnv []string
+	runner := func(_ context.Context, args, env []string) (string, error) {
+		gotArgs, gotEnv = args, env
+		return "", nil
+	}
+	s := NewServer("shh", runner,
+		WithLinkers(store, fl),
+		WithPerUserEnv(func(team, user string) []string { return []string{"VAMOOSE_WATCH_FILE=/w/" + team + "-" + user} }),
+	)
+	s.PollUsers(context.Background())
+	if len(gotArgs) != 2 || gotArgs[0] != "daemon" || gotArgs[1] != "--once" {
+		t.Fatalf("args = %v, want [daemon --once]", gotArgs)
+	}
+	var hasTok, hasWatch bool
+	for _, kv := range gotEnv {
+		switch kv {
+		case "VAMOOSE_GOOGLE_ACCESS_TOKEN=at":
+			hasTok = true
+		case "VAMOOSE_WATCH_FILE=/w/T1-U1":
+			hasWatch = true
+		}
+	}
+	if !hasTok || !hasWatch {
+		t.Errorf("env = %v, want the owner's token and watch file", gotEnv)
+	}
+}

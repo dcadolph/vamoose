@@ -76,6 +76,9 @@ type Server struct {
 	linkers map[string]Linker
 	// linkStates holds pending per-user OAuth links across the redirect.
 	linkStates *linkStateStore
+	// perUserEnv supplies extra per-user environment, such as the watch file, added
+	// to a command's credentials in per-user mode.
+	perUserEnv func(team, user string) []string
 }
 
 // Option configures a Server.
@@ -124,6 +127,12 @@ func WithLinkers(links UserLinkStore, linkers ...Linker) Option {
 			s.linkers[l.Provider()] = l
 		}
 	}
+}
+
+// WithPerUserEnv sets a hook returning extra environment for a linked user, such as
+// their watch file, added alongside their calendar credentials for every command.
+func WithPerUserEnv(fn func(team, user string) []string) Option {
+	return func(s *Server) { s.perUserEnv = fn }
 }
 
 // WithOAuth enables the "Add to Slack" install flow with the app credentials, the
@@ -516,7 +525,39 @@ func (s *Server) runAsUser(responseURL, team, user string, args []string) {
 		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Could not authorize your calendar: " + err.Error()})
 		return
 	}
+	env = append(env, s.extraEnv(team, user)...)
 	s.runCommand(responseURL, args, env, team, user)
+}
+
+// extraEnv returns any per-user environment beyond credentials, such as the watch
+// file, from the WithPerUserEnv hook.
+func (s *Server) extraEnv(team, user string) []string {
+	if s.perUserEnv == nil {
+		return nil
+	}
+	return s.perUserEnv(team, user)
+}
+
+// PollUsers advances every linked user's watched holds once, running the daemon as
+// each user with their own credentials and watch file. It is a no-op outside
+// per-user mode. The Slack server calls it on an interval so per-user approvals
+// auto-advance, which the standalone daemon cannot do without per-user credentials.
+func (s *Server) PollUsers(ctx context.Context) {
+	if s.links == nil {
+		return
+	}
+	ids, err := s.links.List()
+	if err != nil {
+		return
+	}
+	for _, id := range ids {
+		env, uerr := s.userEnv(ctx, id.Team, id.User)
+		if uerr != nil {
+			continue
+		}
+		env = append(env, s.extraEnv(id.Team, id.User)...)
+		_, _ = s.run(ctx, []string{"daemon", "--once"}, env)
+	}
 }
 
 // handleLink starts linking the invoking user's calendar for the named provider.

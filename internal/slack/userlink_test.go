@@ -92,6 +92,29 @@ func TestUserLinkFileStore(t *testing.T) {
 	})
 }
 
+// TestUserLinkFileStoreList confirms List returns every linked user.
+func TestUserLinkFileStoreList(t *testing.T) {
+	t.Parallel()
+	s := NewUserLinkFileStore(filepath.Join(t.TempDir(), "l.json"))
+	if err := s.SaveLink("T1", "U1", UserLink{Provider: "google"}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if err := s.SaveLink("T2", "U2", UserLink{Provider: "icloud"}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	ids, err := s.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	found := map[string]bool{}
+	for _, id := range ids {
+		found[id.Team+":"+id.User] = true
+	}
+	if len(ids) != 2 || !found["T1:U1"] || !found["T2:U2"] {
+		t.Errorf("List = %+v, want T1:U1 and T2:U2", ids)
+	}
+}
+
 // TestUserLinkRedacted confirms secrets are masked and non-secret fields kept.
 func TestUserLinkRedacted(t *testing.T) {
 	t.Parallel()

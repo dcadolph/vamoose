@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -42,6 +43,14 @@ func (l UserLink) Redacted() UserLink {
 	return r
 }
 
+// LinkID identifies a linked user by workspace and user id.
+type LinkID struct {
+	// Team is the Slack workspace id.
+	Team string
+	// User is the Slack user id.
+	User string
+}
+
 // UserLinkStore persists a Slack user's linked calendar, keyed by workspace and
 // user so each user in each workspace links their own calendar.
 type UserLinkStore interface {
@@ -51,6 +60,8 @@ type UserLinkStore interface {
 	GetLink(teamID, userID string) (UserLink, error)
 	// DeleteLink removes a user's link, succeeding even when none exists.
 	DeleteLink(teamID, userID string) error
+	// List returns every linked user.
+	List() ([]LinkID, error)
 }
 
 // linkKey builds the storage key for a workspace user.
@@ -106,6 +117,23 @@ func (s *UserLinkFileStore) DeleteLink(teamID, userID string) error {
 	}
 	delete(m, linkKey(teamID, userID))
 	return s.store(m)
+}
+
+// List returns every linked user parsed from the store keys.
+func (s *UserLinkFileStore) List() ([]LinkID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	m, err := s.load()
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]LinkID, 0, len(m))
+	for key := range m {
+		if team, user, ok := strings.Cut(key, ":"); ok {
+			ids = append(ids, LinkID{Team: team, User: user})
+		}
+	}
+	return ids, nil
 }
 
 // load reads the link map, returning an empty map when the file is absent.

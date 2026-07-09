@@ -152,6 +152,16 @@ func TestAdvanceRunBranching(t *testing.T) {
 	}
 }
 
+// TestWatchPathOverride confirms VAMOOSE_WATCH_FILE overrides the default location,
+// which the Slack server uses to give each linked user their own watch file.
+func TestWatchPathOverride(t *testing.T) {
+	t.Setenv("VAMOOSE_WATCH_FILE", "/tmp/vamoose-custom-watch.json")
+	p, err := watchPath()
+	if err != nil || p != "/tmp/vamoose-custom-watch.json" {
+		t.Errorf("watchPath = %q, %v; want the override", p, err)
+	}
+}
+
 // TestPollAllPrune confirms a hold whose provider cannot be built is kept by
 // default and dropped with prune. It cannot run in parallel because it isolates
 // the config directory.

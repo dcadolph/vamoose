@@ -50,6 +50,7 @@ func runSlack(ctx context.Context, args []string) error {
 		opts = append(opts, slack.WithOAuth(id, sec, pub, store))
 		logger.Printf("install flow enabled: %s/slack/install", pub)
 	}
+	perUserOn := false
 	if perUser := os.Getenv("VAMOOSE_SLACK_PER_USER"); perUser != "" && perUser != "0" {
 		pub := os.Getenv("VAMOOSE_SLACK_PUBLIC_URL")
 		if pub == "" {
@@ -76,8 +77,9 @@ func runSlack(ctx context.Context, args []string) error {
 		if len(linkers) == 0 {
 			return fmt.Errorf("per-user mode needs a provider configured, for example VAMOOSE_GOOGLE_CLIENT_ID and VAMOOSE_GOOGLE_CLIENT_SECRET")
 		}
-		opts = append(opts, slack.WithPublicURL(pub), slack.WithLinkers(links, linkers...))
-		logger.Printf("per-user mode: %d provider(s); each user runs /vamoose link google", len(linkers))
+		opts = append(opts, slack.WithPublicURL(pub), slack.WithLinkers(links, linkers...), slack.WithPerUserEnv(slackUserWatchEnv))
+		perUserOn = true
+		logger.Printf("per-user mode: %d provider(s); each user runs /vamoose link <provider>", len(linkers))
 	}
 	srv := slack.NewServer(secret, runner, opts...)
 
@@ -91,6 +93,22 @@ func runSlack(ctx context.Context, args []string) error {
 		defer cancel()
 		_ = httpSrv.Shutdown(shutCtx)
 	}()
+
+	if perUserOn {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					srv.PollUsers(ctx)
+				}
+			}
+		}()
+		logger.Printf("per-user auto-advance: polling watched holds every %s", time.Minute)
+	}
 
 	logger.Printf("listening on %s (slash: /slack/commands, interactivity: /slack/interactivity)", *addr)
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -117,6 +135,17 @@ func slackUserLinkStore() (*slack.UserLinkFileStore, error) {
 		return nil, err
 	}
 	return slack.NewUserLinkFileStore(filepath.Join(dir, "vamoose", "slack-user-links.json")), nil
+}
+
+// slackUserWatchEnv returns the VAMOOSE_WATCH_FILE environment for a linked user, so
+// their watched holds live in their own file that the per-user poll loop advances
+// with their credentials.
+func slackUserWatchEnv(team, user string) []string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return nil
+	}
+	return []string{"VAMOOSE_WATCH_FILE=" + filepath.Join(dir, "vamoose", "watches", team+"-"+user+".json")}
 }
 
 // perUserEnvKeys are the environment variables the Slack server injects per user.

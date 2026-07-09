@@ -21,8 +21,13 @@ type watchItem struct {
 	Subject string `json:"subject,omitempty"`
 }
 
-// watchPath returns the watch-list file location under the user config directory.
+// watchPath returns the watch-list file location: VAMOOSE_WATCH_FILE when set,
+// which the Slack server uses to keep each linked user's watches in their own file,
+// otherwise the default under the user config directory.
 func watchPath() (string, error) {
+	if p := os.Getenv("VAMOOSE_WATCH_FILE"); p != "" {
+		return p, nil
+	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
