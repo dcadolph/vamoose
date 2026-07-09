@@ -15,7 +15,7 @@ The moose does the paperwork. You go to the beach.
 > end, but its run and daemon-advance path has not been live-vetted yet. The Microsoft
 > Graph path is unit-tested but hasn't been run against a live Microsoft 365 tenant yet.
 
-Calendar busywork is death by a thousand steps: block the dates, ping your manager,
+Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
 wait for a nod, then re-send the event to the team so nobody schedules over you.
 vamoose turns those chores into **workflows** it runs for you and advances in the
 background. Time off is the flagship workflow, and you can define your own.
