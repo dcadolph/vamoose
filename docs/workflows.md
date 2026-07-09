@@ -38,7 +38,8 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 | `manager`| approve           | Wait on the manager, from the directory or `--manager`.              |
 | `team`   | notify            | Role for the team. Must be `optional`.                               |
 | `id`     | any               | Names the step so branches can target it.                            |
-| `on`     | approve           | Branch by outcome: `{"accepted": id, "declined": id}`, or `end`.     |
+| `on`     | approve           | Branch by outcome: `{"accepted": id, "declined": id, "expired": id}`. |
+| `timeout`| approve           | Duration to wait (e.g. `72h`) before the `expired` branch runs.      |
 | `next`   | any               | The step id to run next, or `end`. Defaults to the following step.   |
 | `subject`| note, event       | Event title for a note or event step.                               |
 
@@ -86,6 +87,23 @@ The built-in `pto-notify-on-decline` shows it. On accept it notifies the team, o
 }
 ```
 
+## Timeouts
+
+An `approve` step can set a `timeout` and an `expired` branch, so a workflow acts on its own when the manager never responds. The daemon runs the expired branch once the timeout passes with no accept or decline. The built-in `pto-cancel-on-timeout` cancels the hold after 72 hours of silence:
+
+```json
+{
+  "name": "pto-cancel-on-timeout",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "approval", "verb": "approve", "manager": true, "timeout": "72h",
+      "on": { "accepted": "notify", "expired": "expired" } },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" },
+    { "id": "expired", "verb": "cancel", "next": "end" }
+  ]
+}
+```
+
 ## Coming next
 
-More branch conditions (a deadline that expires, day of week, attendee counts) come in a later version. Today branches turn on the approval outcome only.
+More branch conditions (day of week, attendee counts) come in a later version. Today branches turn on the approval outcome and, for `approve`, a timeout.
