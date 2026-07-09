@@ -36,6 +36,7 @@ Commands:
   daemon    Poll watched holds and auto-promote them when the manager approves.
   service   Print a launchd or systemd manifest to run the daemon unattended.
   mcp       Serve vamoose to Claude over the Model Context Protocol (stdio).
+  slack     Serve the vamoose Slack app: run vamoose from slash commands.
   whoami    Print the signed-in user, manager, and resolved team.
   team      Show or set your default team: team [list|set <email...>|clear].
   version   Print the vamoose version.
