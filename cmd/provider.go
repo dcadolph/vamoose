@@ -53,7 +53,14 @@ func resolveProvider(flagProvider string) string {
 }
 
 // newGraphProvider builds a Microsoft Graph provider from environment settings.
+// When VAMOOSE_GRAPH_ACCESS_TOKEN is set, it uses that token directly, which lets
+// a caller such as the Slack server run a command as a specific linked user without
+// the interactive sign-in flow.
 func newGraphProvider(s calendar.Settings) (calendar.Provider, error) {
+	if tok := os.Getenv("VAMOOSE_GRAPH_ACCESS_TOKEN"); tok != "" {
+		source := func(context.Context) (string, error) { return tok, nil }
+		return graph.NewProvider(graph.TokenSource(source), graph.WithTimeZone(s.TimeZone)), nil
+	}
 	clientID := os.Getenv("VAMOOSE_CLIENT_ID")
 	if clientID == "" {
 		return nil, fmt.Errorf("VAMOOSE_CLIENT_ID not set: register an Entra app and export its client id")
@@ -78,7 +85,14 @@ func newGraphProvider(s calendar.Settings) (calendar.Provider, error) {
 }
 
 // newGoogleProvider builds a Google Calendar provider from environment settings.
+// When VAMOOSE_GOOGLE_ACCESS_TOKEN is set, it uses that token directly, which lets
+// a caller such as the Slack server run a command as a specific linked user without
+// the interactive sign-in flow.
 func newGoogleProvider(s calendar.Settings) (calendar.Provider, error) {
+	if tok := os.Getenv("VAMOOSE_GOOGLE_ACCESS_TOKEN"); tok != "" {
+		source := func(context.Context) (string, error) { return tok, nil }
+		return google.NewProvider(google.TokenSource(source), google.WithTimeZone(s.TimeZone)), nil
+	}
 	clientID := os.Getenv("VAMOOSE_GOOGLE_CLIENT_ID")
 	if clientID == "" {
 		return nil, fmt.Errorf("VAMOOSE_GOOGLE_CLIENT_ID not set: create an OAuth desktop client and export its id")
