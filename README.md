@@ -8,12 +8,12 @@
 
 The moose does the paperwork. You go to the beach.
 
-> **Status: v0.2.0, early.**
-> The core flow runs live on Google Calendar: sign-in, request, manager approval,
-> team promote, quick actions, and the watch daemon. The v0.2.0 JSON workflow engine
-> (`vamoose run`, custom workflows, a workflow-driven daemon) is unit-tested end to
-> end, but its run and daemon-advance path has not been live-vetted yet. The Microsoft
-> Graph path is unit-tested but hasn't been run against a live Microsoft 365 tenant yet.
+> **Status: v0.3.0, early.**
+> Three backends (Microsoft Graph, Google Calendar, Apple iCloud) behind one workflow
+> engine, driven from the CLI, Claude, or Slack. Live-vetted: Google end to end, and
+> iCloud's core (sign-in, discovery, event create and delete). Unit-tested but not yet
+> live-vetted: the Slack app, iCloud approval detection via EventKit, and the Microsoft
+> Graph path against a real tenant.
 
 Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
 wait for a nod, then re-send the event to the team so nobody schedules over you.
@@ -242,7 +242,7 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Status
 
-v0.2.0. The core flow runs live on Google Calendar end to end. The v0.2.0 workflow
-engine (run, custom workflows, a workflow-driven daemon) is unit-tested, but its run
-and daemon-advance path has not been live-vetted yet. The Microsoft Graph path is
-unit-tested but hasn't hit a live tenant yet.
+v0.3.0, early. Three backends (Graph, Google, iCloud), a JSON workflow engine, and
+CLI, Claude, and Slack surfaces. Google runs live end to end and iCloud's core is
+live-vetted. The Slack app, iCloud approval via EventKit, and Graph against a real
+tenant are unit-tested but not yet live-vetted.
