@@ -51,6 +51,38 @@ In the Slack app under **OAuth & Permissions**, set the redirect URL to `https:/
 
 Without these variables, the server runs single-workspace as above.
 
+## Per-user mode (multi-tenant)
+
+In per-user mode every Slack user links their **own** calendar, and each command runs against that user's calendar. One server, many users, each with their own provider and credentials.
+
+Enable it alongside the install flow (the iCloud modal needs the workspace bot token an install provides):
+
+```sh
+export VAMOOSE_SLACK_PER_USER=1
+export VAMOOSE_SLACK_PUBLIC_URL=https://<your-host>
+# Google linking (web OAuth client):
+export VAMOOSE_GOOGLE_CLIENT_ID=<web-client-id>
+export VAMOOSE_GOOGLE_CLIENT_SECRET=<web-client-secret>
+# Microsoft 365 linking (confidential web app):
+export VAMOOSE_CLIENT_ID=<entra-app-id>
+export VAMOOSE_GRAPH_CLIENT_SECRET=<entra-web-secret>
+export VAMOOSE_TENANT=organizations
+```
+
+Add `https://<your-host>/slack/link/callback` as a redirect URL on the Google OAuth client and the Entra web app. iCloud needs no server credentials.
+
+**Linking.** Each user links once:
+
+- `/vamoose link google` or `/vamoose link graph` replies with a consent link. After they authorize, vamoose stores their refresh token.
+- `/vamoose link icloud` opens a modal for an Apple ID and app-specific password, kept out of the channel.
+- `/vamoose unlink` removes their link.
+
+**Running.** After linking, `/vamoose off next week`, and every other command, runs against that user's calendar. Unlinked users are told to link first. Approve and Decline buttons run as the hold's owner, so they touch the requester's calendar, not the approver's.
+
+**Auto-advance.** The server polls each linked user's watched holds on an interval and advances them with that user's credentials, so `--watch` flows finish without anyone clicking a button. A fresh access token is minted on each poll.
+
+Per-user mode is opt-in. Without `VAMOOSE_SLACK_PER_USER`, the server runs single-workspace as above.
+
 ## Scope
 
-The install flow makes vamoose installable to any workspace, but the server still drives one backend account, so for now every workspace shares that calendar. Per-user calendar linking, where each Slack user connects their own calendar, is the next multi-tenant step, along with hosting.
+Per-user mode is experimental and not yet vetted against a live Slack workspace. The standalone `vamoose daemon` advances the CLI's own watches; per-user watches are advanced by the Slack server's poll loop instead, since only it holds each user's credentials.
