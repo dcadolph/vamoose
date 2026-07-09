@@ -9,8 +9,10 @@
 The moose does the paperwork. You go to the beach.
 
 > **Status: v0.1.0, early.**
-> The whole flow runs live on Google Calendar: sign-in, request, manager approval,
-> team promote, quick actions, and the watch daemon. The Microsoft Graph path is
+> The core flow runs live on Google Calendar: sign-in, request, manager approval,
+> team promote, quick actions, and the watch daemon. A JSON workflow engine
+> (`vamoose run`, custom workflows) has since landed on main for the next release;
+> its sequencing is unit-tested but not yet live-vetted. The Microsoft Graph path is
 > unit-tested but hasn't been run against a live Microsoft 365 tenant yet.
 
 Booking time off by hand is a chore: block the dates, ping your manager, wait for
@@ -25,6 +27,10 @@ runs that whole loop from one command.
    There is no separate approval product to buy or install.
 3. `vamoose promote` adds your whole **team as optional attendees** and resends,
    so everyone sees you are out without their calendars getting blocked.
+
+These three steps are the built-in **pto** workflow, and `request`, `check`, and
+`promote` are fronts over its steps. vamoose runs other workflows too, and you can
+define your own; see [Workflows](#workflows).
 
 Two backends ship behind one provider interface: Microsoft Graph (Outlook,
 Microsoft 365, and Teams) and Google Calendar. Pick one with `--provider` or the
@@ -119,6 +125,55 @@ vamoose event --start 2026-07-20T15:00:00Z --end 2026-07-20T15:30:00Z \
   --subject "1:1" --attendees boss@work.com
 ```
 
+## Workflows
+
+A workflow is an ordered list of steps that vamoose runs and the daemon advances.
+The request-approve-promote flow above is the built-in **pto** workflow. Run a
+workflow by name, with a date phrase or explicit `--start`/`--end`:
+
+```sh
+vamoose run pto next week --watch
+vamoose run notify-only next week
+vamoose run away --start 2026-07-20 --end 2026-07-24
+vamoose workflows            # list the available workflows
+```
+
+Three workflows ship built in:
+
+| Name          | Steps                                | Use                               &nbsp; |
+| ------------- | ------------------------------------ | ---------------------------------------- |
+| `pto`         | hold shown free, approve, notify     | Time off that a manager approves.        |
+| `notify-only` | hold shown free, notify              | Tell the team, no approval needed.       |
+| `away`        | out-of-office block                  | Personal out of office, no fanout.       |
+
+Define your own by dropping a JSON file in `~/.config/vamoose/workflows/<name>.json`.
+A file there overrides a built-in of the same name.
+
+```json
+{
+  "name": "team-heads-up",
+  "description": "Hold shown free, tell the team, no approval.",
+  "steps": [
+    { "verb": "hold", "showAs": "free" },
+    { "verb": "notify", "team": "optional" }
+  ]
+}
+```
+
+Then `vamoose run team-heads-up next week`. Steps use these verbs:
+
+- `hold` creates the event and invites the manager when an `approve` step follows.
+- `approve` waits for the manager to accept the invite.
+- `notify` adds the team as optional attendees.
+- `away` marks you out of office with no attendees.
+- `event` creates a plain event, with attendees from `--attendees`.
+- `cancel` deletes the hold.
+
+A workflow starts with exactly one creating step (`hold`, `away`, or `event`).
+Approval waits on the manager that only a `hold` invites, so an `approve` step
+needs a `hold`, and only `notify` may follow approval. With `--watch`, the hold is
+recorded and `vamoose daemon` runs the remaining steps once the manager accepts.
+
 ## Defining your team
 
 By default `promote` derives your team from the directory: your manager's direct
@@ -155,5 +210,7 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Status
 
-v0.1.0. Runs live on Google Calendar end to end. The Microsoft Graph path is
-unit-tested but hasn't hit a live tenant yet.
+v0.1.0, plus a JSON workflow engine on main for the next release. The core flow
+runs live on Google Calendar end to end; the workflow run and daemon-advance path
+is unit-tested but not yet live-vetted. The Microsoft Graph path is unit-tested but
+hasn't hit a live tenant yet.
