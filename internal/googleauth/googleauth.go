@@ -243,6 +243,44 @@ func (a *Authenticator) refresh(ctx context.Context, refreshToken string) (auth.
 	return t, nil
 }
 
+// WebAuthCodeURL builds the consent URL for a server-side web flow, requesting
+// offline access so the code exchange returns a refresh token. Unlike the loopback
+// flow it uses no PKCE, relying on the confidential client secret. state carries
+// the caller's opaque anti-forgery and routing value.
+func (a *Authenticator) WebAuthCodeURL(redirectURI, state string) string {
+	q := url.Values{
+		"client_id":     {a.clientID},
+		"redirect_uri":  {redirectURI},
+		"response_type": {"code"},
+		"scope":         {strings.Join(a.scopes, " ")},
+		"state":         {state},
+		"access_type":   {"offline"},
+		"prompt":        {"consent"},
+	}
+	return a.authURL + "?" + q.Encode()
+}
+
+// ExchangeCode trades a web-flow authorization code for tokens without PKCE, using
+// the confidential client secret. redirectURI must match the one used to obtain the
+// code.
+func (a *Authenticator) ExchangeCode(ctx context.Context, code, redirectURI string) (auth.Token, error) {
+	form := url.Values{
+		"client_id":     {a.clientID},
+		"client_secret": {a.clientSecret},
+		"code":          {code},
+		"grant_type":    {"authorization_code"},
+		"redirect_uri":  {redirectURI},
+	}
+	return a.postToken(ctx, form)
+}
+
+// Refresh exchanges a refresh token for a fresh access token, carrying the refresh
+// token forward when Google omits it. The Slack server uses this to run a command
+// as a linked user.
+func (a *Authenticator) Refresh(ctx context.Context, refreshToken string) (auth.Token, error) {
+	return a.refresh(ctx, refreshToken)
+}
+
 // tokenResponse is Google's token endpoint reply.
 type tokenResponse struct {
 	AccessToken      string `json:"access_token"`

@@ -149,3 +149,67 @@ func TestAuthCodeURL(t *testing.T) {
 		}
 	}
 }
+
+// TestWebAuthCodeURL confirms the web consent URL requests offline access and
+// consent, and omits PKCE.
+func TestWebAuthCodeURL(t *testing.T) {
+	t.Parallel()
+	a := NewAuthenticator("cid", "secret", &memStore{}, WithScopes("calendar"))
+	raw := a.WebAuthCodeURL("https://pub.example/link/google/callback", "st8")
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	q := u.Query()
+	checks := map[string]string{
+		"client_id":     "cid",
+		"redirect_uri":  "https://pub.example/link/google/callback",
+		"response_type": "code",
+		"scope":         "calendar",
+		"state":         "st8",
+		"access_type":   "offline",
+		"prompt":        "consent",
+	}
+	for key, want := range checks {
+		if got := q.Get(key); got != want {
+			t.Errorf("%s = %q, want %q", key, got, want)
+		}
+	}
+	if q.Has("code_challenge") {
+		t.Error("web flow should not use PKCE")
+	}
+}
+
+// TestExchangeCode confirms a web-flow code exchange returns tokens without PKCE.
+func TestExchangeCode(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(tokenHandler(t, "authorization_code", "web-refresh"))
+	defer srv.Close()
+	a := NewAuthenticator("cid", "secret", &memStore{}, WithTokenURL(srv.URL))
+	tok, err := a.ExchangeCode(context.Background(), "code123", "https://pub.example/cb")
+	if err != nil {
+		t.Fatalf("ExchangeCode: %v", err)
+	}
+	if tok.AccessToken != "server-token" || tok.RefreshToken != "web-refresh" {
+		t.Errorf("token = %+v, want access server-token, refresh web-refresh", tok)
+	}
+}
+
+// TestRefreshExported confirms Refresh mints an access token and carries the
+// refresh token forward when Google omits it.
+func TestRefreshExported(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(tokenHandler(t, "refresh_token", ""))
+	defer srv.Close()
+	a := NewAuthenticator("cid", "secret", &memStore{}, WithTokenURL(srv.URL))
+	tok, err := a.Refresh(context.Background(), "rt-in")
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if tok.AccessToken != "server-token" {
+		t.Errorf("access = %q, want server-token", tok.AccessToken)
+	}
+	if tok.RefreshToken != "rt-in" {
+		t.Errorf("refresh = %q, want carried-forward rt-in", tok.RefreshToken)
+	}
+}
