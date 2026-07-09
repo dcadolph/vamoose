@@ -39,6 +39,7 @@ Commands:
   slack     Serve the vamoose Slack app: run vamoose from slash commands.
   whoami    Print the signed-in user, manager, and resolved team.
   team      Show or set your default team: team [list|set <email...>|clear].
+  calendars List or create calendars (icloud): calendars [list|create <name>].
   version   Print the vamoose version.
 
 Run "vamoose <command> -h" for command flags.

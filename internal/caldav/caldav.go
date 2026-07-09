@@ -13,8 +13,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/xml"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +33,10 @@ import (
 type Provider struct {
 	// client issues CalDAV requests to the server.
 	client *caldav.Client
+	// httpc is the authenticated HTTP client, retained for raw MKCALENDAR requests.
+	httpc webdav.HTTPClient
+	// endpoint is the CalDAV server root, used to resolve discovered URLs.
+	endpoint string
 	// username is the account address, used as the ORGANIZER and returned by Me.
 	username string
 	// calendarName is the preferred calendar to write to, empty for the first one.
@@ -42,10 +49,12 @@ type Provider struct {
 	// macOS EventKit, recovering approval detection that iCloud CalDAV omits.
 	status StatusFunc
 
-	// mu guards the lazily discovered calendar path.
+	// mu guards the lazily discovered paths.
 	mu sync.Mutex
 	// calendarPath is the resolved target calendar collection, discovered on first use.
 	calendarPath string
+	// homeSet is the discovered calendar home set, where new calendars are created.
+	homeSet string
 }
 
 // Option configures a Provider.
@@ -87,6 +96,8 @@ func NewProvider(endpoint, username, password string, opts ...Option) (*Provider
 	}
 	p := &Provider{
 		client:   cl,
+		httpc:    httpc,
+		endpoint: endpoint,
 		username: username,
 		timeZone: "UTC",
 		prodID:   "-//vamoose//caldav//EN",
@@ -456,4 +467,119 @@ func newUID() (string, error) {
 		return "", fmt.Errorf("%w: uid: %v", ErrCalDAV, err)
 	}
 	return hex.EncodeToString(b) + "@vamoose", nil
+}
+
+// CalendarInfo names a calendar collection.
+type CalendarInfo struct {
+	// Name is the calendar display name, used to select it with the calendar option.
+	Name string
+	// Path is the calendar collection path.
+	Path string
+}
+
+// ListCalendars returns the calendars in the account.
+func (p *Provider) ListCalendars(ctx context.Context) ([]CalendarInfo, error) {
+	home, err := p.home(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cals, err := p.client.FindCalendars(ctx, home)
+	if err != nil {
+		return nil, fmt.Errorf("%w: list calendars: %v", ErrCalDAV, err)
+	}
+	out := make([]CalendarInfo, 0, len(cals))
+	for _, c := range cals {
+		out = append(out, CalendarInfo{Name: c.Name, Path: c.Path})
+	}
+	return out, nil
+}
+
+// CreateCalendar creates a new calendar with the given display name and returns its
+// path. It lets a caller make a dedicated calendar without the Calendar app.
+func (p *Provider) CreateCalendar(ctx context.Context, displayName string) (string, error) {
+	if displayName == "" {
+		return "", fmt.Errorf("%w: calendar name required", ErrCalDAV)
+	}
+	home, err := p.home(ctx)
+	if err != nil {
+		return "", err
+	}
+	slug, err := randomSlug()
+	if err != nil {
+		return "", err
+	}
+	base, err := url.Parse(p.endpoint)
+	if err != nil {
+		return "", fmt.Errorf("%w: endpoint url: %v", ErrCalDAV, err)
+	}
+	ref, err := url.Parse(home)
+	if err != nil {
+		return "", fmt.Errorf("%w: home url: %v", ErrCalDAV, err)
+	}
+	u := *base.ResolveReference(ref)
+	u.Path = strings.TrimRight(u.Path, "/") + "/vamoose-" + slug + "/"
+
+	req, err := http.NewRequestWithContext(ctx, "MKCALENDAR", u.String(), strings.NewReader(mkcalendarBody(displayName)))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/xml; charset=utf-8")
+	resp, err := p.httpc.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("%w: mkcalendar: %v", ErrCalDAV, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return "", fmt.Errorf("%w: mkcalendar failed: %s: %s", ErrCalDAV, resp.Status, strings.TrimSpace(string(b)))
+	}
+	return u.Path, nil
+}
+
+// home discovers and caches the calendar home set, where new calendars are created.
+func (p *Provider) home(ctx context.Context) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.homeSet != "" {
+		return p.homeSet, nil
+	}
+	principal, err := p.client.FindCurrentUserPrincipal(ctx)
+	if err != nil {
+		return "", fmt.Errorf("%w: find principal: %v", ErrCalDAV, err)
+	}
+	hs, err := p.client.FindCalendarHomeSet(ctx, principal)
+	if err != nil {
+		return "", fmt.Errorf("%w: find calendar home: %v", ErrCalDAV, err)
+	}
+	p.homeSet = hs
+	return hs, nil
+}
+
+// mkcalendarTemplate is the MKCALENDAR request body, with the display name escaped in.
+const mkcalendarTemplate = `<?xml version="1.0" encoding="utf-8"?>
+<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:set>
+    <D:prop>
+      <D:displayname>%s</D:displayname>
+      <C:supported-calendar-component-set>
+        <C:comp name="VEVENT"/>
+      </C:supported-calendar-component-set>
+    </D:prop>
+  </D:set>
+</C:mkcalendar>`
+
+// mkcalendarBody renders the MKCALENDAR body with the display name XML-escaped.
+func mkcalendarBody(displayName string) string {
+	var b strings.Builder
+	_ = xml.EscapeText(&b, []byte(displayName))
+	return fmt.Sprintf(mkcalendarTemplate, b.String())
+}
+
+// randomSlug returns a short random hex string for a unique collection segment.
+func randomSlug() (string, error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("%w: slug: %v", ErrCalDAV, err)
+	}
+	return hex.EncodeToString(b), nil
 }

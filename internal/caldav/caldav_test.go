@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -210,5 +211,17 @@ func TestDeleteHoldRefusesCollection(t *testing.T) {
 		if err := p.DeleteHold(context.Background(), bad); err == nil {
 			t.Errorf("DeleteHold(%q) should be refused", bad)
 		}
+	}
+}
+
+// TestMkcalendarBody confirms the display name is XML-escaped in the request body.
+func TestMkcalendarBody(t *testing.T) {
+	t.Parallel()
+	body := mkcalendarBody("Fun & <Games>")
+	if !strings.Contains(body, "Fun &amp; &lt;Games&gt;") {
+		t.Errorf("display name not escaped:\n%s", body)
+	}
+	if !strings.Contains(body, `name="VEVENT"`) {
+		t.Error("body missing the VEVENT component set")
 	}
 }

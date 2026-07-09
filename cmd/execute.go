@@ -46,6 +46,8 @@ func Execute(args []string) int {
 		return run(runSlack(ctx, rest))
 	case "whoami":
 		return run(runWhoami(ctx, rest))
+	case "calendars":
+		return run(runCalendars(ctx, rest))
 	case "team":
 		return run(runTeam(ctx, rest))
 	case "version", "-v", "--version":
