@@ -94,18 +94,53 @@ func TestValidate(t *testing.T) {
 			{Verb: VerbAway}, {Verb: VerbApprove},
 		}},
 		Want: ErrInvalid,
-	}, { // Test 15: A non-notify step after approval is invalid.
+	}, { // Test 15: A cancel after approval is valid now the walker runs it.
 		Name: "cancel after approve",
 		Workflow: Workflow{Name: "x", Steps: []Step{
 			{Verb: VerbHold}, {Verb: VerbApprove}, {Verb: VerbCancel},
 		}},
-		Want: ErrInvalid,
+		Want: nil,
 	}, { // Test 16: Away then notify with no approval is valid.
 		Name: "away then notify",
 		Workflow: Workflow{Name: "x", Steps: []Step{
 			{Verb: VerbAway}, {Verb: VerbNotify},
 		}},
 		Want: nil,
+	}, { // Test 17: A branching pto with accept and decline paths is valid.
+		Name: "branching pto",
+		Workflow: Workflow{Name: "pto-b", Steps: []Step{
+			{ID: "hold", Verb: VerbHold},
+			{ID: "ok", Verb: VerbApprove, On: map[string]string{"accepted": "notify", "declined": "denied"}},
+			{ID: "notify", Verb: VerbNotify, Next: "end"},
+			{ID: "denied", Verb: VerbNote, Subject: "Declined", Next: "end"},
+		}},
+		Want: nil,
+	}, { // Test 18: A branch to an unknown step is invalid.
+		Name: "unknown branch target",
+		Workflow: Workflow{Name: "x", Steps: []Step{
+			{ID: "hold", Verb: VerbHold},
+			{ID: "ok", Verb: VerbApprove, On: map[string]string{"accepted": "ghost"}},
+		}},
+		Want: ErrInvalid,
+	}, { // Test 19: on on a non-approve step is invalid.
+		Name: "on not on approve",
+		Workflow: Workflow{Name: "x", Steps: []Step{
+			{Verb: VerbHold, On: map[string]string{"accepted": "end"}},
+		}},
+		Want: ErrInvalid,
+	}, { // Test 20: An invalid branch outcome is invalid.
+		Name: "bad outcome",
+		Workflow: Workflow{Name: "x", Steps: []Step{
+			{ID: "h", Verb: VerbHold},
+			{Verb: VerbApprove, On: map[string]string{"maybe": "end"}},
+		}},
+		Want: ErrInvalid,
+	}, { // Test 21: Duplicate step ids are invalid.
+		Name: "duplicate id",
+		Workflow: Workflow{Name: "x", Steps: []Step{
+			{ID: "a", Verb: VerbHold}, {ID: "a", Verb: VerbNotify},
+		}},
+		Want: ErrInvalid,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
@@ -145,6 +180,44 @@ func TestVerbClass(t *testing.T) {
 			}
 			if got := test.Verb.Waits(); got != test.WantWaits {
 				t.Errorf("%s.Waits() = %v, want %v", test.Verb, got, test.WantWaits)
+			}
+		})
+	}
+}
+
+func TestNext(t *testing.T) {
+	t.Parallel()
+	branch := Workflow{Steps: []Step{
+		{ID: "hold", Verb: VerbHold},
+		{ID: "ok", Verb: VerbApprove, On: map[string]string{"accepted": "notify", "declined": "denied"}},
+		{ID: "notify", Verb: VerbNotify, Next: "end"},
+		{ID: "denied", Verb: VerbNote, Next: "end"},
+	}}
+	linear := Workflow{Steps: []Step{{Verb: VerbHold}, {Verb: VerbApprove}, {Verb: VerbNotify}}}
+	tests := []struct {
+		Name     string
+		Workflow Workflow
+		I        int
+		Outcome  string
+		Want     int
+	}{{ // Test 0: A plain step falls through to the next.
+		Name: "fall through", Workflow: branch, I: 0, Outcome: "", Want: 1,
+	}, { // Test 1: Accepted follows the accepted branch.
+		Name: "accepted branch", Workflow: branch, I: 1, Outcome: "accepted", Want: 2,
+	}, { // Test 2: Declined follows the declined branch.
+		Name: "declined branch", Workflow: branch, I: 1, Outcome: "declined", Want: 3,
+	}, { // Test 3: next end stops.
+		Name: "next end", Workflow: branch, I: 2, Outcome: "", Want: -1,
+	}, { // Test 4: A linear accept with no branch falls through.
+		Name: "linear accept", Workflow: linear, I: 1, Outcome: "accepted", Want: 2,
+	}, { // Test 5: Past the end stops.
+		Name: "past end", Workflow: linear, I: 2, Outcome: "", Want: -1,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := test.Workflow.Next(test.I, test.Outcome); got != test.Want {
+				t.Errorf("%s: Next(%d, %q) = %d, want %d", test.Name, test.I, test.Outcome, got, test.Want)
 			}
 		})
 	}

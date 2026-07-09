@@ -115,6 +115,41 @@ func TestAdvanceRun(t *testing.T) {
 	}
 }
 
+// TestAdvanceRunBranching confirms the branching workflow takes the notify path on
+// acceptance and the note path on decline.
+func TestAdvanceRunBranching(t *testing.T) {
+	isolateConfig(t)
+	const wf = "pto-notify-on-decline" // built-in: approve gate at step 1
+
+	// Accepted follows the accepted branch: notify the team, no note.
+	accepted := &mockProvider{
+		hold: managerHold(calendar.ResponseAccepted),
+		team: []calendar.Person{{Email: "peer@x.com"}},
+	}
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: wf, Step: 1}
+	if res, _ := advanceRun(context.Background(), accepted, item); res != pollApproved {
+		t.Errorf("accepted res = %v, want approved", res)
+	}
+	if accepted.updated == nil {
+		t.Error("accepted branch should notify the team")
+	}
+	if accepted.created != nil {
+		t.Error("accepted branch should not create a note")
+	}
+
+	// Declined follows the declined branch: create a note, no team notify.
+	declined := &mockProvider{hold: managerHold(calendar.ResponseDeclined)}
+	if res, _ := advanceRun(context.Background(), declined, item); res != pollDeclined {
+		t.Errorf("declined res = %v, want declined", res)
+	}
+	if declined.created == nil {
+		t.Error("declined branch should create a note")
+	}
+	if declined.updated != nil {
+		t.Error("declined branch should not notify the team")
+	}
+}
+
 // TestWatchStore exercises the watch list on disk against an isolated HOME.
 // It cannot run in parallel because it sets process environment variables.
 func TestWatchStore(t *testing.T) {

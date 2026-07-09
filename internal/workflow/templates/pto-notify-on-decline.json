@@ -1,0 +1,11 @@
+{
+  "name": "pto-notify-on-decline",
+  "description": "Time off: notify the team on approval, note it on your calendar on decline.",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "approval", "verb": "approve", "manager": true,
+      "on": { "accepted": "notify", "declined": "denied" } },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" },
+    { "id": "denied", "verb": "note", "subject": "Time off declined", "next": "end" }
+  ]
+}

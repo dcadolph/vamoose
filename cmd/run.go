@@ -162,20 +162,30 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	}
 	fmt.Fprintln(os.Stdout, startedMessage(wf, created))
 
-	return runSteps(ctx, prov, providerName, wf, 1, created, opt.Watch)
+	return runSteps(ctx, prov, providerName, wf, wf.Next(0, ""), created, opt.Watch)
 }
 
-// runSteps runs the workflow steps from index `from` against an existing hold.
-// Notify fans out to the team, cancel deletes the hold, and an approval gate stops
+// runSteps walks the workflow from step `from` against an existing hold, following
+// each step's next or fall-through. Notify fans out to the team, note marks the
+// requester's calendar, cancel deletes the hold, and an approval gate stops
 // execution, recording the run for the daemon when watching. The run command calls
-// it after creation; the daemon calls it again past the gate once approval lands.
+// it after creation; the daemon calls it again from the branch once approval lands.
 func runSteps(ctx context.Context, prov calendar.Provider, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
-	for i := from; i < len(wf.Steps); i++ {
+	visited := make(map[int]bool)
+	for i := from; i >= 0 && i < len(wf.Steps); i = wf.Next(i, "") {
+		if visited[i] {
+			return nil
+		}
+		visited[i] = true
 		switch wf.Steps[i].Verb {
 		case workflow.VerbApprove:
 			return gateOnApproval(providerName, wf, i, hold, watch)
 		case workflow.VerbNotify:
 			if err := promoteHold(ctx, prov, hold); err != nil {
+				return err
+			}
+		case workflow.VerbNote:
+			if err := createNote(ctx, prov, wf.Steps[i], hold); err != nil {
 				return err
 			}
 		case workflow.VerbCancel:
@@ -187,6 +197,27 @@ func runSteps(ctx context.Context, prov calendar.Provider, providerName string, 
 			return nil
 		}
 	}
+	return nil
+}
+
+// createNote creates a short informational event on the requester's own calendar,
+// marking an outcome such as a decline. It reuses the hold's window.
+func createNote(ctx context.Context, prov calendar.Provider, step workflow.Step, hold calendar.Hold) error {
+	subject := step.Subject
+	if subject == "" {
+		subject = "Time off update"
+	}
+	created, err := prov.CreateHold(ctx, calendar.Hold{
+		Subject: subject,
+		Start:   hold.Start,
+		End:     hold.End,
+		AllDay:  hold.AllDay,
+		ShowAs:  calendar.ShowFree,
+	})
+	if err != nil {
+		return fmt.Errorf("create note: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Noted on your calendar: %q (id: %s)\n", subject, created.ID)
 	return nil
 }
 
@@ -262,6 +293,30 @@ func previewWorkflow(w io.Writer, wf workflow.Workflow, hold calendar.Hold) {
 		fmt.Fprintf(w, "  invite %s (%s)\n", personLabel(a.Person), a.Role)
 	}
 	for _, s := range wf.Steps[1:] {
-		fmt.Fprintf(w, "  then %s\n", s.Verb)
+		if s.Verb == workflow.VerbApprove && len(s.On) > 0 {
+			fmt.Fprintf(w, "  approve, then %s\n", branchSummary(s))
+			continue
+		}
+		fmt.Fprintf(w, "  %s\n", stepLabel(s))
 	}
+}
+
+// branchSummary describes an approve step's accepted and declined branches.
+func branchSummary(s workflow.Step) string {
+	var parts []string
+	if t, ok := s.On[workflow.OutcomeAccepted]; ok {
+		parts = append(parts, "accepted -> "+t)
+	}
+	if t, ok := s.On[workflow.OutcomeDeclined]; ok {
+		parts = append(parts, "declined -> "+t)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// stepLabel renders a step as its id and verb, or just the verb when they match.
+func stepLabel(s workflow.Step) string {
+	if s.ID != "" && s.ID != string(s.Verb) {
+		return s.ID + " (" + string(s.Verb) + ")"
+	}
+	return string(s.Verb)
 }
