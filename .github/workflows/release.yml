@@ -62,11 +62,14 @@ jobs:
           fail_on_unmatched_files: true
 
       - name: Bump Homebrew formula
-        if: ${{ env.TAP_TOKEN != '' }}
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          if [ -z "${TAP_TOKEN:-}" ]; then
+            echo "HOMEBREW_TAP_TOKEN not set; skipping formula bump"
+            exit 0
+          fi
           VER="${TAG#v}"
           da=$(sha256sum "dist/vamoose_${VER}_Darwin_arm64.tar.gz" | cut -d' ' -f1)
           di=$(sha256sum "dist/vamoose_${VER}_Darwin_x86_64.tar.gz" | cut -d' ' -f1)
