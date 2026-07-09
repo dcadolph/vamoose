@@ -186,3 +186,32 @@ func TestActionRuns(t *testing.T) {
 		})
 	}
 }
+
+// TestActionError confirms a failed Approve or Decline reports the base verb, not
+// the past-tense label: "Could not approve", never "Could not approved".
+func TestActionError(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Action   string
+		WantText string
+	}{{ // Test 0: A failed approve reads "Could not approve".
+		Action: actionApprove, WantText: "Could not approve:",
+	}, { // Test 1: A failed decline reads "Could not decline".
+		Action: actionDecline, WantText: "Could not decline:",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			srv, ch := captureServer(t)
+			runner := func(context.Context, []string) (string, error) {
+				return "boom", fmt.Errorf("exit status 1")
+			}
+			s := NewServer("shh", runner)
+			s.runAction(srv.URL, test.Action, "EVT1")
+			body := <-ch
+			if !bytes.Contains(body, []byte(test.WantText)) {
+				t.Errorf("error text = %s, want substring %q", body, test.WantText)
+			}
+		})
+	}
+}

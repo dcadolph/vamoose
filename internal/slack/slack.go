@@ -217,21 +217,21 @@ func (s *Server) handleInteractivity(w http.ResponseWriter, r *http.Request) {
 // original message.
 func (s *Server) runAction(responseURL, actionID, holdID string) {
 	var args []string
-	var verb string
+	var done, verb string
 	switch actionID {
 	case actionApprove:
-		args, verb = []string{"promote", "--id", holdID}, "Approved"
+		args, done, verb = []string{"promote", "--id", holdID}, "Approved", "approve"
 	case actionDecline:
-		args, verb = []string{"cancel", "--id", holdID}, "Declined"
+		args, done, verb = []string{"cancel", "--id", holdID}, "Declined", "decline"
 	default:
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
 	defer cancel()
 	out, err := s.run(ctx, args)
-	text := verb + ".\n" + codeBlock(out)
+	text := done + ".\n" + codeBlock(out)
 	if err != nil {
-		text = "Could not " + strings.ToLower(verb) + ": " + err.Error() + "\n" + codeBlock(out)
+		text = "Could not " + verb + ": " + err.Error() + "\n" + codeBlock(out)
 	}
 	s.post(responseURL, map[string]any{"replace_original": true, "text": text})
 }
