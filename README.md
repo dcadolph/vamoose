@@ -246,3 +246,9 @@ v0.3.0, early. Three backends (Graph, Google, iCloud), a JSON workflow engine, a
 CLI, Claude, and Slack surfaces. Google runs live end to end and iCloud's core is
 live-vetted. The Slack app, iCloud approval via EventKit, and Graph against a real
 tenant are unit-tested but not yet live-vetted.
+
+## License
+
+Business Source License 1.1 (see [LICENSE](LICENSE)). Source-available: you may use,
+modify, and run vamoose in production, but not offer it to others as a hosted service
+that provides its primary functionality. It converts to Apache-2.0 on the Change Date.
