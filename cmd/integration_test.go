@@ -19,7 +19,7 @@ import (
 // TestGraphApprovalFlow drives the whole flagship flow end to end against a
 // stateful in-memory Graph: create a hold, poll while pending, flip the manager
 // to accepted, then auto-promote the directory team. It exercises the real
-// provider, the daemon's advanceHold, and promoteHold together, with no account.
+// provider, the daemon's advanceRun, and promoteHold together, with no account.
 func TestGraphApprovalFlow(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
@@ -109,7 +109,8 @@ func TestGraphApprovalFlow(t *testing.T) {
 	}
 
 	// daemon before approval: still pending, nothing promoted.
-	if res, _ := advanceHold(ctx, prov, "evt-1", true); res != pollPending {
+	item := watchItem{Provider: "graph", HoldID: "evt-1", Workflow: "pto", Step: 1}
+	if res, _ := advanceRun(ctx, prov, item); res != pollPending {
 		t.Fatalf("before approval = %v, want pending", res)
 	}
 
@@ -119,9 +120,9 @@ func TestGraphApprovalFlow(t *testing.T) {
 	mu.Unlock()
 
 	// daemon after approval: approved, and the directory team is fanned out.
-	res, err := advanceHold(ctx, prov, "evt-1", true)
+	res, err := advanceRun(ctx, prov, item)
 	if err != nil {
-		t.Fatalf("advanceHold: %v", err)
+		t.Fatalf("advanceRun: %v", err)
 	}
 	if res != pollApproved {
 		t.Fatalf("after approval = %v, want approved", res)

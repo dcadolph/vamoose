@@ -93,9 +93,9 @@ func pollAll(ctx context.Context, logger *log.Logger) {
 			remaining = append(remaining, w)
 			continue
 		}
-		switch res, aerr := advanceHold(ctx, prov, w.HoldID, w.AutoPromote); res {
+		switch res, aerr := advanceRun(ctx, prov, w); res {
 		case pollApproved:
-			logger.Printf("%s: approved and promoted", label(w))
+			logger.Printf("%s: approved and advanced", label(w))
 		case pollDeclined:
 			logger.Printf("%s: declined; no longer watching", label(w))
 		case pollPending:
@@ -119,19 +119,22 @@ func label(w watchItem) string {
 	return fmt.Sprintf("%s %s", w.Provider, w.HoldID)
 }
 
-// advanceHold inspects a hold's manager response and promotes on approval when
-// autoPromote is set. The provider is injected so the logic is testable.
-func advanceHold(ctx context.Context, prov calendar.Provider, holdID string, autoPromote bool) (pollResult, error) {
-	hold, err := prov.GetHold(ctx, holdID)
+// advanceRun advances a watched workflow run: it loads the workflow, checks the
+// manager's response, and on approval runs the steps past the gate (notify and any
+// other steps that follow it). The provider is injected so the logic is testable.
+func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (pollResult, error) {
+	wf, err := workflowLoader().Load(item.Workflow)
+	if err != nil {
+		return pollFailed, err
+	}
+	hold, err := prov.GetHold(ctx, item.HoldID)
 	if err != nil {
 		return pollFailed, err
 	}
 	switch managerAttendee(hold).Response {
 	case calendar.ResponseAccepted:
-		if autoPromote {
-			if err := promoteHold(ctx, prov, hold); err != nil {
-				return pollFailed, err
-			}
+		if err := runSteps(ctx, prov, item.Provider, wf, item.Step+1, hold, false); err != nil {
+			return pollFailed, err
 		}
 		return pollApproved, nil
 	case calendar.ResponseDeclined:

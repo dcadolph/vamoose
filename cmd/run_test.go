@@ -90,8 +90,8 @@ func TestRunWorkflowPTOWatch(t *testing.T) {
 	if len(watches) != 1 {
 		t.Fatalf("watches = %d, want 1", len(watches))
 	}
-	if w := watches[0]; w.HoldID != "created-id" || !w.AutoPromote {
-		t.Errorf("watch = %+v, want created-id auto-promote", w)
+	if w := watches[0]; w.HoldID != "created-id" || w.Workflow != "pto" || w.Step != 1 {
+		t.Errorf("watch = %+v, want created-id pto step 1", w)
 	}
 	if prov.updated != nil {
 		t.Error("notify ran before approval")

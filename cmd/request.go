@@ -116,7 +116,14 @@ func createHold(ctx context.Context, req holdRequest) error {
 	fmt.Fprintf(os.Stdout, "Hold created and sent to %s for approval.\nHold id: %s\nCheck status with: vamoose check\n",
 		mgr.Email, created.ID)
 	if req.Watch {
-		if err := addWatch(watchItem{Provider: providerName, HoldID: created.ID, AutoPromote: true, Subject: created.Subject}); err != nil {
+		pto, werr := workflowLoader().Load("pto")
+		if werr != nil {
+			return fmt.Errorf("load pto workflow: %w", werr)
+		}
+		if err := addWatch(watchItem{
+			Provider: providerName, HoldID: created.ID,
+			Workflow: pto.Name, Step: firstApproveStep(pto), Subject: created.Subject,
+		}); err != nil {
 			return fmt.Errorf("add watch: %w", err)
 		}
 		fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to auto-promote when approved.")

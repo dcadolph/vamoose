@@ -7,14 +7,16 @@ import (
 	"path/filepath"
 )
 
-// watchItem is a hold the daemon polls until the manager responds.
+// watchItem is a workflow run the daemon advances when the manager responds.
 type watchItem struct {
 	// Provider is the calendar provider that owns the hold.
 	Provider string `json:"provider"`
 	// HoldID is the provider event identifier.
 	HoldID string `json:"hold_id"`
-	// AutoPromote fans the hold out to the team once the manager approves.
-	AutoPromote bool `json:"auto_promote"`
+	// Workflow is the name of the workflow driving this hold.
+	Workflow string `json:"workflow"`
+	// Step is the index of the pending step, the approval gate the daemon waits on.
+	Step int `json:"step"`
 	// Subject is the hold title, kept for readable logs.
 	Subject string `json:"subject,omitempty"`
 }

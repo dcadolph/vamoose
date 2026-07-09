@@ -65,65 +65,53 @@ func managerHold(resp calendar.Response) calendar.Hold {
 	}}
 }
 
-func TestAdvanceHold(t *testing.T) {
-	t.Parallel()
+// TestAdvanceRun drives the daemon's per-run advance: it loads the workflow, reads
+// the manager response, and on approval runs the steps past the gate. It isolates
+// HOME for the promote path, so it does not run in parallel.
+func TestAdvanceRun(t *testing.T) {
+	isolateConfig(t)
 	tests := []struct {
-		Hold    calendar.Hold
-		GetErr  error
-		WantRes pollResult
-	}{{ // Test 0: Accepted approves.
-		Hold: managerHold(calendar.ResponseAccepted), WantRes: pollApproved,
-	}, { // Test 1: Declined.
-		Hold: managerHold(calendar.ResponseDeclined), WantRes: pollDeclined,
-	}, { // Test 2: Not responded pends.
-		Hold: managerHold(calendar.ResponseNotResponded), WantRes: pollPending,
+		Name        string
+		Response    calendar.Response
+		GetErr      error
+		Workflow    string
+		WantRes     pollResult
+		WantPromote bool
+	}{{ // Test 0: Approval runs the notify step and promotes the team.
+		Name: "approved", Response: calendar.ResponseAccepted, Workflow: "pto",
+		WantRes: pollApproved, WantPromote: true,
+	}, { // Test 1: A decline stops the run.
+		Name: "declined", Response: calendar.ResponseDeclined, Workflow: "pto",
+		WantRes: pollDeclined,
+	}, { // Test 2: No response keeps waiting.
+		Name: "pending", Response: calendar.ResponseNotResponded, Workflow: "pto",
+		WantRes: pollPending,
 	}, { // Test 3: A fetch error fails.
-		GetErr: errors.New("boom"), WantRes: pollFailed,
+		Name: "fetch error", Response: calendar.ResponseAccepted, GetErr: errors.New("boom"),
+		Workflow: "pto", WantRes: pollFailed,
+	}, { // Test 4: An unknown workflow fails.
+		Name: "unknown workflow", Response: calendar.ResponseAccepted, Workflow: "ghost",
+		WantRes: pollFailed,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
-			t.Parallel()
-			prov := &mockProvider{hold: test.Hold, getErr: test.GetErr}
-			got, _ := advanceHold(context.Background(), prov, "id", false)
-			if got != test.WantRes {
-				t.Errorf("advanceHold = %v, want %v", got, test.WantRes)
+			prov := &mockProvider{
+				hold:   managerHold(test.Response),
+				getErr: test.GetErr,
+				team:   []calendar.Person{{Email: "peer@x.com"}},
 			}
-			if prov.updated != nil {
-				t.Error("UpdateHold called with autoPromote off")
+			item := watchItem{Provider: "graph", HoldID: "id", Workflow: test.Workflow, Step: 1}
+			res, _ := advanceRun(context.Background(), prov, item)
+			if res != test.WantRes {
+				t.Errorf("%s: advanceRun = %v, want %v", test.Name, res, test.WantRes)
+			}
+			if test.WantPromote && prov.updated == nil {
+				t.Errorf("%s: expected the team to be promoted", test.Name)
+			}
+			if !test.WantPromote && prov.updated != nil {
+				t.Errorf("%s: unexpected promote", test.Name)
 			}
 		})
-	}
-}
-
-// TestAdvanceHoldPromotes confirms approval with autoPromote fans out the team.
-// It cannot run in parallel because it isolates HOME to avoid team config.
-func TestAdvanceHoldPromotes(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
-
-	prov := &mockProvider{
-		hold: managerHold(calendar.ResponseAccepted),
-		team: []calendar.Person{{Email: "peer@x.com"}},
-	}
-	res, err := advanceHold(context.Background(), prov, "id", true)
-	if err != nil {
-		t.Fatalf("advanceHold: %v", err)
-	}
-	if res != pollApproved {
-		t.Errorf("res = %v, want approved", res)
-	}
-	if prov.updated == nil {
-		t.Fatal("promote did not update the hold")
-	}
-	found := false
-	for _, a := range prov.updated.Attendees {
-		if a.Person.Email == "peer@x.com" && a.Role == calendar.RoleOptional {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("peer was not added as an optional attendee")
 	}
 }
 
@@ -137,7 +125,7 @@ func TestWatchStore(t *testing.T) {
 	if w, err := loadWatches(); err != nil || w != nil {
 		t.Fatalf("loadWatches on empty = %v, %v; want nil, nil", w, err)
 	}
-	if err := addWatch(watchItem{Provider: "graph", HoldID: "e1", AutoPromote: true}); err != nil {
+	if err := addWatch(watchItem{Provider: "graph", HoldID: "e1", Workflow: "pto", Step: 1}); err != nil {
 		t.Fatalf("addWatch: %v", err)
 	}
 	if err := addWatch(watchItem{Provider: "graph", HoldID: "e2"}); err != nil {

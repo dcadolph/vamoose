@@ -162,17 +162,18 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	}
 	fmt.Fprintf(os.Stdout, "Started %q. Hold id: %s\n", wf.Name, created.ID)
 
-	return advanceImmediateSteps(ctx, prov, providerName, wf, created, opt.Watch)
+	return runSteps(ctx, prov, providerName, wf, 1, created, opt.Watch)
 }
 
-// advanceImmediateSteps runs the steps after creation. Notify fans out to the team,
-// cancel deletes the hold, and an approval gate stops execution, enqueuing the hold
-// for the daemon when watching.
-func advanceImmediateSteps(ctx context.Context, prov calendar.Provider, providerName string, wf workflow.Workflow, hold calendar.Hold, watch bool) error {
-	for _, step := range wf.Steps[1:] {
-		switch step.Verb {
+// runSteps runs the workflow steps from index `from` against an existing hold.
+// Notify fans out to the team, cancel deletes the hold, and an approval gate stops
+// execution, recording the run for the daemon when watching. The run command calls
+// it after creation; the daemon calls it again past the gate once approval lands.
+func runSteps(ctx context.Context, prov calendar.Provider, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
+	for i := from; i < len(wf.Steps); i++ {
+		switch wf.Steps[i].Verb {
 		case workflow.VerbApprove:
-			return gateOnApproval(providerName, wf, hold, watch)
+			return gateOnApproval(providerName, wf, i, hold, watch)
 		case workflow.VerbNotify:
 			if err := promoteHold(ctx, prov, hold); err != nil {
 				return err
@@ -189,23 +190,35 @@ func advanceImmediateSteps(ctx context.Context, prov calendar.Provider, provider
 	return nil
 }
 
-// gateOnApproval stops the workflow at its approval step. When watching, it enqueues
-// the hold so the daemon promotes it once the manager accepts.
-func gateOnApproval(providerName string, wf workflow.Workflow, hold calendar.Hold, watch bool) error {
+// gateOnApproval stops the workflow at its approval step. When watching, it records
+// the run at that step so the daemon advances it once the manager accepts.
+func gateOnApproval(providerName string, wf workflow.Workflow, stepIdx int, hold calendar.Hold, watch bool) error {
 	if !watch {
-		fmt.Fprintf(os.Stdout, "Waiting on approval. Check with 'vamoose check', or run 'vamoose daemon' after 'vamoose run %s --watch'.\n", wf.Name)
+		fmt.Fprintf(os.Stdout, "Waiting on approval. Check with 'vamoose check' or run 'vamoose daemon' after 'vamoose run %s --watch'.\n", wf.Name)
 		return nil
 	}
 	if err := addWatch(watchItem{
-		Provider:    providerName,
-		HoldID:      hold.ID,
-		AutoPromote: wf.Has(workflow.VerbNotify),
-		Subject:     hold.Subject,
+		Provider: providerName,
+		HoldID:   hold.ID,
+		Workflow: wf.Name,
+		Step:     stepIdx,
+		Subject:  hold.Subject,
 	}); err != nil {
 		return fmt.Errorf("add watch: %w", err)
 	}
 	fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to advance the workflow when approved.")
 	return nil
+}
+
+// firstApproveStep returns the index of the workflow's approval step, or -1 when it
+// has none.
+func firstApproveStep(wf workflow.Workflow) int {
+	for i, s := range wf.Steps {
+		if s.Verb == workflow.VerbApprove {
+			return i
+		}
+	}
+	return -1
 }
 
 // createShowAs returns the free/busy status for a creating step, applying the verb
