@@ -2,6 +2,7 @@ package caldav
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -170,5 +171,44 @@ func TestApplyStatuses(t *testing.T) {
 	}
 	if h.Attendees[1].Response != calendar.ResponseNotResponded {
 		t.Errorf("peer response changed unexpectedly to %q", h.Attendees[1].Response)
+	}
+}
+
+// TestIsEventPath confirms only single event objects are considered deletable.
+func TestIsEventPath(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		In   string
+		Want bool
+	}{{ // Test 0: An event object is deletable.
+		In: "/calendars/home/abc123.ics", Want: true,
+	}, { // Test 1: A collection path is not.
+		In: "/calendars/home/", Want: false,
+	}, { // Test 2: A path without the event suffix is not.
+		In: "/calendars/home", Want: false,
+	}, { // Test 3: Empty is not.
+		In: "", Want: false,
+	}, { // Test 4: The root is not.
+		In: "/", Want: false,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := isEventPath(test.In); got != test.Want {
+				t.Errorf("isEventPath(%q) = %v, want %v", test.In, got, test.Want)
+			}
+		})
+	}
+}
+
+// TestDeleteHoldRefusesCollection confirms DeleteHold rejects non-event paths before
+// touching the server, so it can never wipe a calendar.
+func TestDeleteHoldRefusesCollection(t *testing.T) {
+	t.Parallel()
+	p := &Provider{} // nil client: the guard must return before any request.
+	for _, bad := range []string{"", "/calendars/home/", "/calendars/home"} {
+		if err := p.DeleteHold(context.Background(), bad); err == nil {
+			t.Errorf("DeleteHold(%q) should be refused", bad)
+		}
 	}
 }

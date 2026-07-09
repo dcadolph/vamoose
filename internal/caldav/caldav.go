@@ -188,12 +188,23 @@ func (p *Provider) UpdateHold(ctx context.Context, h calendar.Hold) (calendar.Ho
 	return h, nil
 }
 
-// DeleteHold cancels the event and lets the server notify its attendees.
+// DeleteHold cancels the event and lets the server notify its attendees. It refuses
+// to delete anything but a single event object, so it can never remove a calendar
+// collection and wipe events it did not create.
 func (p *Provider) DeleteHold(ctx context.Context, id string) error {
+	if !isEventPath(id) {
+		return fmt.Errorf("%w: refusing to delete %q: not a single event", ErrCalDAV, id)
+	}
 	if err := p.client.RemoveAll(ctx, id); err != nil {
 		return fmt.Errorf("%w: delete: %v", ErrCalDAV, err)
 	}
 	return nil
+}
+
+// isEventPath reports whether id addresses a single event object rather than a
+// calendar collection, guarding against deleting a whole calendar.
+func isEventPath(id string) bool {
+	return id != "" && !strings.HasSuffix(id, "/") && strings.HasSuffix(id, ".ics")
 }
 
 // ensure discovers the target calendar collection once and caches its path.
