@@ -227,7 +227,7 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 - [Command reference](cmd/README.md): every command and its flags.
 - [Workflows](docs/workflows.md): built-in and custom workflows.
 - [Providers](docs/providers.md): Microsoft Graph, Google Calendar, and iCloud setup.
-- [Claude](docs/claude.md): the MCP server and the skill.
+- [Claude](docs/claude-guide.md): the MCP server and the skill.
 - [Slack](docs/slack.md): drive vamoose from Slack with approval buttons.
 - [Architecture](docs/architecture.md): surfaces, core, and adapters.
 

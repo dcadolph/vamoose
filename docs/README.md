@@ -5,7 +5,7 @@
 - [Command reference](../cmd/README.md): every command and its flags.
 - [Workflows](workflows.md): built-in and custom workflows.
 - [Providers](providers.md): Microsoft Graph, Google Calendar, and iCloud setup.
-- [Claude](claude.md): the MCP server and the skill.
+- [Claude](claude-guide.md): the MCP server and the skill.
 - [Slack](slack.md): drive vamoose from Slack with approval buttons.
 - [Architecture](architecture.md): surfaces, core, and adapters.
 

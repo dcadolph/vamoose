@@ -108,7 +108,7 @@ Print a launchd (macOS) or systemd (Linux) manifest to run the daemon unattended
 
 `vamoose mcp`
 
-Serve vamoose to Claude over the Model Context Protocol on stdio. See [Claude](../docs/claude.md).
+Serve vamoose to Claude over the Model Context Protocol on stdio. See [Claude](../docs/claude-guide.md).
 
 ## Info
 
