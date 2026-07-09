@@ -33,11 +33,27 @@ background. Time off is the flagship workflow, and you can define your own.
 
 These three steps are the built-in **pto** workflow, and `request`, `check`, and
 `promote` are fronts over its steps. vamoose runs other workflows too, and you can
-define your own; see [Workflows](#workflows).
+define your own. See [Workflows](#workflows).
 
 Two backends ship behind one provider interface: Microsoft Graph (Outlook,
 Microsoft 365, and Teams) and Google Calendar. Pick one with `--provider` or the
-`VAMOOSE_PROVIDER` environment variable; the three commands work the same on both.
+`VAMOOSE_PROVIDER` environment variable, and every command works the same on both.
+
+## Why not just calendar rules?
+
+You can rig a version of this with one calendar's rules or a saved email. vamoose
+earns its keep the moment you have more than one account:
+
+- **One brain for every account.** The same workflows, commands, and setup whether
+  you are on Google, Outlook, or Microsoft 365. Learn it once, not once per client.
+- **No rebuilding per client.** Native rules live inside one app and stop at its edge.
+  Define a workflow once and point it at any backend with `--provider`.
+- **No drift.** Change your time-off flow in one place. Hand-built rules drift the day
+  you update Outlook and forget Gmail.
+- **Workflows are files, not clicks.** JSON you can read, diff, share, version, and
+  dry-run, instead of a settings panel you rebuild by hand on every machine.
+- **Runs where you already are.** The CLI, Claude, and (soon) Slack, not one vendor's
+  web UI.
 
 ## Setup
 
