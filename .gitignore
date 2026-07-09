@@ -1,6 +1,7 @@
 # Compiled binary
 /vamoose
 /vamoose-eventkit
+/vamoose-eventkit.app/
 vamoose.exe
 
 # Build and release output

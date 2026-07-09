@@ -19,6 +19,11 @@ import (
 // helperName is the compiled Swift helper binary name.
 const helperName = "vamoose-eventkit"
 
+// helperBundlePath is the helper inside its macOS .app bundle. A signed bundle is
+// its own TCC subject, so macOS prompts for and attaches calendar access to it
+// rather than to the parent terminal.
+const helperBundlePath = "vamoose-eventkit.app/Contents/MacOS/vamoose-eventkit"
+
 // Status returns attendee responses for the event with the given iCalendar UID,
 // keyed by lowercase email, read from the local Calendar.app.
 func Status(ctx context.Context, uid string) (map[string]calendar.Response, error) {
@@ -55,9 +60,11 @@ func helperPath() (string, error) {
 		return p, nil
 	}
 	if exe, err := os.Executable(); err == nil {
-		cand := filepath.Join(filepath.Dir(exe), helperName)
-		if _, statErr := os.Stat(cand); statErr == nil {
-			return cand, nil
+		dir := filepath.Dir(exe)
+		for _, cand := range []string{filepath.Join(dir, helperBundlePath), filepath.Join(dir, helperName)} {
+			if _, statErr := os.Stat(cand); statErr == nil {
+				return cand, nil
+			}
 		}
 	}
 	if p, err := exec.LookPath(helperName); err == nil {

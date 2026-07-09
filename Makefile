@@ -6,15 +6,20 @@
 build:
 	go build -o vamoose .
 
-# eventkit compiles the macOS EventKit helper, which enables native approval
-# detection on iCloud. The Info.plist is embedded into the Mach-O so macOS shows
-# the calendar-access prompt; without its usage-description key macOS 14+ denies
-# access outright. Requires the Swift toolchain and runs on macOS only.
+# eventkit compiles the macOS EventKit helper and packages it as a signed .app
+# bundle. TCC treats a bundled, signed app as its own subject, so macOS shows the
+# calendar-access prompt and the grant sticks to the app; a bare CLI binary is
+# attributed to the parent terminal and denied without a prompt. Requires the
+# Swift toolchain and runs on macOS only.
+APP := vamoose-eventkit.app
 eventkit:
-	swiftc -O internal/eventkit/eventkit-helper.swift -o vamoose-eventkit \
+	rm -rf $(APP)
+	mkdir -p $(APP)/Contents/MacOS
+	cp internal/eventkit/Info.plist $(APP)/Contents/Info.plist
+	swiftc -O internal/eventkit/eventkit-helper.swift -o $(APP)/Contents/MacOS/vamoose-eventkit \
 		-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist \
 		-Xlinker internal/eventkit/Info.plist
-	codesign --force --sign - vamoose-eventkit
+	codesign --force --sign - $(APP)
 
 # test runs the Go test suite.
 test:
@@ -22,4 +27,4 @@ test:
 
 # clean removes the built binaries.
 clean:
-	rm -f vamoose vamoose-eventkit
+	rm -rf vamoose vamoose-eventkit vamoose-eventkit.app

@@ -6,6 +6,18 @@
 	<string>com.dcadolph.vamoose.eventkit</string>
 	<key>CFBundleName</key>
 	<string>vamoose-eventkit</string>
+	<key>CFBundleExecutable</key>
+	<string>vamoose-eventkit</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
+	<key>LSUIElement</key>
+	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>vamoose reads calendar invite responses so it can tell when an approver accepts a time-off hold.</string>
 	<key>NSCalendarsUsageDescription</key>
