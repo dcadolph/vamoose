@@ -1,7 +1,10 @@
 // Package slack serves the vamoose Slack app. It verifies Slack request
 // signatures and runs vamoose subcommands on behalf of slash commands, so anything
-// the CLI does can be driven from Slack. The runner is injected, so the package
-// stays testable without spawning processes.
+// the CLI does can be driven from Slack. When a command creates a hold that awaits
+// approval, it posts Approve and Decline buttons; clicking one promotes or cancels
+// the hold. That makes Slack a backend-independent approval signal, so approval
+// works even on backends that cannot report calendar accepts. The runner is
+// injected, so the package stays testable without spawning processes.
 package slack
 
 import (
@@ -15,13 +18,23 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// maxBody caps the request body read, guarding against oversized posts.
-const maxBody = 1 << 20
+const (
+	// maxBody caps the request body read, guarding against oversized posts.
+	maxBody = 1 << 20
+	// actionApprove is the action id of the Approve button.
+	actionApprove = "vamoose_approve"
+	// actionDecline is the action id of the Decline button.
+	actionDecline = "vamoose_decline"
+)
+
+// holdIDRe extracts a hold id from vamoose command output.
+var holdIDRe = regexp.MustCompile(`(?i)hold id:\s*(\S+)`)
 
 // Runner executes a vamoose subcommand and returns its combined output.
 type Runner func(ctx context.Context, args []string) (string, error)
@@ -110,29 +123,85 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeMessage(w, "ephemeral", "Running `vamoose "+text+"` ...")
-	go s.runAndReport(form.Get("response_url"), args)
+	go s.runCommand(form.Get("response_url"), args)
 }
 
-// runAndReport runs the subcommand and posts its output to the Slack response URL.
-func (s *Server) runAndReport(responseURL string, args []string) {
+// runCommand runs a slash subcommand and posts the result. When the output shows a
+// hold awaiting approval, it posts Approve and Decline buttons instead of plain text.
+func (s *Server) runCommand(responseURL string, args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
 	defer cancel()
 	out, err := s.run(ctx, args)
-	text := codeBlock(out)
 	if err != nil {
-		text = "Command failed: " + err.Error() + "\n" + codeBlock(out)
+		s.post(responseURL, map[string]any{
+			"response_type": "ephemeral",
+			"text":          "Command failed: " + err.Error() + "\n" + codeBlock(out),
+		})
+		return
 	}
-	s.postResponse(responseURL, text)
+	if id := holdID(out); id != "" && strings.Contains(strings.ToLower(out), "approval") {
+		s.post(responseURL, map[string]any{
+			"response_type": "in_channel",
+			"text":          firstLine(out),
+			"blocks":        approvalBlocks(strings.TrimSpace(out), id),
+		})
+		return
+	}
+	s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": codeBlock(out)})
 }
 
-// handleInteractivity verifies an interaction payload. Approve and decline handling
-// lands in the next slice.
+// handleInteractivity verifies a button interaction and acts on Approve or Decline.
 func (s *Server) handleInteractivity(w http.ResponseWriter, r *http.Request) {
-	if _, err := s.verify(r); err != nil {
+	body, err := s.verify(r)
+	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	form, err := url.ParseQuery(string(body))
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	var payload struct {
+		ResponseURL string `json:"response_url"`
+		Actions     []struct {
+			ActionID string `json:"action_id"`
+			Value    string `json:"value"`
+		} `json:"actions"`
+	}
+	if err := json.Unmarshal([]byte(form.Get("payload")), &payload); err != nil {
+		http.Error(w, "bad payload", http.StatusBadRequest)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
+	if len(payload.Actions) == 0 {
+		return
+	}
+	act := payload.Actions[0]
+	go s.runAction(payload.ResponseURL, act.ActionID, act.Value)
+}
+
+// runAction promotes or cancels a hold in response to a button click and updates the
+// original message.
+func (s *Server) runAction(responseURL, actionID, holdID string) {
+	var args []string
+	var verb string
+	switch actionID {
+	case actionApprove:
+		args, verb = []string{"promote", "--id", holdID}, "Approved"
+	case actionDecline:
+		args, verb = []string{"cancel", "--id", holdID}, "Declined"
+	default:
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
+	defer cancel()
+	out, err := s.run(ctx, args)
+	text := verb + ".\n" + codeBlock(out)
+	if err != nil {
+		text = "Could not " + strings.ToLower(verb) + ": " + err.Error() + "\n" + codeBlock(out)
+	}
+	s.post(responseURL, map[string]any{"replace_original": true, "text": text})
 }
 
 // verify reads the request body and checks the Slack signature and timestamp,
@@ -160,12 +229,12 @@ func (s *Server) verify(r *http.Request) ([]byte, error) {
 	return body, nil
 }
 
-// postResponse posts a message to a Slack response URL.
-func (s *Server) postResponse(responseURL, text string) {
+// post sends a JSON payload to a Slack response URL.
+func (s *Server) post(responseURL string, payload any) {
 	if responseURL == "" {
 		return
 	}
-	b, err := json.Marshal(map[string]string{"response_type": "ephemeral", "text": text})
+	b, err := json.Marshal(payload)
 	if err != nil {
 		return
 	}
@@ -176,6 +245,36 @@ func (s *Server) postResponse(responseURL, text string) {
 	req.Header.Set("Content-Type", "application/json")
 	if resp, err := s.httpClient.Do(req); err == nil {
 		_ = resp.Body.Close()
+	}
+}
+
+// approvalBlocks builds a Slack message with Approve and Decline buttons carrying
+// the hold id.
+func approvalBlocks(summary, holdID string) []any {
+	return []any{
+		map[string]any{
+			"type": "section",
+			"text": map[string]any{"type": "mrkdwn", "text": summary},
+		},
+		map[string]any{
+			"type": "actions",
+			"elements": []any{
+				map[string]any{
+					"type":      "button",
+					"text":      map[string]any{"type": "plain_text", "text": "Approve"},
+					"style":     "primary",
+					"action_id": actionApprove,
+					"value":     holdID,
+				},
+				map[string]any{
+					"type":      "button",
+					"text":      map[string]any{"type": "plain_text", "text": "Decline"},
+					"style":     "danger",
+					"action_id": actionDecline,
+					"value":     holdID,
+				},
+			},
+		},
 	}
 }
 
@@ -192,6 +291,24 @@ func codeBlock(out string) string {
 		return "_(no output)_"
 	}
 	return "```\n" + out + "\n```"
+}
+
+// holdID returns the hold id printed in command output, or empty.
+func holdID(out string) string {
+	if m := holdIDRe.FindStringSubmatch(out); len(m) == 2 {
+		return m[1]
+	}
+	return ""
+}
+
+// firstLine returns the first non-empty line of s, for a short message summary.
+func firstLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if t := strings.TrimSpace(line); t != "" {
+			return t
+		}
+	}
+	return "vamoose"
 }
 
 // tokenize splits slash command text into arguments, honoring single and double

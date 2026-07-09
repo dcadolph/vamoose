@@ -6,7 +6,7 @@ vamoose is built in layers with hard boundaries.
 
 ## Surfaces
 
-Thin clients with no business logic: the CLI, the MCP server (`vamoose mcp`), and the Claude skill. A surface parses input and calls the core.
+Thin clients with no business logic: the CLI, the MCP server (`vamoose mcp`), the Slack app (`vamoose slack`), and the Claude skill. A surface parses input and calls the core.
 
 ## Core
 
