@@ -194,7 +194,7 @@ func runSteps(ctx context.Context, prov calendar.Provider, providerName string, 
 // the run at that step so the daemon advances it once the manager accepts.
 func gateOnApproval(providerName string, wf workflow.Workflow, stepIdx int, hold calendar.Hold, watch bool) error {
 	if !watch {
-		fmt.Fprintf(os.Stdout, "Waiting on approval. Check with 'vamoose check' or run 'vamoose daemon' after 'vamoose run %s --watch'.\n", wf.Name)
+		fmt.Fprintln(os.Stdout, "Waiting on approval. Run 'vamoose check' to poll, or add --watch and run 'vamoose daemon' to advance on approval.")
 		return nil
 	}
 	if err := addWatch(watchItem{
@@ -208,17 +208,6 @@ func gateOnApproval(providerName string, wf workflow.Workflow, stepIdx int, hold
 	}
 	fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to advance the workflow when approved.")
 	return nil
-}
-
-// firstApproveStep returns the index of the workflow's approval step, or -1 when it
-// has none.
-func firstApproveStep(wf workflow.Workflow) int {
-	for i, s := range wf.Steps {
-		if s.Verb == workflow.VerbApprove {
-			return i
-		}
-	}
-	return -1
 }
 
 // createShowAs returns the free/busy status for a creating step, applying the verb

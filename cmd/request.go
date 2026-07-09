@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
@@ -74,61 +73,26 @@ type holdRequest struct {
 	Watch bool
 }
 
-// createHold resolves the manager, creates the hold shown as free, caches it,
-// and optionally enqueues it for the daemon to auto-promote.
+// createHold runs the built-in pto workflow: it creates the hold shown free,
+// invites the manager, and gates on approval, watching for the daemon when asked.
+// request and off are thin fronts over this one workflow.
 func createHold(ctx context.Context, req holdRequest) error {
-	providerName := resolveProvider(req.Provider)
-	prov, err := newProvider(providerName, resolveTimeZone(req.TZ))
+	wf, err := workflowLoader().Load("pto")
 	if err != nil {
-		return err
+		return fmt.Errorf("load pto workflow: %w", err)
 	}
-
-	mgr, err := resolveManager(ctx, prov, req.Manager)
-	if err != nil {
-		return err
-	}
-
-	hold := calendar.Hold{
-		Subject: req.Subject,
-		Body:    req.Body,
-		Start:   req.Start,
-		End:     req.End,
-		AllDay:  req.AllDay,
-		ShowAs:  calendar.ShowFree,
-		Attendees: []calendar.Attendee{
-			{Person: mgr, Role: calendar.RoleRequired},
-		},
-	}
-
-	if req.DryRun {
-		fmt.Fprintf(os.Stdout, "would create hold %q %s -> %s, inviting %s\n",
-			hold.Subject, req.Start.Format(time.RFC3339), req.End.Format(time.RFC3339), mgr.Email)
-		return nil
-	}
-
-	created, err := prov.CreateHold(ctx, hold)
-	if err != nil {
-		return fmt.Errorf("create hold: %w", err)
-	}
-	if err := saveState(state{LastHold: holdRef{Provider: providerName, ID: created.ID}}); err != nil {
-		return fmt.Errorf("save state: %w", err)
-	}
-	fmt.Fprintf(os.Stdout, "Hold created and sent to %s for approval.\nHold id: %s\nCheck status with: vamoose check\n",
-		mgr.Email, created.ID)
-	if req.Watch {
-		pto, werr := workflowLoader().Load("pto")
-		if werr != nil {
-			return fmt.Errorf("load pto workflow: %w", werr)
-		}
-		if err := addWatch(watchItem{
-			Provider: providerName, HoldID: created.ID,
-			Workflow: pto.Name, Step: firstApproveStep(pto), Subject: created.Subject,
-		}); err != nil {
-			return fmt.Errorf("add watch: %w", err)
-		}
-		fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to auto-promote when approved.")
-	}
-	return nil
+	return executeWorkflow(ctx, wf, runOptions{
+		Provider: req.Provider,
+		TZ:       req.TZ,
+		Subject:  req.Subject,
+		Body:     req.Body,
+		Manager:  req.Manager,
+		Start:    req.Start,
+		End:      req.End,
+		AllDay:   req.AllDay,
+		DryRun:   req.DryRun,
+		Watch:    req.Watch,
+	})
 }
 
 // resolveManager returns the approver: the explicit email when given, otherwise the
