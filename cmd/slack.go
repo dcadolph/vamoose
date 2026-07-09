@@ -50,6 +50,25 @@ func runSlack(ctx context.Context, args []string) error {
 		opts = append(opts, slack.WithOAuth(id, sec, pub, store))
 		logger.Printf("install flow enabled: %s/slack/install", pub)
 	}
+	if perUser := os.Getenv("VAMOOSE_SLACK_PER_USER"); perUser != "" && perUser != "0" {
+		pub := os.Getenv("VAMOOSE_SLACK_PUBLIC_URL")
+		if pub == "" {
+			return fmt.Errorf("per-user mode requires VAMOOSE_SLACK_PUBLIC_URL for the OAuth callback")
+		}
+		links, lerr := slackUserLinkStore()
+		if lerr != nil {
+			return fmt.Errorf("slack user link store: %w", lerr)
+		}
+		var linkers []slack.Linker
+		if id, sec := os.Getenv("VAMOOSE_GOOGLE_CLIENT_ID"), os.Getenv("VAMOOSE_GOOGLE_CLIENT_SECRET"); id != "" && sec != "" {
+			linkers = append(linkers, newGoogleLinker(id, sec))
+		}
+		if len(linkers) == 0 {
+			return fmt.Errorf("per-user mode needs a provider configured, for example VAMOOSE_GOOGLE_CLIENT_ID and VAMOOSE_GOOGLE_CLIENT_SECRET")
+		}
+		opts = append(opts, slack.WithPublicURL(pub), slack.WithLinkers(links, linkers...))
+		logger.Printf("per-user mode: %d provider(s); each user runs /vamoose link google", len(linkers))
+	}
 	srv := slack.NewServer(secret, runner, opts...)
 
 	httpSrv := &http.Server{Addr: *addr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
@@ -79,6 +98,15 @@ func slackTokenStore() (*slack.FileStore, error) {
 		return nil, err
 	}
 	return slack.NewFileStore(filepath.Join(dir, "vamoose", "slack-tokens.json")), nil
+}
+
+// slackUserLinkStore returns a file-backed store for per-user calendar links.
+func slackUserLinkStore() (*slack.UserLinkFileStore, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	return slack.NewUserLinkFileStore(filepath.Join(dir, "vamoose", "slack-user-links.json")), nil
 }
 
 // perUserEnvKeys are the environment variables the Slack server injects per user.

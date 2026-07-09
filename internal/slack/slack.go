@@ -140,6 +140,10 @@ func WithOAuth(clientID, clientSecret, publicURL string, store TokenStore) Optio
 // WithOAuthBaseURL overrides the Slack OAuth API root, for tests.
 func WithOAuthBaseURL(u string) Option { return func(s *Server) { s.oauthBaseURL = u } }
 
+// WithPublicURL sets the server's public base URL, used to build the OAuth redirect
+// for the per-user link flow. WithOAuth also sets it for the install flow.
+func WithPublicURL(u string) Option { return func(s *Server) { s.publicURL = u } }
+
 // Handler returns the HTTP handler serving the Slack endpoints.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
