@@ -6,7 +6,7 @@ import (
 )
 
 // version is the semantic version, overridable at build time via -ldflags.
-var version = "0.5.0"
+var version = "0.6.0"
 
 // versionString returns the version, appending the VCS revision when available.
 func versionString() string {
