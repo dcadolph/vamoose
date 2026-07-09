@@ -8,12 +8,12 @@
 
 The moose does the paperwork. You go to the beach.
 
-> **Status: v0.1.0, early.**
+> **Status: v0.2.0, early.**
 > The core flow runs live on Google Calendar: sign-in, request, manager approval,
-> team promote, quick actions, and the watch daemon. A JSON workflow engine
-> (`vamoose run`, custom workflows) has since landed on main for the next release;
-> its sequencing is unit-tested but not yet live-vetted. The Microsoft Graph path is
-> unit-tested but hasn't been run against a live Microsoft 365 tenant yet.
+> team promote, quick actions, and the watch daemon. The v0.2.0 JSON workflow engine
+> (`vamoose run`, custom workflows, a workflow-driven daemon) is unit-tested end to
+> end, but its run and daemon-advance path has not been live-vetted yet. The Microsoft
+> Graph path is unit-tested but hasn't been run against a live Microsoft 365 tenant yet.
 
 Calendar busywork is death by a thousand steps: block the dates, ping your manager,
 wait for a nod, then re-send the event to the team so nobody schedules over you.
@@ -213,7 +213,7 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Status
 
-v0.1.0, plus a JSON workflow engine on main for the next release. The core flow
-runs live on Google Calendar end to end; the workflow run and daemon-advance path
-is unit-tested but not yet live-vetted. The Microsoft Graph path is unit-tested but
-hasn't hit a live tenant yet.
+v0.2.0. The core flow runs live on Google Calendar end to end. The v0.2.0 workflow
+engine (run, custom workflows, a workflow-driven daemon) is unit-tested, but its run
+and daemon-advance path has not been live-vetted yet. The Microsoft Graph path is
+unit-tested but hasn't hit a live tenant yet.
