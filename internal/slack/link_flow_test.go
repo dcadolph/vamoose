@@ -144,3 +144,45 @@ func TestViewSubmissionMissingFields(t *testing.T) {
 		t.Error("empty submission should not store a link")
 	}
 }
+
+// TestApprovalValueRoundTrip confirms per-user encoding carries the owner while
+// single-tenant stays the plain hold id.
+func TestApprovalValueRoundTrip(t *testing.T) {
+	t.Parallel()
+	h, team, user := decodeApprovalValue(approvalValue("EVT1", "T1", "U1"))
+	if h != "EVT1" || team != "T1" || user != "U1" {
+		t.Errorf("per-user decode = %q/%q/%q, want EVT1/T1/U1", h, team, user)
+	}
+	if got := approvalValue("EVT2", "", ""); got != "EVT2" {
+		t.Errorf("single-tenant value = %q, want EVT2", got)
+	}
+	if h, team, user := decodeApprovalValue("EVT2"); h != "EVT2" || team != "" || user != "" {
+		t.Errorf("plain decode = %q/%q/%q, want EVT2//", h, team, user)
+	}
+}
+
+// TestRunActionAsOwner confirms a per-user Approve runs promote with the hold
+// owner's injected environment, not the clicker's.
+func TestRunActionAsOwner(t *testing.T) {
+	t.Parallel()
+	store := NewUserLinkFileStore(filepath.Join(t.TempDir(), "l.json"))
+	if err := store.SaveLink("T1", "U1", UserLink{Provider: "google", RefreshToken: "rt"}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	fl := fakeLinker{provider: "google", env: []string{"VAMOOSE_PROVIDER=google", "VAMOOSE_GOOGLE_ACCESS_TOKEN=at"}}
+	var gotArgs, gotEnv []string
+	runner := func(_ context.Context, args, env []string) (string, error) {
+		gotArgs, gotEnv = args, env
+		return "promoted", nil
+	}
+	srv, ch := captureServer(t)
+	s := NewServer("shh", runner, WithLinkers(store, fl))
+	s.runAction(srv.URL, actionApprove, approvalValue("EVT1", "T1", "U1"))
+	<-ch
+	if len(gotArgs) != 3 || gotArgs[2] != "EVT1" {
+		t.Errorf("args = %v, want promote --id EVT1", gotArgs)
+	}
+	if len(gotEnv) != 2 || gotEnv[1] != "VAMOOSE_GOOGLE_ACCESS_TOKEN=at" {
+		t.Errorf("env = %v, want the owner's google token", gotEnv)
+	}
+}

@@ -141,7 +141,7 @@ func TestApprovalButtons(t *testing.T) {
 		return "Hold created and sent to boss@x.com for approval.\nHold id: EVT1", nil
 	}
 	s := NewServer("shh", runner)
-	s.runCommand(srv.URL, []string{"off", "next", "week"}, nil)
+	s.runCommand(srv.URL, []string{"off", "next", "week"}, nil, "", "")
 	body := <-ch
 	if !bytes.Contains(body, []byte(`"value":"EVT1"`)) {
 		t.Errorf("button value EVT1 missing: %s", body)

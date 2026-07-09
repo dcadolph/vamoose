@@ -202,12 +202,12 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeMessage(w, "ephemeral", "Running `vamoose "+text+"` ...")
-	go s.runCommand(form.Get("response_url"), args, nil)
+	go s.runCommand(form.Get("response_url"), args, nil, "", "")
 }
 
 // runCommand runs a slash subcommand and posts the result. When the output shows a
 // hold awaiting approval, it posts Approve and Decline buttons instead of plain text.
-func (s *Server) runCommand(responseURL string, args, env []string) {
+func (s *Server) runCommand(responseURL string, args, env []string, ownerTeam, ownerUser string) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
 	defer cancel()
 	out, err := s.run(ctx, args, env)
@@ -222,11 +222,41 @@ func (s *Server) runCommand(responseURL string, args, env []string) {
 		s.post(responseURL, map[string]any{
 			"response_type": "in_channel",
 			"text":          firstLine(out),
-			"blocks":        approvalBlocks(strings.TrimSpace(out), id),
+			"blocks":        approvalBlocks(strings.TrimSpace(out), approvalValue(id, ownerTeam, ownerUser)),
 		})
 		return
 	}
 	s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": codeBlock(out)})
+}
+
+// approvalValue encodes the hold id, and in per-user mode the owning user, into a
+// button value so a click can run the action as that user. In single-tenant mode it
+// is the plain hold id.
+func approvalValue(holdID, team, user string) string {
+	if user == "" {
+		return holdID
+	}
+	b, err := json.Marshal(map[string]string{"t": team, "u": user, "h": holdID})
+	if err != nil {
+		return holdID
+	}
+	return string(b)
+}
+
+// decodeApprovalValue splits a button value into a hold id and, when present, the
+// owning user encoded for per-user mode.
+func decodeApprovalValue(value string) (holdID, team, user string) {
+	if strings.HasPrefix(value, "{") {
+		var v struct {
+			T string `json:"t"`
+			U string `json:"u"`
+			H string `json:"h"`
+		}
+		if json.Unmarshal([]byte(value), &v) == nil && v.H != "" {
+			return v.H, v.T, v.U
+		}
+	}
+	return value, "", ""
 }
 
 // handleInteractivity verifies a button interaction and acts on Approve or Decline.
@@ -278,7 +308,8 @@ func (s *Server) handleInteractivity(w http.ResponseWriter, r *http.Request) {
 
 // runAction promotes or cancels a hold in response to a button click and updates the
 // original message.
-func (s *Server) runAction(responseURL, actionID, holdID string) {
+func (s *Server) runAction(responseURL, actionID, value string) {
+	holdID, team, user := decodeApprovalValue(value)
 	var args []string
 	var done, verb string
 	switch actionID {
@@ -291,7 +322,15 @@ func (s *Server) runAction(responseURL, actionID, holdID string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
 	defer cancel()
-	out, err := s.run(ctx, args, nil)
+	// In per-user mode, run the action as the hold's owner so it touches their
+	// calendar, not the clicker's.
+	var env []string
+	if user != "" && s.links != nil {
+		if e, uerr := s.userEnv(ctx, team, user); uerr == nil {
+			env = e
+		}
+	}
+	out, err := s.run(ctx, args, env)
 	text := done + ".\n" + codeBlock(out)
 	if err != nil {
 		text = "Could not " + verb + ": " + err.Error() + "\n" + codeBlock(out)
@@ -446,10 +485,26 @@ func tokenize(text string) ([]string, error) {
 	return args, nil
 }
 
-// runAsUser resolves the invoking user's linked calendar into injected environment
-// and runs the command as that user, or asks them to link first.
-func (s *Server) runAsUser(responseURL, team, user string, args []string) {
+// userEnv resolves a linked user's calendar into the environment that runs a
+// command as that user. It returns ErrNotLinked when the user has no link.
+func (s *Server) userEnv(ctx context.Context, team, user string) ([]string, error) {
 	link, err := s.links.GetLink(team, user)
+	if err != nil {
+		return nil, err
+	}
+	linker, ok := s.linkers[link.Provider]
+	if !ok {
+		return nil, fmt.Errorf("no linker configured for %s", link.Provider)
+	}
+	return linker.RunEnv(ctx, link)
+}
+
+// runAsUser resolves the invoking user's linked calendar and runs the command as
+// that user, or asks them to link first.
+func (s *Server) runAsUser(responseURL, team, user string, args []string) {
+	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
+	defer cancel()
+	env, err := s.userEnv(ctx, team, user)
 	if errors.Is(err, ErrNotLinked) {
 		s.post(responseURL, map[string]any{
 			"response_type": "ephemeral",
@@ -458,22 +513,10 @@ func (s *Server) runAsUser(responseURL, team, user string, args []string) {
 		return
 	}
 	if err != nil {
-		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Could not read your link: " + err.Error()})
-		return
-	}
-	linker, ok := s.linkers[link.Provider]
-	if !ok {
-		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "No linker configured for " + link.Provider})
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), s.runTimeout)
-	defer cancel()
-	env, err := linker.RunEnv(ctx, link)
-	if err != nil {
 		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Could not authorize your calendar: " + err.Error()})
 		return
 	}
-	s.runCommand(responseURL, args, env)
+	s.runCommand(responseURL, args, env, team, user)
 }
 
 // handleLink starts linking the invoking user's calendar for the named provider.
