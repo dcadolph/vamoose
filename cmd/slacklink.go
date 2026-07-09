@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 
 	"github.com/dcadolph/vamoose/internal/auth"
 	"github.com/dcadolph/vamoose/internal/googleauth"
@@ -101,5 +102,34 @@ func (l *graphLinker) RunEnv(ctx context.Context, link slack.UserLink) ([]string
 	return []string{
 		"VAMOOSE_PROVIDER=" + defaultProvider,
 		"VAMOOSE_GRAPH_ACCESS_TOKEN=" + tok.AccessToken,
+	}, nil
+}
+
+// icloudLinker links a Slack user's iCloud calendar. iCloud has no OAuth, so the
+// user submits an Apple ID and app-specific password through a Slack modal; those
+// credentials are stored and injected per command.
+type icloudLinker struct{}
+
+// Provider returns the calendar provider name.
+func (icloudLinker) Provider() string { return providerICloud }
+
+// AuthURL returns an empty string, signaling that iCloud links by modal, not OAuth.
+func (icloudLinker) AuthURL(string, string) string { return "" }
+
+// Exchange is unused for iCloud; the modal submission builds the link directly.
+func (icloudLinker) Exchange(context.Context, string, string) (slack.UserLink, error) {
+	return slack.UserLink{}, errors.New("icloud links via a modal, not oauth")
+}
+
+// RunEnv returns the environment that runs a vamoose subcommand as the linked
+// iCloud user.
+func (icloudLinker) RunEnv(_ context.Context, link slack.UserLink) ([]string, error) {
+	if link.ICloudUser == "" || link.ICloudAppPassword == "" {
+		return nil, errors.New("icloud link is missing credentials")
+	}
+	return []string{
+		"VAMOOSE_PROVIDER=" + providerICloud,
+		"VAMOOSE_ICLOUD_USERNAME=" + link.ICloudUser,
+		"VAMOOSE_ICLOUD_APP_PASSWORD=" + link.ICloudAppPassword,
 	}, nil
 }

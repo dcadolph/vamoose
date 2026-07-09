@@ -70,6 +70,9 @@ func runSlack(ctx context.Context, args []string) error {
 			}
 			linkers = append(linkers, newGraphLinker(tenant, id, sec))
 		}
+		// iCloud needs no server credentials: users submit an app-specific password
+		// through a modal, which requires the workspace bot token from an install.
+		linkers = append(linkers, icloudLinker{})
 		if len(linkers) == 0 {
 			return fmt.Errorf("per-user mode needs a provider configured, for example VAMOOSE_GOOGLE_CLIENT_ID and VAMOOSE_GOOGLE_CLIENT_SECRET")
 		}

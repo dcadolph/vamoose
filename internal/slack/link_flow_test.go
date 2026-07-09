@@ -100,3 +100,47 @@ func TestRunAsUserNotLinked(t *testing.T) {
 		t.Errorf("unlinked prompt missing: %s", body)
 	}
 }
+
+// icloudValues builds modal state with the given Apple ID and app password.
+func icloudValues(user, pass string) modalValues {
+	var mv modalValues
+	mv.Values = map[string]map[string]struct {
+		Value string `json:"value"`
+	}{
+		"username": {"value": {Value: user}},
+		"password": {"value": {Value: pass}},
+	}
+	return mv
+}
+
+// TestViewSubmissionStoresICloud confirms a submitted credential modal stores the
+// iCloud link with its credentials.
+func TestViewSubmissionStoresICloud(t *testing.T) {
+	t.Parallel()
+	store := NewUserLinkFileStore(filepath.Join(t.TempDir(), "l.json"))
+	s := NewServer("shh", noopRunner, WithLinkers(store, fakeLinker{provider: "icloud"}))
+	w := httptest.NewRecorder()
+	s.handleViewSubmission(w, "T1", "U1", credentialModalCallback, "icloud", icloudValues("me@icloud.com", "abcd-efgh"))
+	if w.Code != 200 {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	link, err := store.GetLink("T1", "U1")
+	if err != nil || link.Provider != "icloud" || link.ICloudUser != "me@icloud.com" || link.ICloudAppPassword != "abcd-efgh" {
+		t.Errorf("stored link = %+v, %v", link, err)
+	}
+}
+
+// TestViewSubmissionMissingFields returns a Slack field error and stores nothing.
+func TestViewSubmissionMissingFields(t *testing.T) {
+	t.Parallel()
+	store := NewUserLinkFileStore(filepath.Join(t.TempDir(), "l.json"))
+	s := NewServer("shh", noopRunner, WithLinkers(store, fakeLinker{provider: "icloud"}))
+	w := httptest.NewRecorder()
+	s.handleViewSubmission(w, "T1", "U1", credentialModalCallback, "icloud", icloudValues("", ""))
+	if !strings.Contains(w.Body.String(), "response_action") {
+		t.Errorf("want a Slack errors response, got: %s", w.Body.String())
+	}
+	if _, err := store.GetLink("T1", "U1"); err == nil {
+		t.Error("empty submission should not store a link")
+	}
+}

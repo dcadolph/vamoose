@@ -9,6 +9,7 @@ import (
 
 	"github.com/dcadolph/vamoose/internal/auth"
 	"github.com/dcadolph/vamoose/internal/googleauth"
+	"github.com/dcadolph/vamoose/internal/slack"
 )
 
 // TestGoogleLinker confirms the linker exchanges a code for a refresh token and
@@ -84,5 +85,28 @@ func TestGraphLinker(t *testing.T) {
 	}
 	if !slices.Contains(env, "VAMOOSE_PROVIDER=graph") || !slices.Contains(env, "VAMOOSE_GRAPH_ACCESS_TOKEN=a2") {
 		t.Errorf("RunEnv env = %v, want provider graph + access a2", env)
+	}
+}
+
+// TestICloudLinker confirms iCloud has no OAuth URL and injects its stored
+// credentials, erroring when they are missing.
+func TestICloudLinker(t *testing.T) {
+	t.Parallel()
+	var l icloudLinker
+	if l.Provider() != providerICloud {
+		t.Errorf("Provider = %q, want %q", l.Provider(), providerICloud)
+	}
+	if l.AuthURL("s", "r") != "" {
+		t.Error("iCloud should have no OAuth URL")
+	}
+	env, err := l.RunEnv(context.Background(), slack.UserLink{Provider: "icloud", ICloudUser: "me@icloud.com", ICloudAppPassword: "pw"})
+	if err != nil {
+		t.Fatalf("RunEnv: %v", err)
+	}
+	if !slices.Contains(env, "VAMOOSE_ICLOUD_USERNAME=me@icloud.com") || !slices.Contains(env, "VAMOOSE_ICLOUD_APP_PASSWORD=pw") {
+		t.Errorf("RunEnv env = %v, want the iCloud credentials", env)
+	}
+	if _, err := l.RunEnv(context.Background(), slack.UserLink{Provider: "icloud"}); err == nil {
+		t.Error("want an error for missing credentials")
 	}
 }

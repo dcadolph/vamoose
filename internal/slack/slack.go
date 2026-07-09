@@ -242,14 +242,30 @@ func (s *Server) handleInteractivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var payload struct {
+		Type        string `json:"type"`
 		ResponseURL string `json:"response_url"`
 		Actions     []struct {
 			ActionID string `json:"action_id"`
 			Value    string `json:"value"`
 		} `json:"actions"`
+		Team struct {
+			ID string `json:"id"`
+		} `json:"team"`
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
+		View struct {
+			CallbackID      string      `json:"callback_id"`
+			PrivateMetadata string      `json:"private_metadata"`
+			State           modalValues `json:"state"`
+		} `json:"view"`
 	}
 	if err := json.Unmarshal([]byte(form.Get("payload")), &payload); err != nil {
 		http.Error(w, "bad payload", http.StatusBadRequest)
+		return
+	}
+	if payload.Type == "view_submission" {
+		s.handleViewSubmission(w, payload.Team.ID, payload.User.ID, payload.View.CallbackID, payload.View.PrivateMetadata, payload.View.State)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -473,12 +489,16 @@ func (s *Server) handleLink(w http.ResponseWriter, form url.Values, args []strin
 		return
 	}
 	state := s.linkStates.issue(form.Get("team_id"), form.Get("user_id"), provider)
-	authURL := linker.AuthURL(state, s.linkRedirectURI())
-	if authURL == "" {
-		writeMessage(w, "ephemeral", provider+" cannot be linked from a slash command yet.")
+	if authURL := linker.AuthURL(state, s.linkRedirectURI()); authURL != "" {
+		writeMessage(w, "ephemeral", "Link your "+provider+" calendar: "+authURL)
 		return
 	}
-	writeMessage(w, "ephemeral", "Link your "+provider+" calendar: "+authURL)
+	// No OAuth URL: the provider links by a credential modal, such as iCloud.
+	if err := s.openCredentialModal(form.Get("team_id"), form.Get("trigger_id"), provider); err != nil {
+		writeMessage(w, "ephemeral", "Could not open the "+provider+" link form: "+err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // handleUnlink removes the invoking user's linked calendar.
@@ -545,4 +565,106 @@ func (s *Server) providerNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// credentialModalCallback is the callback id of the credential-entry modal.
+const credentialModalCallback = "vamoose_link_credentials"
+
+// modalValues holds a submitted modal's input values, keyed by block id then action
+// id, matching Slack's view.state.values shape.
+type modalValues struct {
+	// Values is the nested block-to-action input map.
+	Values map[string]map[string]struct {
+		Value string `json:"value"`
+	} `json:"values"`
+}
+
+// openCredentialModal opens a Slack modal for a provider that links by credentials
+// rather than OAuth, currently iCloud. It needs the workspace bot token from an
+// install, so it fails when the app is not installed.
+func (s *Server) openCredentialModal(teamID, triggerID, provider string) error {
+	if s.tokens == nil {
+		return fmt.Errorf("credential linking needs the app installed to this workspace")
+	}
+	if triggerID == "" {
+		return fmt.Errorf("missing trigger id")
+	}
+	botToken, err := s.tokens.Get(teamID)
+	if err != nil {
+		return fmt.Errorf("workspace not installed: %w", err)
+	}
+	view := map[string]any{
+		"type":             "modal",
+		"callback_id":      credentialModalCallback,
+		"private_metadata": provider,
+		"title":            map[string]any{"type": "plain_text", "text": "Link " + provider},
+		"submit":           map[string]any{"type": "plain_text", "text": "Link"},
+		"close":            map[string]any{"type": "plain_text", "text": "Cancel"},
+		"blocks": []any{
+			credentialInput("username", "Apple ID email"),
+			credentialInput("password", "App-specific password"),
+		},
+	}
+	body, err := json.Marshal(map[string]any{"trigger_id": triggerID, "view": view})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPost, s.oauthBaseURL+"/views.open", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+botToken)
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return err
+	}
+	if !out.OK {
+		return fmt.Errorf("views.open: %s", out.Error)
+	}
+	return nil
+}
+
+// credentialInput builds a plain-text input block for the credential modal.
+func credentialInput(blockID, label string) map[string]any {
+	return map[string]any{
+		"type":     "input",
+		"block_id": blockID,
+		"label":    map[string]any{"type": "plain_text", "text": label},
+		"element":  map[string]any{"type": "plain_text_input", "action_id": "value"},
+	}
+}
+
+// handleViewSubmission stores the credentials a user submitted through the link
+// modal and replies so Slack closes it, or returns a field error when either input
+// is empty. The provider comes from the modal's private metadata.
+func (s *Server) handleViewSubmission(w http.ResponseWriter, teamID, userID, callbackID, provider string, state modalValues) {
+	if callbackID != credentialModalCallback || s.links == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	user := state.Values["username"]["value"].Value
+	pass := state.Values["password"]["value"].Value
+	if user == "" || pass == "" {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"response_action": "errors",
+			"errors":          map[string]string{"username": "Enter your Apple ID and app-specific password."},
+		})
+		return
+	}
+	link := UserLink{Provider: provider, ICloudUser: user, ICloudAppPassword: pass}
+	if err := s.links.SaveLink(teamID, userID, link); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
