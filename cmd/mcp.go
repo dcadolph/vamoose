@@ -39,7 +39,7 @@ func registerTools(srv *mcp.Server) {
 	})
 	srv.Register(mcp.Tool{
 		Name:        "request_time_off",
-		Description: "Create a vacation hold shown as free and invite the manager to approve it.",
+		Description: "Create a time-off hold shown as free and invite the manager to approve it.",
 		InputSchema: objectSchema([]string{"start", "end", "subject"}, map[string]any{
 			"start":    strProp("Start date as YYYY-MM-DD or an RFC3339 time"),
 			"end":      strProp("End date as YYYY-MM-DD or an RFC3339 time"),

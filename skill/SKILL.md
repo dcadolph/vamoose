@@ -5,13 +5,13 @@ description: >-
   a calendar hold shown as free, invites your manager to approve it, then fans the
   event out to your team as optional attendees once approved. Backs onto Microsoft
   365, Outlook, and Teams via Microsoft Graph, or Google Calendar. Trigger when the user wants to
-  request vacation, set an out-of-office hold, or route time off for manager
+  request time off, set an out-of-office hold, or route it for manager
   approval.
 ---
 
 # vamoose
 
-Drive the vamoose CLI to run a vacation request end to end.
+Drive the vamoose CLI to run a time-off request end to end.
 
 ## Before you start
 

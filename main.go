@@ -1,5 +1,5 @@
-// Command vamoose creates a vacation calendar hold, routes it to your manager
-// for approval, then fans it out to your team as optional attendees.
+// Command vamoose runs calendar workflows, from a time-off hold that a manager
+// approves and the team is notified of, to quick actions and your own workflows.
 package main
 
 import (

@@ -50,7 +50,7 @@ const launchdManifest = `<?xml version="1.0" encoding="UTF-8"?>
 
 // systemdManifest is the Linux systemd user unit template.
 const systemdManifest = `[Unit]
-Description=vamoose vacation-hold daemon
+Description=vamoose calendar-workflow daemon
 After=network-online.target
 
 [Service]

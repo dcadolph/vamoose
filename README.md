@@ -4,7 +4,7 @@
 
 <h1 align="center">vamoose</h1>
 
-<p align="center">Time off, minus the tedium.</p>
+<p align="center">Calendar workflows, minus the tedium.</p>
 
 The moose does the paperwork. You go to the beach.
 
@@ -15,9 +15,10 @@ The moose does the paperwork. You go to the beach.
 > its sequencing is unit-tested but not yet live-vetted. The Microsoft Graph path is
 > unit-tested but hasn't been run against a live Microsoft 365 tenant yet.
 
-Booking time off by hand is a chore: block the dates, ping your manager, wait for
-a nod, then re-send the event to the team so nobody schedules over you. vamoose
-runs that whole loop from one command.
+Calendar busywork is death by a thousand steps: block the dates, ping your manager,
+wait for a nod, then re-send the event to the team so nobody schedules over you.
+vamoose turns those chores into **workflows** it runs for you and advances in the
+background. Time off is the flagship workflow, and you can define your own.
 
 ## How it works
 
@@ -203,9 +204,11 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Roadmap
 
+- Conditional and branching workflows: if-this-then-that and multi-step chains
+  beyond the built-in time-off flow.
 - Auto-promote via Graph change-notification webhooks instead of polling.
 - Store tokens in the OS keychain rather than a config file.
-- Set the scheduled out-of-office auto-reply for the vacation window.
+- Set the scheduled out-of-office auto-reply for the time-off window.
 - Harden the CLI and auth with cobra and MSAL.
 
 ## Status

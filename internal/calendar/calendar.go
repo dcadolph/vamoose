@@ -1,4 +1,4 @@
-// Package calendar defines the provider-agnostic model for vacation holds and
+// Package calendar defines the provider-agnostic model for calendar holds and
 // the Provider interface that calendar backends implement.
 package calendar
 
@@ -88,7 +88,7 @@ type Attendee struct {
 	Response Response
 }
 
-// Hold is a vacation request modeled as a calendar event.
+// Hold is a calendar event vamoose creates and manages, such as a time-off hold.
 type Hold struct {
 	// ID is the provider event identifier, empty before creation.
 	ID string
@@ -128,7 +128,7 @@ func (h Hold) DeclinedBy(email string) bool {
 	return false
 }
 
-// Provider creates and advances vacation holds on a calendar backend.
+// Provider creates and advances holds on a calendar backend.
 type Provider interface {
 	// Me returns the signed-in user.
 	Me(ctx context.Context) (Person, error)

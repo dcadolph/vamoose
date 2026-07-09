@@ -10,7 +10,7 @@ import (
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
 
-// runRequest creates a vacation hold shown as free and invites the manager to approve it.
+// runRequest creates a time-off hold shown as free and invites the manager to approve it.
 func runRequest(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("request", flag.ContinueOnError)
 	var (
@@ -49,7 +49,7 @@ func runRequest(ctx context.Context, args []string) error {
 	})
 }
 
-// holdRequest describes a vacation hold to create and how to route it.
+// holdRequest describes a time-off hold to create and how to route it.
 type holdRequest struct {
 	// Provider is the selected calendar provider, empty for the default.
 	Provider string

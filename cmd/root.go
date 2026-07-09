@@ -12,7 +12,7 @@ const moose = `
           ( o  o )
            \  --  /          V A M O O S E
            /|    |\
-          ( |    | )         time off, minus the tedium
+          ( |    | )         calendar workflows, minus the tedium
             \\  //
              ""  ""
 `
@@ -26,7 +26,7 @@ Usage: vamoose <command> [flags]
 Commands:
   run       Run a workflow, e.g. "run pto next week" (see workflows).
   workflows List the available workflows, built-in and user-defined.
-  request   Create a vacation hold and invite your manager to approve it.
+  request   Create a time-off hold and invite your manager to approve it.
   off       Request time off from a date phrase, e.g. "off next week".
   check     Show whether your manager has approved the hold.
   promote   Add your team as optional attendees once approved.
