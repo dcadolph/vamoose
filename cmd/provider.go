@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/dcadolph/vamoose/internal/auth"
 	"github.com/dcadolph/vamoose/internal/caldav"
 	"github.com/dcadolph/vamoose/internal/calendar"
+	"github.com/dcadolph/vamoose/internal/eventkit"
 	"github.com/dcadolph/vamoose/internal/google"
 	"github.com/dcadolph/vamoose/internal/googleauth"
 	"github.com/dcadolph/vamoose/internal/graph"
@@ -113,6 +115,11 @@ func newICloudProvider(s calendar.Settings) (calendar.Provider, error) {
 	opts := []caldav.Option{caldav.WithTimeZone(s.TimeZone)}
 	if name := os.Getenv("VAMOOSE_ICLOUD_CALENDAR"); name != "" {
 		opts = append(opts, caldav.WithCalendarName(name))
+	}
+	// On macOS, recover attendee accept/decline from the local Calendar.app, which
+	// iCloud does not report over CalDAV.
+	if runtime.GOOS == "darwin" {
+		opts = append(opts, caldav.WithStatus(eventkit.Status))
 	}
 	return caldav.NewProvider("https://caldav.icloud.com", user, pass, opts...)
 }

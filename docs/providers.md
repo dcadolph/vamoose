@@ -46,7 +46,12 @@ export VAMOOSE_ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 
 Set a target calendar with `VAMOOSE_ICLOUD_CALENDAR="Home"`. The default is the first calendar that accepts events. Like Google, iCloud has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`.
 
-**Approval is manual on iCloud.** iCloud creates the hold and emails the manager the invite, but it does not report the manager's accept or decline back over CalDAV, so `check` and the daemon cannot detect approval. Use iCloud for holds, away, events, and notify, and run `vamoose promote` by hand once you know the manager accepted. If you need automatic approval detection, use Google or Graph.
+**Approval on iCloud.** iCloud creates the hold and emails the manager the invite, but it does not report the manager's accept or decline back over CalDAV. Two ways still get you approval:
+
+- **macOS EventKit.** Build the helper with `make eventkit`. vamoose then reads the manager's accept or decline from your local Calendar.app, so `check` and the daemon detect approval on iCloud too. Grant calendar access on the first run.
+- **Slack.** Approve or decline with a button in Slack, which works regardless of backend. See [Slack](slack.md).
+
+Without either, promote by hand once you know the manager accepted.
 
 ## Tokens
 

@@ -38,6 +38,9 @@ type Provider struct {
 	timeZone string
 	// prodID is the iCalendar PRODID stamped on created events.
 	prodID string
+	// status optionally reads attendee responses from an external source, such as
+	// macOS EventKit, recovering approval detection that iCloud CalDAV omits.
+	status StatusFunc
 
 	// mu guards the lazily discovered calendar path.
 	mu sync.Mutex
@@ -62,6 +65,13 @@ func WithTimeZone(tz string) Option {
 func WithCalendarName(name string) Option {
 	return func(p *Provider) { p.calendarName = name }
 }
+
+// StatusFunc returns attendee responses for an event UID, keyed by lowercase email.
+type StatusFunc func(ctx context.Context, uid string) (map[string]calendar.Response, error)
+
+// WithStatus sets a source of attendee responses that overrides those from the
+// server, for backends that do not report accept/decline over CalDAV.
+func WithStatus(fn StatusFunc) Option { return func(p *Provider) { p.status = fn } }
 
 // NewProvider returns a CalDAV Provider for the endpoint, authenticating with the
 // username and password over HTTP Basic. For iCloud the password is an
@@ -136,7 +146,25 @@ func (p *Provider) GetHold(ctx context.Context, id string) (calendar.Hold, error
 	if comp == nil {
 		return calendar.Hold{}, calendar.ErrNotFound
 	}
-	return p.fromEvent(comp, id), nil
+	h := p.fromEvent(comp, id)
+	if p.status != nil {
+		if uid, _ := comp.Props.Text(ical.PropUID); uid != "" {
+			if statuses, serr := p.status(ctx, uid); serr == nil {
+				applyStatuses(&h, statuses)
+			}
+		}
+	}
+	return h, nil
+}
+
+// applyStatuses overrides attendee responses from an external status map keyed by
+// lowercase email, recovering approvals a backend does not report over CalDAV.
+func applyStatuses(h *calendar.Hold, statuses map[string]calendar.Response) {
+	for i := range h.Attendees {
+		if r, ok := statuses[strings.ToLower(h.Attendees[i].Person.Email)]; ok {
+			h.Attendees[i].Response = r
+		}
+	}
 }
 
 // UpdateHold rewrites an existing hold, preserving its identity, and lets the

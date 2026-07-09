@@ -155,3 +155,20 @@ func TestParticipationMapping(t *testing.T) {
 		t.Error("mailto round trip failed")
 	}
 }
+
+// TestApplyStatuses confirms external responses override matching attendees by
+// case-insensitive email and leave others untouched.
+func TestApplyStatuses(t *testing.T) {
+	t.Parallel()
+	h := calendar.Hold{Attendees: []calendar.Attendee{
+		{Person: calendar.Person{Email: "Boss@X.com"}, Role: calendar.RoleRequired, Response: calendar.ResponseNotResponded},
+		{Person: calendar.Person{Email: "peer@x.com"}, Role: calendar.RoleOptional, Response: calendar.ResponseNotResponded},
+	}}
+	applyStatuses(&h, map[string]calendar.Response{"boss@x.com": calendar.ResponseAccepted})
+	if h.Attendees[0].Response != calendar.ResponseAccepted {
+		t.Errorf("boss response = %q, want accepted", h.Attendees[0].Response)
+	}
+	if h.Attendees[1].Response != calendar.ResponseNotResponded {
+		t.Errorf("peer response changed unexpectedly to %q", h.Attendees[1].Response)
+	}
+}
