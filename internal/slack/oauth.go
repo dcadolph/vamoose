@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dcadolph/vamoose/internal/secret"
 )
 
 // installScopes are the bot scopes vamoose requests during OAuth install. users:read.email
@@ -152,16 +154,32 @@ func (s *stateStore) consume(tok string) bool {
 	return s.now().Before(exp)
 }
 
-// FileStore persists workspace bot tokens as a JSON map at a path.
+// FileStore persists workspace bot tokens as a JSON map at a path, sealed with
+// AES-256-GCM when an encryption box is set.
 type FileStore struct {
 	// path is the JSON file location.
 	path string
+	// box seals and opens the file when set, for a headless host; nil keeps plaintext.
+	box *secret.Box
 	// mu guards concurrent reads and writes.
 	mu sync.Mutex
 }
 
-// NewFileStore returns a token store backed by the file at path.
+// NewFileStore returns a plaintext token store backed by the file at path.
 func NewFileStore(path string) *FileStore { return &FileStore{path: path} }
+
+// NewTokenStore returns a token store that encrypts bot tokens at rest when
+// VAMOOSE_SECRET_KEY is set, for a hosted server, otherwise a plaintext 0600 file.
+func NewTokenStore(path string) (*FileStore, error) {
+	box, err := secret.FromEnv(os.Getenv)
+	if errors.Is(err, secret.ErrNoKey) {
+		return &FileStore{path: path}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &FileStore{path: path, box: box}, nil
+}
 
 // Save records a workspace's bot token, creating parent directories as needed.
 func (f *FileStore) Save(teamID, botToken string) error {
@@ -175,9 +193,19 @@ func (f *FileStore) Save(teamID, botToken string) error {
 	if err := os.MkdirAll(filepath.Dir(f.path), 0o700); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(m, "", "  ")
+	var b []byte
+	if f.box != nil {
+		b, err = json.Marshal(m)
+	} else {
+		b, err = json.MarshalIndent(m, "", "  ")
+	}
 	if err != nil {
 		return err
+	}
+	if f.box != nil {
+		if b, err = f.box.Seal(b); err != nil {
+			return err
+		}
 	}
 	return os.WriteFile(f.path, b, 0o600)
 }
@@ -196,7 +224,8 @@ func (f *FileStore) Get(teamID string) (string, error) {
 	return "", fmt.Errorf("workspace %s not installed", teamID)
 }
 
-// load reads the token map, returning an empty map when the file is absent.
+// load reads the token map, decrypting when a box is set, and returns an empty map when
+// the file is absent.
 func (f *FileStore) load() (map[string]string, error) {
 	b, err := os.ReadFile(f.path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -204,6 +233,12 @@ func (f *FileStore) load() (map[string]string, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if f.box != nil {
+		b, err = f.box.Open(b)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt slack tokens: %w", err)
+		}
 	}
 	m := map[string]string{}
 	if err := json.Unmarshal(b, &m); err != nil {

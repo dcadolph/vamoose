@@ -127,13 +127,18 @@ func runSlack(ctx context.Context, args []string) error {
 }
 
 // slackTokenStore returns a file-backed store for per-workspace bot tokens under the
-// user config directory.
+// user config directory, encrypted at rest when VAMOOSE_SECRET_KEY is set for a hosted
+// server, otherwise a plaintext file.
 func slackTokenStore() (*slack.FileStore, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
 	}
-	return slack.NewFileStore(filepath.Join(dir, "vamoose", "slack-tokens.json")), nil
+	name := "slack-tokens.json"
+	if os.Getenv(secret.KeyEnv) != "" {
+		name = "slack-tokens.enc"
+	}
+	return slack.NewTokenStore(filepath.Join(dir, "vamoose", name))
 }
 
 // slackUserLinkStore returns a store for per-user calendar links, encrypted at rest
