@@ -53,6 +53,7 @@ nav:
   - Providers: providers.md
   - Slack: slack.md
   - Claude: claude-guide.md
+  - Hosting: hosting.md
   - Architecture: architecture.md
 
 markdown_extensions:

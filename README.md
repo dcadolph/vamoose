@@ -278,6 +278,7 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 | [Providers](docs/providers.md)           | Microsoft Graph, Google, iCloud, and CalDAV setup.           |
 | [Slack](docs/slack.md)                   | Drive vamoose from Slack, with approval buttons.             |
 | [Claude](docs/claude-guide.md)           | The MCP server and the skill.                                |
+| [Hosting](docs/hosting.md)               | Run it as a service, secrets encrypted at rest.             |
 | [Architecture](docs/architecture.md)     | Surfaces, core, and adapters.                                |
 
 ## Roadmap

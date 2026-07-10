@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/dcadolph/vamoose/internal/secret"
 )
 
 // doctorCheck is one line of the doctor report.
@@ -98,10 +100,15 @@ func doctorChecks(getenv func(string) string) []doctorCheck {
 	if tz == "" {
 		tz = "UTC (default)"
 	}
+	secrets := "OS keychain or a local file"
+	if set(secret.KeyEnv) {
+		secrets = "encrypted at rest (VAMOOSE_SECRET_KEY set)"
+	}
 	checks = append(checks,
 		doctorCheck{Label: "Time zone: " + tz, OK: true, Optional: true},
 		doctorCheck{Label: "Slack messaging (VAMOOSE_SLACK_BOT_TOKEN)", OK: set("VAMOOSE_SLACK_BOT_TOKEN"), Optional: true, Hint: "set for message steps to Slack"},
 		doctorCheck{Label: "Email messaging (VAMOOSE_SMTP_HOST)", OK: set("VAMOOSE_SMTP_HOST"), Optional: true, Hint: "set for message steps to email"},
+		doctorCheck{Label: "Secrets: " + secrets, OK: true, Optional: true},
 	)
 	return checks
 }

@@ -65,7 +65,7 @@ brew install dcadolph/tap/vamoose
 
     ---
 
-    Wait steps pause a run; schedules rerun a whole workflow weekly. It moves on its own, in the background.
+    Wait steps pause a run. Schedules rerun a whole workflow weekly. It moves on its own, in the background.
 
 -   :material-robot-happy:{ .lg .middle } __Drivable by AI__
 
@@ -83,7 +83,7 @@ brew install dcadolph/tap/vamoose
 
 ## Start here
 
-- [Quickstart](quickstart.md) — zero to your first approved hold in a few minutes.
-- [Concepts](concepts.md) — how holds, approval, and workflows fit together.
-- [Commands](commands.md) — every command, flag, and environment variable.
-- [Workflows](workflows.md) — design your own, with branching, delays, and guards.
+- [Quickstart](quickstart.md): zero to your first approved hold in a few minutes.
+- [Concepts](concepts.md): how holds, approval, and workflows fit together.
+- [Commands](commands.md): every command, flag, and environment variable.
+- [Workflows](workflows.md): design your own, with branching, delays, and guards.
