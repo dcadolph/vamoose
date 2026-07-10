@@ -1,0 +1,29 @@
+# Run the vamoose Slack server as an always-on service. Set the referenced variables
+# in a .env file next to this one, then: docker compose up -d
+#
+# Generate a secret key once with: openssl rand -base64 32
+services:
+  vamoose:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Encrypts tokens and per-user links at rest on the volume.
+      VAMOOSE_SECRET_KEY: ${VAMOOSE_SECRET_KEY}
+      VAMOOSE_TIMEZONE: ${VAMOOSE_TIMEZONE:-UTC}
+      # Slack app.
+      VAMOOSE_SLACK_SIGNING_SECRET: ${VAMOOSE_SLACK_SIGNING_SECRET}
+      VAMOOSE_SLACK_CLIENT_ID: ${VAMOOSE_SLACK_CLIENT_ID}
+      VAMOOSE_SLACK_CLIENT_SECRET: ${VAMOOSE_SLACK_CLIENT_SECRET}
+      VAMOOSE_SLACK_PUBLIC_URL: ${VAMOOSE_SLACK_PUBLIC_URL}
+      # Per-user mode: each Slack user links their own calendar.
+      VAMOOSE_SLACK_PER_USER: "1"
+      VAMOOSE_GOOGLE_CLIENT_ID: ${VAMOOSE_GOOGLE_CLIENT_ID}
+      VAMOOSE_GOOGLE_CLIENT_SECRET: ${VAMOOSE_GOOGLE_CLIENT_SECRET}
+    volumes:
+      # Persist encrypted tokens, links, and watch state across restarts.
+      - vamoose-data:/home/vamoose/.config/vamoose
+
+volumes:
+  vamoose-data:
