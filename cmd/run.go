@@ -299,11 +299,32 @@ func previewWorkflow(w io.Writer, wf workflow.Workflow, hold calendar.Hold) {
 	}
 	for _, s := range wf.Steps[1:] {
 		if s.Verb == workflow.VerbApprove && len(s.On) > 0 {
-			fmt.Fprintf(w, "  approve, then %s\n", branchSummary(s))
+			fmt.Fprintf(w, "  approve, then %s%s\n", branchSummary(s), whenSummary(s.When))
 			continue
 		}
-		fmt.Fprintf(w, "  %s\n", stepLabel(s))
+		fmt.Fprintf(w, "  %s%s\n", stepLabel(s), whenSummary(s.When))
 	}
+}
+
+// whenSummary describes a step's guard for the dry-run preview, returning the empty
+// string when the guard is unset.
+func whenSummary(w workflow.When) string {
+	var parts []string
+	if w.DayOfWeek != "" {
+		parts = append(parts, w.DayOfWeek)
+	}
+	switch {
+	case w.MinAttendees > 0 && w.MaxAttendees > 0:
+		parts = append(parts, fmt.Sprintf("%d-%d attendees", w.MinAttendees, w.MaxAttendees))
+	case w.MinAttendees > 0:
+		parts = append(parts, fmt.Sprintf("%d+ attendees", w.MinAttendees))
+	case w.MaxAttendees > 0:
+		parts = append(parts, fmt.Sprintf("up to %d attendees", w.MaxAttendees))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " when " + strings.Join(parts, ", ")
 }
 
 // branchSummary describes an approve step's accepted and declined branches.

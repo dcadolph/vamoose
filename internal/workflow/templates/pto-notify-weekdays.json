@@ -1,0 +1,9 @@
+{
+  "name": "pto-notify-weekdays",
+  "description": "Time off a manager approves; tell the team only on weekdays.",
+  "steps": [
+    { "verb": "hold", "showAs": "free" },
+    { "verb": "approve", "manager": true },
+    { "verb": "notify", "team": "optional", "when": { "dayOfWeek": "mon-fri" } }
+  ]
+}

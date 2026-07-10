@@ -267,3 +267,32 @@ func TestRunStepsWhenGuard(t *testing.T) {
 		t.Error("notify was skipped despite the guard allowing")
 	}
 }
+
+// TestWhenSummary confirms the dry-run guard summary renders each condition and stays
+// empty for an unset guard.
+func TestWhenSummary(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		When workflow.When
+		Want string
+	}{{ // Test 0: An unset guard renders nothing.
+		When: workflow.When{}, Want: "",
+	}, { // Test 1: A day-of-week guard.
+		When: workflow.When{DayOfWeek: "mon-fri"}, Want: " when mon-fri",
+	}, { // Test 2: A minimum attendee bound.
+		When: workflow.When{MinAttendees: 3}, Want: " when 3+ attendees",
+	}, { // Test 3: A maximum attendee bound.
+		When: workflow.When{MaxAttendees: 4}, Want: " when up to 4 attendees",
+	}, { // Test 4: A range and a day set combine.
+		When: workflow.When{DayOfWeek: "sat,sun", MinAttendees: 2, MaxAttendees: 5},
+		Want: " when sat,sun, 2-5 attendees",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := whenSummary(test.When); got != test.Want {
+				t.Errorf("whenSummary = %q, want %q", got, test.Want)
+			}
+		})
+	}
+}

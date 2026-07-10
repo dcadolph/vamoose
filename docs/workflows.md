@@ -40,6 +40,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 | `id`     | any               | Names the step so branches can target it.                            |
 | `on`     | approve           | Branch by outcome: `{"accepted": id, "declined": id, "expired": id}`. |
 | `timeout`| approve           | Duration to wait (e.g. `72h`) before the `expired` branch runs.      |
+| `when`   | any but the first | Guard that skips the step unless its conditions hold. See Guards.    |
 | `next`   | any               | The step id to run next, or `end`. Defaults to the following step.   |
 | `subject`| note, event       | Event title for a note or event step.                               |
 
@@ -104,6 +105,31 @@ An `approve` step can set a `timeout` and an `expired` branch, so a workflow act
 }
 ```
 
-## Coming next
+## Guards
 
-More branch conditions (day of week, attendee counts) come in a later version. Today branches turn on the approval outcome and, for `approve`, a timeout.
+A step can carry a `when` guard that gates whether it runs. When the conditions do not hold, the workflow skips the step and continues, so a guard trims a workflow rather than branching it. Guards layer on top of `on`: `on` chooses a path by the approval outcome, `when` gates any step on that path. The creating step always runs, so it cannot carry a guard.
+
+Conditions are all optional and combine with and:
+
+| Condition      | Meaning                                                       &nbsp; |
+| -------------- | -------------------------------------------------------------------- |
+| `dayOfWeek`    | Run only on the named days, checked at execution time.               |
+| `minAttendees` | Run only when the hold has at least this many attendees.             |
+| `maxAttendees` | Run only when the hold has at most this many attendees.              |
+
+`dayOfWeek` is a comma-separated set of three-letter days or inclusive ranges, such as `mon-fri` or `sat,sun`. A range wraps past Saturday, so `fri-mon` is Friday through Monday. The attendee counts read the hold's invitees when the step runs, so an event that invites a crowd can trigger a follow-on step a small one skips.
+
+The built-in `pto-notify-weekdays` approves time off but tells the team only on weekdays, so an approval that lands over the weekend does not page the team:
+
+```json
+{
+  "name": "pto-notify-weekdays",
+  "steps": [
+    { "verb": "hold", "showAs": "free" },
+    { "verb": "approve", "manager": true },
+    { "verb": "notify", "team": "optional", "when": { "dayOfWeek": "mon-fri" } }
+  ]
+}
+```
+
+A skipped step does not run later; the guard drops it for this run.
