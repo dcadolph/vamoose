@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -189,6 +190,30 @@ func registerWorkflowTools(srv *mcp.Server) {
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
 			return execSelf(ctx, scheduleWorkflowArgs(parseArgs(raw))...)
+		},
+	})
+	srv.Register(mcp.Tool{
+		Name:        "create_workflow",
+		Description: "Create or replace a reusable user workflow from a JSON definition, so it can then be previewed and run by name. The definition is validated and rejected with the reason if invalid. Model it on the built-ins from list_workflows.",
+		InputSchema: objectSchema([]string{"definition"}, map[string]any{
+			"definition": strProp("The workflow as a JSON object with a name, description, and steps. Step verbs are hold, approve, notify, note, away, event, cancel, message, and wait."),
+		}),
+		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
+			def := argString(parseArgs(raw), "definition")
+			if def == "" {
+				return "", fmt.Errorf("create_workflow: definition is required")
+			}
+			f, err := os.CreateTemp("", "vamoose-workflow-*.json")
+			if err != nil {
+				return "", err
+			}
+			defer os.Remove(f.Name())
+			if _, err := f.WriteString(def); err != nil {
+				f.Close()
+				return "", err
+			}
+			f.Close()
+			return execSelf(ctx, "workflows", "add", "--file", f.Name())
 		},
 	})
 }

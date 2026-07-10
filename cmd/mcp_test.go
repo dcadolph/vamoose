@@ -24,7 +24,7 @@ func TestRegisterTools(t *testing.T) {
 		"whoami", "request_time_off", "time_off_status",
 		"promote_to_team", "cancel_hold", "set_away", "create_event",
 		"list_workflows", "preview_workflow", "run_workflow",
-		"list_schedules", "schedule_workflow",
+		"list_schedules", "schedule_workflow", "create_workflow",
 	}
 	for _, name := range want {
 		if !strings.Contains(out.String(), `"name":"`+name+`"`) {
