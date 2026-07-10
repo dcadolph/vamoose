@@ -40,6 +40,7 @@ Commands:
   whoami    Print the signed-in user, manager, and resolved team.
   team      Show or set your default team: team [list|set <email...>|clear].
   calendars List or create calendars (icloud): calendars [list|create <name>].
+  doctor    Check your configuration and report what is set up or missing.
   version   Print the vamoose version.
 
 Run "vamoose <command> -h" for command flags.
@@ -48,7 +49,7 @@ Setup (Microsoft 365 / Outlook):
   VAMOOSE_CLIENT_ID   Entra application (client) id (required)
   VAMOOSE_TENANT      Entra tenant id or "organizations" (default: organizations)
   VAMOOSE_TIMEZONE    IANA time zone for event times (default: UTC)
-  VAMOOSE_PROVIDER    Calendar provider name: graph, google, or icloud (default: graph)
+  VAMOOSE_PROVIDER    Calendar provider name: graph, google, icloud, or caldav (default: graph)
 
 Setup (Google Calendar, --provider google):
   VAMOOSE_GOOGLE_CLIENT_ID      OAuth desktop client id

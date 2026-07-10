@@ -124,6 +124,12 @@ Print the signed-in user, manager, and resolved team. Run it first to confirm au
 
 Show or set your default team, used when the directory lookup is wrong or unavailable.
 
+### doctor
+
+`vamoose doctor`
+
+Check your configuration and report what is set up or missing: the selected provider's credentials, time zone, and the optional Slack and email backends for message steps.
+
 ### version
 
 `vamoose version`
