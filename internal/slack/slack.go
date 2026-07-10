@@ -12,11 +12,13 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -195,8 +197,8 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, "ephemeral", "Usage: /vamoose <command>, for example /vamoose off next week")
 		return
 	}
-	// In per-user mode, link and unlink are served here, and every other command
-	// runs as the invoking user's linked calendar.
+	// In per-user mode, link and unlink are served here before the allowlist, since they
+	// are Slack-only commands with no CLI subcommand.
 	if s.links != nil {
 		switch args[0] {
 		case "link":
@@ -206,12 +208,35 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 			s.handleUnlink(w, form)
 			return
 		}
+	}
+	if !allowedSubcommand(args[0]) {
+		writeMessage(w, "ephemeral", "The `"+args[0]+"` command is not available from Slack.")
+		return
+	}
+	// Per-user commands run as the invoking user's linked calendar; single-tenant
+	// commands run as the server. Either way the team is passed so an approval can bind
+	// the approver.
+	if s.links != nil {
 		writeMessage(w, "ephemeral", "Running `vamoose "+text+"` ...")
 		go s.runAsUser(form.Get("response_url"), form.Get("team_id"), form.Get("user_id"), args)
 		return
 	}
 	writeMessage(w, "ephemeral", "Running `vamoose "+text+"` ...")
-	go s.runCommand(form.Get("response_url"), args, nil, "", "")
+	go s.runCommand(form.Get("response_url"), args, nil, form.Get("team_id"), "")
+}
+
+// allowedSubcommand reports whether a subcommand may be driven from a Slack slash
+// command. Server and host operations (daemon, service, slack, mcp, login) are not
+// reachable, and neither are the approval actions (promote, cancel), which run only
+// through a verified approval button, so a slash command cannot bypass the approver.
+func allowedSubcommand(name string) bool {
+	switch name {
+	case "off", "away", "event", "request", "run", "workflows", "check", "schedule",
+		"team", "calendars", "doctor", "whoami", "help", "version":
+		return true
+	default:
+		return false
+	}
 }
 
 // runCommand runs a slash subcommand and posts the result. When the output shows a
@@ -221,51 +246,150 @@ func (s *Server) runCommand(responseURL string, args, env []string, ownerTeam, o
 	defer cancel()
 	out, err := s.run(ctx, args, env)
 	if err != nil {
+		// Report the error to the invoker but log the raw output server side rather than
+		// posting it, so internal detail does not leak.
+		log.Printf("slack: command %q failed: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(out))
 		s.post(responseURL, map[string]any{
 			"response_type": "ephemeral",
-			"text":          "Command failed: " + err.Error() + "\n" + codeBlock(out),
+			"text":          "Command failed: " + err.Error(),
 		})
 		return
 	}
 	if id := holdID(out); id != "" && strings.Contains(strings.ToLower(out), "approval") {
+		approver := s.resolveApproverID(ctx, ownerTeam, out)
+		// In per-user mode the buttons run as the hold owner, so without a verified
+		// approver anyone could approve. Withhold the buttons and fall back to the
+		// calendar invite the approver can accept, which the per-user poll advances.
+		if ownerUser != "" && approver == "" {
+			log.Printf("slack: withholding approval buttons for hold %s: could not resolve the approver (needs the users:read.email scope and the approver in the workspace)", id)
+			s.post(responseURL, map[string]any{
+				"response_type": "in_channel",
+				"text":          firstLine(out) + " The approver can accept the calendar invite to approve.",
+			})
+			return
+		}
+		value := s.approvalValue(approvalPayload{H: id, T: ownerTeam, U: ownerUser, A: approver})
 		s.post(responseURL, map[string]any{
 			"response_type": "in_channel",
 			"text":          firstLine(out),
-			"blocks":        approvalBlocks(strings.TrimSpace(out), approvalValue(id, ownerTeam, ownerUser)),
+			"blocks":        approvalBlocks(firstLine(out), value),
 		})
 		return
 	}
 	s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": codeBlock(out)})
 }
 
-// approvalValue encodes the hold id, and in per-user mode the owning user, into a
-// button value so a click can run the action as that user. In single-tenant mode it
-// is the plain hold id.
-func approvalValue(holdID, team, user string) string {
-	if user == "" {
-		return holdID
-	}
-	b, err := json.Marshal(map[string]string{"t": team, "u": user, "h": holdID})
-	if err != nil {
-		return holdID
-	}
-	return string(b)
+// approvalPayload is the data an approval button carries: the hold to act on, the owner
+// whose calendar it touches in per-user mode, and the approver allowed to click it.
+type approvalPayload struct {
+	// H is the hold id the action promotes or cancels.
+	H string `json:"h"`
+	// T is the owning workspace (team) id, set in per-user mode.
+	T string `json:"t,omitempty"`
+	// U is the owning user id, set in per-user mode so the action runs as them.
+	U string `json:"u,omitempty"`
+	// A is the approver's Slack user id, set when it could be resolved, so a click can
+	// be rejected unless it comes from the approver.
+	A string `json:"a,omitempty"`
 }
 
-// decodeApprovalValue splits a button value into a hold id and, when present, the
-// owning user encoded for per-user mode.
-func decodeApprovalValue(value string) (holdID, team, user string) {
-	if strings.HasPrefix(value, "{") {
-		var v struct {
-			T string `json:"t"`
-			U string `json:"u"`
-			H string `json:"h"`
-		}
-		if json.Unmarshal([]byte(value), &v) == nil && v.H != "" {
-			return v.H, v.T, v.U
-		}
+// approvalValue encodes and signs an approval payload into a button value. The form is
+// base64(json).base64(hmac) using the Slack signing secret, so a forged or tampered
+// value, including one with the approver stripped, is rejected on decode.
+func (s *Server) approvalValue(p approvalPayload) string {
+	raw, err := json.Marshal(p)
+	if err != nil {
+		return ""
 	}
-	return value, "", ""
+	enc := base64.RawURLEncoding.EncodeToString(raw)
+	return enc + "." + s.signValue(enc)
+}
+
+// signValue returns the base64 HMAC-SHA256 of enc keyed by the signing secret.
+func (s *Server) signValue(enc string) string {
+	mac := hmac.New(sha256.New, []byte(s.signingSecret))
+	_, _ = io.WriteString(mac, enc)
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// decodeApprovalValue verifies an approval button value's signature and returns its
+// payload. ok is false when the value is malformed or the signature does not match, so
+// a click on a forged value is dropped.
+func (s *Server) decodeApprovalValue(value string) (approvalPayload, bool) {
+	enc, sig, found := strings.Cut(value, ".")
+	if !found {
+		return approvalPayload{}, false
+	}
+	if !hmac.Equal([]byte(sig), []byte(s.signValue(enc))) {
+		return approvalPayload{}, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(enc)
+	if err != nil {
+		return approvalPayload{}, false
+	}
+	var p approvalPayload
+	if err := json.Unmarshal(raw, &p); err != nil || p.H == "" {
+		return approvalPayload{}, false
+	}
+	return p, true
+}
+
+// approverRe extracts the approver email from a hold's start message so a click can be
+// checked against the person the workflow sent the hold to.
+var approverRe = regexp.MustCompile(`(?i)sent to (\S+@\S+) for approval`)
+
+// resolveApproverID pulls the approver email from the command output and resolves it to
+// a Slack user id through users.lookupByEmail, so a click can be verified. It returns the
+// empty string when there is no approver email, no workspace token, or the lookup fails.
+func (s *Server) resolveApproverID(ctx context.Context, team, out string) string {
+	if team == "" || s.tokens == nil {
+		return ""
+	}
+	m := approverRe.FindStringSubmatch(out)
+	if len(m) != 2 {
+		return ""
+	}
+	botToken, err := s.tokens.Get(team)
+	if err != nil {
+		return ""
+	}
+	id, err := s.lookupUserByEmail(ctx, botToken, m[1])
+	if err != nil {
+		log.Printf("slack: could not resolve approver %s to a Slack user: %v", m[1], err)
+		return ""
+	}
+	return id
+}
+
+// lookupUserByEmail resolves a Slack user id from an email via users.lookupByEmail using
+// the workspace bot token. It needs the users:read.email scope on the install.
+func (s *Server) lookupUserByEmail(ctx context.Context, botToken, email string) (string, error) {
+	form := url.Values{"email": {email}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.oauthBaseURL+"/users.lookupByEmail", strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+botToken)
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+		User  struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	if !out.OK {
+		return "", fmt.Errorf("users.lookupByEmail: %s", out.Error)
+	}
+	return out.User.ID, nil
 }
 
 // handleInteractivity verifies a button interaction and acts on Approve or Decline.
@@ -312,20 +436,30 @@ func (s *Server) handleInteractivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	act := payload.Actions[0]
-	go s.runAction(payload.ResponseURL, act.ActionID, act.Value)
+	go s.runAction(payload.ResponseURL, payload.User.ID, act.ActionID, act.Value)
 }
 
 // runAction promotes or cancels a hold in response to a button click and updates the
-// original message.
-func (s *Server) runAction(responseURL, actionID, value string) {
-	holdID, team, user := decodeApprovalValue(value)
+// original message. It verifies the signed button value and, when the value binds an
+// approver, rejects a click from anyone but that approver, so a channel member cannot
+// approve or cancel someone else's hold.
+func (s *Server) runAction(responseURL, clicker, actionID, value string) {
+	p, ok := s.decodeApprovalValue(value)
+	if !ok {
+		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "This approval action is invalid or has expired."})
+		return
+	}
+	if p.A != "" && clicker != p.A {
+		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Only <@" + p.A + "> can act on this request."})
+		return
+	}
 	var args []string
 	var done, verb string
 	switch actionID {
 	case actionApprove:
-		args, done, verb = []string{"promote", "--id", holdID}, "Approved", "approve"
+		args, done, verb = []string{"promote", "--id", p.H}, "Approved", "approve"
 	case actionDecline:
-		args, done, verb = []string{"cancel", "--id", holdID}, "Declined", "decline"
+		args, done, verb = []string{"cancel", "--id", p.H}, "Declined", "decline"
 	default:
 		return
 	}
@@ -334,15 +468,18 @@ func (s *Server) runAction(responseURL, actionID, value string) {
 	// In per-user mode, run the action as the hold's owner so it touches their
 	// calendar, not the clicker's.
 	var env []string
-	if user != "" && s.links != nil {
-		if e, uerr := s.userEnv(ctx, team, user); uerr == nil {
+	if p.U != "" && s.links != nil {
+		if e, uerr := s.userEnv(ctx, p.T, p.U); uerr == nil {
 			env = e
 		}
 	}
 	out, err := s.run(ctx, args, env)
-	text := done + ".\n" + codeBlock(out)
+	text := done + "."
 	if err != nil {
-		text = "Could not " + verb + ": " + err.Error() + "\n" + codeBlock(out)
+		// Log the details server side rather than echoing raw command output to the
+		// channel, which could leak internal information.
+		log.Printf("slack: %s failed for hold %s: %v: %s", verb, p.H, err, strings.TrimSpace(out))
+		text = "Could not " + verb + ": the server logged the details."
 	}
 	s.post(responseURL, map[string]any{"replace_original": true, "text": text})
 }
@@ -391,9 +528,9 @@ func (s *Server) post(responseURL string, payload any) {
 	}
 }
 
-// approvalBlocks builds a Slack message with Approve and Decline buttons carrying
-// the hold id.
-func approvalBlocks(summary, holdID string) []any {
+// approvalBlocks builds a Slack message with Approve and Decline buttons carrying the
+// signed approval value.
+func approvalBlocks(summary, value string) []any {
 	return []any{
 		map[string]any{
 			"type": "section",
@@ -407,14 +544,14 @@ func approvalBlocks(summary, holdID string) []any {
 					"text":      map[string]any{"type": "plain_text", "text": "Approve"},
 					"style":     "primary",
 					"action_id": actionApprove,
-					"value":     holdID,
+					"value":     value,
 				},
 				map[string]any{
 					"type":      "button",
 					"text":      map[string]any{"type": "plain_text", "text": "Decline"},
 					"style":     "danger",
 					"action_id": actionDecline,
-					"value":     holdID,
+					"value":     value,
 				},
 			},
 		},

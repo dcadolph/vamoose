@@ -17,8 +17,10 @@ import (
 	"time"
 )
 
-// installScopes are the bot scopes vamoose requests during OAuth install.
-const installScopes = "commands,chat:write"
+// installScopes are the bot scopes vamoose requests during OAuth install. users:read.email
+// lets the server resolve an approver's email to a Slack user id so it can verify that a
+// click on an approval button comes from the authorized approver.
+const installScopes = "commands,chat:write,users:read.email"
 
 // TokenStore persists per-workspace bot tokens keyed by Slack team id.
 type TokenStore interface {

@@ -23,8 +23,8 @@ import (
 // that records the injected arguments and environment instead of touching a calendar).
 //
 // It proves: signature verification, slash routing, link and unlink interception, the
-// OAuth link-state round trip, per-user credential injection, owner-encoded approval
-// buttons acting as the hold owner rather than the clicker, the iCloud credential
+// OAuth link-state round trip, per-user credential injection, approver-verified approval
+// buttons that reject a non-approver and act as the hold owner, the iCloud credential
 // modal, and per-user daemon advance. It does NOT prove real Slack's exact payloads
 // and signatures, real OAuth consent, real calendar mutation, or Block Kit rendering;
 // those still need a live workspace.
@@ -77,6 +77,13 @@ func mockSlackAPI(t *testing.T) (*httptest.Server, <-chan capturedPost) {
 		if strings.HasSuffix(r.URL.Path, "/views.open") {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `{"ok":true}`)
+			return
+		}
+		// Resolve the approver email to a fixed Slack user id, so the server can bind and
+		// verify the approver on the approval buttons.
+		if strings.HasSuffix(r.URL.Path, "/users.lookupByEmail") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"ok":true,"user":{"id":"UBOSS"}}`)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -155,6 +162,20 @@ func waitPost(t *testing.T, ch <-chan capturedPost) capturedPost {
 	}
 }
 
+// clickPayload builds a block_actions interactivity payload for a user clicking Approve
+// on a button carrying value.
+func clickPayload(responseURL, user, value string) string {
+	payload := map[string]any{
+		"type":         "block_actions",
+		"response_url": responseURL,
+		"team":         map[string]any{"id": "T1"},
+		"user":         map[string]any{"id": user},
+		"actions":      []any{map[string]any{"action_id": actionApprove, "value": value}},
+	}
+	b, _ := json.Marshal(payload)
+	return string(b)
+}
+
 // TestPerUserSlackWalkthrough drives the whole per-user Slack story against a mocked
 // workspace. Run it narrated with:
 //
@@ -198,7 +219,7 @@ func TestPerUserSlackWalkthrough(t *testing.T) {
 		return f
 	}
 
-	t.Log("workspace: team T1; users U1 (Alice), U2 (Bob, the approver clicking a button), U3 (Carol)")
+	t.Log("workspace: team T1; users U1 (Alice, requester), U2 (Bob, a non-approver), U3 (Carol); approver boss@x.com -> UBOSS")
 
 	// 1. A forged request is rejected before any work happens.
 	t.Log("1. security: a request with a bad signature is rejected")
@@ -243,34 +264,43 @@ func TestPerUserSlackWalkthrough(t *testing.T) {
 	}
 	t.Logf("   -> stored: T1/U1 -> google (%s)", cbw.Body.String())
 
-	// 5. Now the same command runs on Alice's calendar and posts approval buttons.
+	// 5. Now the same command runs on Alice's calendar. The server resolves the approver
+	// (boss@x.com -> UBOSS) and posts approval buttons bound to that approver.
 	t.Log("5. Alice runs `/vamoose off next week` again, now linked")
 	slash(form("U1", "off next week", ""))
+	if lookup := waitPost(t, posts); !strings.HasSuffix(lookup.Path, "/users.lookupByEmail") {
+		t.Fatalf("expected an approver lookup, got %s", lookup.Path)
+	}
 	buttons := waitPost(t, posts)
 	ranAs := rec.last()
 	if !envHas(ranAs, "VAMOOSE_GOOGLE_ACCESS_TOKEN=ya29-alice") {
 		t.Fatalf("command env = %v, want Alice's google token", ranAs.Env)
 	}
-	wantValue := approvalValue("EVT1", "T1", "U1")
-	escaped, _ := json.Marshal(wantValue) // the value is nested, so JSON-escaped in the body
-	if !strings.Contains(buttons.Body, string(escaped[1:len(escaped)-1])) {
-		t.Fatalf("approval buttons = %s, want owner-encoded value %s", buttons.Body, wantValue)
+	value := buttonValue(t, []byte(buttons.Body))
+	p, ok := s.decodeApprovalValue(value)
+	if !ok || p.H != "EVT1" || p.U != "U1" || p.A != "UBOSS" {
+		t.Fatalf("approval value = %+v ok=%v, want hold EVT1 owner U1 approver UBOSS", p, ok)
 	}
 	t.Logf("   -> ran `vamoose %s` with Alice's injected credentials", strings.Join(ranAs.Args, " "))
-	t.Logf("   -> posted Approve/Decline buttons whose value encodes the owner: %s", wantValue)
+	t.Log("   -> posted Approve/Decline buttons bound to approver UBOSS, acting as owner U1")
 
-	// 6. A DIFFERENT user (Bob) clicks Approve; it must act on Alice's calendar.
-	t.Log("6. Bob (U2), not Alice, clicks Approve")
-	payload := map[string]any{
-		"type":         "block_actions",
-		"response_url": sink.URL + "/response",
-		"team":         map[string]any{"id": "T1"},
-		"user":         map[string]any{"id": "U2"},
-		"actions":      []any{map[string]any{"action_id": actionApprove, "value": wantValue}},
+	// 6. A channel member who is NOT the approver clicks Approve; it is rejected and no
+	// action runs.
+	t.Log("6. Bob (U2), not the approver, clicks Approve")
+	if act := signedForm(t, h, secret, "/slack/interactivity", url.Values{"payload": {clickPayload(sink.URL+"/response", "U2", value)}}); act.Code != 200 {
+		t.Fatalf("interactivity status = %d", act.Code)
 	}
-	pj, _ := json.Marshal(payload)
-	act := signedForm(t, h, secret, "/slack/interactivity", url.Values{"payload": {string(pj)}})
-	if act.Code != 200 {
+	if reject := waitPost(t, posts); !strings.Contains(reject.Body, "Only") {
+		t.Fatalf("Bob's click should be rejected, got: %s", reject.Body)
+	}
+	if last := rec.last(); len(last.Args) > 0 && last.Args[0] == "promote" {
+		t.Fatal("a non-approver's click ran promote")
+	}
+	t.Log("   -> Slack told Bob only the approver can act")
+
+	// 6b. The approver (UBOSS) clicks Approve; it runs promote as Alice, the owner.
+	t.Log("6b. The approver (UBOSS) clicks Approve")
+	if act := signedForm(t, h, secret, "/slack/interactivity", url.Values{"payload": {clickPayload(sink.URL+"/response", "UBOSS", value)}}); act.Code != 200 {
 		t.Fatalf("interactivity status = %d", act.Code)
 	}
 	done := waitPost(t, posts)
@@ -279,9 +309,9 @@ func TestPerUserSlackWalkthrough(t *testing.T) {
 		t.Fatalf("action args = %v, want promote --id EVT1", promote.Args)
 	}
 	if !envHas(promote, "VAMOOSE_GOOGLE_ACCESS_TOKEN=ya29-alice") {
-		t.Fatalf("action env = %v, want Alice's token though Bob clicked", promote.Env)
+		t.Fatalf("action env = %v, want Alice's token though the approver clicked", promote.Env)
 	}
-	t.Logf("   -> ran `vamoose %s` with ALICE's credentials, not Bob's", strings.Join(promote.Args, " "))
+	t.Logf("   -> ran `vamoose %s` with ALICE's credentials, approved by UBOSS", strings.Join(promote.Args, " "))
 	t.Logf("   -> Slack message updated: %s", jsonText(done.Body))
 
 	// 7. Carol links iCloud, which opens a credential modal instead of an OAuth URL.

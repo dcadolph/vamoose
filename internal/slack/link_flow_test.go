@@ -145,19 +145,25 @@ func TestViewSubmissionMissingFields(t *testing.T) {
 	}
 }
 
-// TestApprovalValueRoundTrip confirms per-user encoding carries the owner while
-// single-tenant stays the plain hold id.
+// TestApprovalValueRoundTrip confirms a signed approval value round-trips its payload
+// and that tampered, wrong-secret, and unsigned values are rejected.
 func TestApprovalValueRoundTrip(t *testing.T) {
 	t.Parallel()
-	h, team, user := decodeApprovalValue(approvalValue("EVT1", "T1", "U1"))
-	if h != "EVT1" || team != "T1" || user != "U1" {
-		t.Errorf("per-user decode = %q/%q/%q, want EVT1/T1/U1", h, team, user)
+	s := NewServer("shh", noopRunner)
+	v := s.approvalValue(approvalPayload{H: "EVT1", T: "T1", U: "U1", A: "UBOSS"})
+	p, ok := s.decodeApprovalValue(v)
+	if !ok || p.H != "EVT1" || p.T != "T1" || p.U != "U1" || p.A != "UBOSS" {
+		t.Errorf("decode = %+v ok=%v, want EVT1/T1/U1/UBOSS", p, ok)
 	}
-	if got := approvalValue("EVT2", "", ""); got != "EVT2" {
-		t.Errorf("single-tenant value = %q, want EVT2", got)
+	if _, ok := s.decodeApprovalValue(v + "x"); ok {
+		t.Error("a tampered value should not verify")
 	}
-	if h, team, user := decodeApprovalValue("EVT2"); h != "EVT2" || team != "" || user != "" {
-		t.Errorf("plain decode = %q/%q/%q, want EVT2//", h, team, user)
+	other := NewServer("different-secret", noopRunner)
+	if _, ok := s.decodeApprovalValue(other.approvalValue(approvalPayload{H: "EVT1"})); ok {
+		t.Error("a value signed with another secret should not verify")
+	}
+	if _, ok := s.decodeApprovalValue("EVT1"); ok {
+		t.Error("an unsigned value should not verify")
 	}
 }
 
@@ -177,7 +183,8 @@ func TestRunActionAsOwner(t *testing.T) {
 	}
 	srv, ch := captureServer(t)
 	s := NewServer("shh", runner, WithLinkers(store, fl))
-	s.runAction(srv.URL, actionApprove, approvalValue("EVT1", "T1", "U1"))
+	// No approver is bound here, so the click runs as the owner regardless of clicker.
+	s.runAction(srv.URL, "U9", actionApprove, s.approvalValue(approvalPayload{H: "EVT1", T: "T1", U: "U1"}))
 	<-ch
 	if len(gotArgs) != 3 || gotArgs[2] != "EVT1" {
 		t.Errorf("args = %v, want promote --id EVT1", gotArgs)
