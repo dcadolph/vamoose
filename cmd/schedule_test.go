@@ -88,6 +88,27 @@ func TestFireSchedules(t *testing.T) {
 	}
 }
 
+// TestPollSchedules confirms the daemon fires a due schedule, and that a run against an
+// unbuildable provider still advances the schedule instead of retrying every poll.
+func TestPollSchedules(t *testing.T) {
+	isolateConfig(t)
+	past := time.Now().Add(-time.Hour)
+	if err := saveSchedules([]scheduleItem{{
+		Workflow: "pto", Provider: "no-such-provider", Every: "168h",
+		NextRun: past, Phrase: "next week", Manager: "boss@x.com",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	pollSchedules(context.Background(), log.New(io.Discard, "", 0))
+	got, _ := loadSchedules()
+	if len(got) != 1 {
+		t.Fatalf("schedules = %d, want 1", len(got))
+	}
+	if !got[0].NextRun.After(past.Add(time.Hour)) {
+		t.Errorf("next run = %v, want it advanced past the fire time", got[0].NextRun)
+	}
+}
+
 // TestFireSchedulesAdvancesOnError confirms a failing run still advances the schedule,
 // so a persistent error does not fire every poll.
 func TestFireSchedulesAdvancesOnError(t *testing.T) {

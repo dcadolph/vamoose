@@ -71,6 +71,7 @@ func runDaemon(ctx context.Context, args []string) error {
 	warned := make(map[string]bool)
 	for {
 		pollAll(ctx, logger, *prune, warned)
+		pollSchedules(ctx, logger)
 		if *once {
 			return nil
 		}

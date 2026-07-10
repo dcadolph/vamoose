@@ -216,3 +216,41 @@ func fireSchedules(ctx context.Context, now time.Time, schedules []scheduleItem,
 	}
 	return out
 }
+
+// pollSchedules fires any recurring workflow whose next run has passed and persists the
+// advanced next-run times. The daemon calls it each poll.
+func pollSchedules(ctx context.Context, logger *log.Logger) {
+	schedules, err := loadSchedules()
+	if err != nil {
+		logger.Printf("load schedules: %v", err)
+		return
+	}
+	if len(schedules) == 0 {
+		return
+	}
+	updated := fireSchedules(ctx, time.Now(), schedules, runScheduledWorkflow, logger)
+	if err := saveSchedules(updated); err != nil {
+		logger.Printf("save schedules: %v", err)
+	}
+}
+
+// runScheduledWorkflow runs a scheduled workflow once, resolving its relative window at
+// run time and enqueuing it so the daemon advances it on approval.
+func runScheduledWorkflow(ctx context.Context, s scheduleItem) error {
+	wf, err := workflowLoader().Load(s.Workflow)
+	if err != nil {
+		return err
+	}
+	start, end, allDay, err := resolveWindow("", "", s.Phrase)
+	if err != nil {
+		return fmt.Errorf("resolve window: %w", err)
+	}
+	subject := s.Subject
+	if subject == "" {
+		subject = defaultSubject(wf)
+	}
+	return executeWorkflow(ctx, wf, runOptions{
+		Provider: s.Provider, Subject: subject, Manager: s.Manager,
+		Start: start, End: end, AllDay: allDay, Watch: true,
+	})
+}
