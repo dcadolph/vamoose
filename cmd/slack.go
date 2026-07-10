@@ -78,7 +78,7 @@ func runSlack(ctx context.Context, args []string) error {
 		if len(linkers) == 0 {
 			return fmt.Errorf("per-user mode needs a provider configured, for example VAMOOSE_GOOGLE_CLIENT_ID and VAMOOSE_GOOGLE_CLIENT_SECRET")
 		}
-		opts = append(opts, slack.WithPublicURL(pub), slack.WithLinkers(links, linkers...), slack.WithPerUserEnv(slackUserWatchEnv))
+		opts = append(opts, slack.WithPublicURL(pub), slack.WithLinkers(links, linkers...), slack.WithPerUserEnv(slackUserFilesEnv))
 		perUserOn = true
 		logger.Printf("per-user mode: %d provider(s); each user runs /vamoose link <provider>", len(linkers))
 	}
@@ -155,15 +155,19 @@ func slackUserLinkStore() (*slack.UserLinkFileStore, error) {
 	return slack.NewUserLinkStore(filepath.Join(dir, "vamoose", name))
 }
 
-// slackUserWatchEnv returns the VAMOOSE_WATCH_FILE environment for a linked user, so
-// their watched holds live in their own file that the per-user poll loop advances
-// with their credentials.
-func slackUserWatchEnv(team, user string) []string {
+// slackUserFilesEnv returns the per-user file environment for a linked user: their watch
+// file, so the poll loop advances their holds with their credentials, and their audit
+// file, so each user's run history is separate and free of cross-process contention.
+func slackUserFilesEnv(team, user string) []string {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return nil
 	}
-	return []string{"VAMOOSE_WATCH_FILE=" + filepath.Join(dir, "vamoose", "watches", team+"-"+user+".json")}
+	base := filepath.Join(dir, "vamoose")
+	return []string{
+		"VAMOOSE_WATCH_FILE=" + filepath.Join(base, "watches", team+"-"+user+".json"),
+		"VAMOOSE_AUDIT_FILE=" + filepath.Join(base, "audit", team+"-"+user+".json"),
+	}
 }
 
 // perUserEnvKeys are the environment variables the Slack server injects per user.

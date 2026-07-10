@@ -159,6 +159,12 @@ Show or set your default team, used when the directory lookup is wrong or unavai
 
 List or create calendars. iCloud and CalDAV only. Useful to create a dedicated calendar so vamoose never touches your main one.
 
+### history
+
+`vamoose history [--hold <id>] [--limit <n>] [--json]`
+
+Show the recorded run history: when each hold was created, approved, declined, or expired, who approved it, and the notify, note, and message steps that ran. `--hold` filters to one hold, `--limit` shows only the most recent events, and `--json` emits them for tooling.
+
 ### doctor
 
 `vamoose doctor`
@@ -230,3 +236,4 @@ The Slack server also reads `VAMOOSE_SLACK_SIGNING_SECRET` and, for install and 
 - **Config directory** is the OS user config directory, `vamoose/` within it: `~/.config/vamoose` on Linux, `~/Library/Application Support/vamoose` on macOS.
 - **Watch state** for `--watch` holds is `watches.json` in the config directory, or the path in `VAMOOSE_WATCH_FILE` when set (the Slack server uses this to give each linked user their own file).
 - **Schedules** from `vamoose schedule` are `schedules.json` in the config directory, which the daemon reads to fire recurring runs.
+- **Run history** is `audit.json` in the config directory, an append-only log of workflow events that `vamoose history` reads. It is capped to the most recent events, and sealed with AES-256-GCM when `VAMOOSE_SECRET_KEY` is set. Set `VAMOOSE_AUDIT_FILE` to override the path (the Slack server gives each linked user their own).
