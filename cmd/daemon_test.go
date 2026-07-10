@@ -240,6 +240,64 @@ func TestAdvanceRunChain(t *testing.T) {
 	}
 }
 
+// TestAdvanceRunWait drives a wait step: it holds until the delay passes, then advances
+// to the following approve gate without re-inviting the already-invited manager, and
+// completes once the manager approves. It isolates HOME to load a user workflow.
+func TestAdvanceRunWait(t *testing.T) {
+	isolateConfig(t)
+	dir, err := workflowsDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wf := `{"name":"wait-approve","steps":[
+		{"id":"hold","verb":"hold"},
+		{"id":"pause","verb":"wait","for":"48h"},
+		{"id":"ok","verb":"approve","manager":true},
+		{"id":"notify","verb":"notify","team":"optional","next":"end"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "wait-approve.json"), []byte(wf), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pending := calendar.Hold{ID: "id", Attendees: []calendar.Attendee{
+		{Person: calendar.Person{Email: "boss@x.com"}, Role: calendar.RoleRequired, Response: calendar.ResponseNotResponded},
+	}}
+
+	// Within the delay: still waiting.
+	early := &mockProvider{hold: pending, team: []calendar.Person{{Email: "peer@x.com"}}}
+	recent := watchItem{Provider: "graph", HoldID: "id", Workflow: "wait-approve", Step: 1, CreatedAt: time.Now().Add(-time.Hour)}
+	if res, _, _ := advanceRun(context.Background(), early, recent); res != pollPending {
+		t.Errorf("within the delay res = %v, want pollPending", res)
+	}
+
+	// Delay passed: advance to the approve gate, without re-inviting the manager.
+	mid := &mockProvider{hold: pending, team: []calendar.Person{{Email: "peer@x.com"}}}
+	elapsed := watchItem{Provider: "graph", HoldID: "id", Workflow: "wait-approve", Step: 1, CreatedAt: time.Now().Add(-100 * time.Hour)}
+	res, updated, err := advanceRun(context.Background(), mid, elapsed)
+	if err != nil || res != pollAdvanced {
+		t.Fatalf("delay passed res = %v, err = %v; want pollAdvanced", res, err)
+	}
+	if updated.Step != 2 || updated.Approver != "" {
+		t.Errorf("advanced to step %d approver %q, want step 2 with no approver", updated.Step, updated.Approver)
+	}
+	if mid.updated != nil {
+		t.Error("advancing to a manager gate should not re-invite anyone")
+	}
+
+	// At the approve gate the manager accepts: the workflow completes and notifies.
+	accepted := calendar.Hold{ID: "id", Attendees: []calendar.Attendee{
+		{Person: calendar.Person{Email: "boss@x.com"}, Role: calendar.RoleRequired, Response: calendar.ResponseAccepted},
+	}}
+	last := &mockProvider{hold: accepted, team: []calendar.Person{{Email: "peer@x.com"}}}
+	if res, _, err := advanceRun(context.Background(), last, updated); err != nil || res != pollApproved {
+		t.Fatalf("after approval res = %v, err = %v; want pollApproved", res, err)
+	}
+	if last.updated == nil {
+		t.Error("notify should have run after the manager approved")
+	}
+}
+
 // hasRequired reports whether the attendees include a required attendee with the email.
 func hasRequired(attendees []calendar.Attendee, email string) bool {
 	for _, a := range attendees {

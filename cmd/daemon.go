@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
+	"github.com/dcadolph/vamoose/internal/comms"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
 
@@ -116,7 +117,7 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 		case pollApproved:
 			logger.Printf("%s: approved and advanced", label(w))
 		case pollAdvanced:
-			logger.Printf("%s: %s approved; now awaiting %s", label(w), w.Approver, updated.Approver)
+			logger.Printf("%s: advanced to the next step", label(w))
 			remaining = append(remaining, updated)
 		case pollDeclined:
 			logger.Printf("%s: declined; no longer watching", label(w))
@@ -143,12 +144,12 @@ func label(w watchItem) string {
 	return fmt.Sprintf("%s %s", w.Provider, w.HoldID)
 }
 
-// advanceRun advances a watched workflow run: it loads the workflow, checks the
-// current gate's approver, and on acceptance runs the steps up to the next gate. When
-// the next gate is another approver, it invites them and returns the updated watch
-// item so the daemon keeps watching that gate; when the flow completes it returns
-// approved. The provider is injected so the logic is testable. It returns the watch
-// item to persist, which is unchanged except when the chain advances.
+// advanceRun advances a watched workflow run: it loads the workflow and acts on the
+// current waiting step. A wait step advances once its delay elapses; an approve step
+// advances on the approver's response, or its timeout. Advancing runs the steps up to
+// the next waiting step, inviting the next approver when the chain continues, and
+// returns the watch item to persist, unchanged unless the run advances. The provider is
+// injected so the logic is testable.
 func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (pollResult, watchItem, error) {
 	wf, err := workflowLoader().Load(item.Workflow)
 	if err != nil {
@@ -159,47 +160,66 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 		return pollFailed, item, err
 	}
 	notifier := resolveNotifier()
+	if item.Step < 0 || item.Step >= len(wf.Steps) {
+		return pollPending, item, nil
+	}
+	pending := wf.Steps[item.Step]
+
+	// A wait step advances once its delay has passed.
+	if pending.Verb == workflow.VerbWait {
+		if d := pending.ParsedFor(); d <= 0 || item.CreatedAt.IsZero() || time.Since(item.CreatedAt) < d {
+			return pollPending, item, nil
+		}
+		return advanceToNextGate(ctx, prov, notifier, wf, item, hold, wf.Next(item.Step, ""))
+	}
+
 	switch gateResponse(hold, item) {
 	case calendar.ResponseAccepted:
-		gate, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.Next(item.Step, workflow.OutcomeAccepted), hold)
-		if werr != nil {
-			return pollFailed, item, werr
-		}
-		if gate < 0 {
-			return pollApproved, item, nil
-		}
-		// The chain continues: invite the next approver and watch that gate.
-		next := calendar.Person{Email: wf.Steps[gate].Approver}
-		if _, uerr := prov.UpdateHold(ctx, inviteRequired(hold, next)); uerr != nil {
-			return pollFailed, item, fmt.Errorf("invite next approver: %w", uerr)
-		}
-		item.Step = gate
-		item.Approver = next.Email
-		item.CreatedAt = time.Now()
-		return pollAdvanced, item, nil
+		return advanceToNextGate(ctx, prov, notifier, wf, item, hold, wf.Next(item.Step, workflow.OutcomeAccepted))
 	case calendar.ResponseDeclined:
-		if item.Step >= 0 && item.Step < len(wf.Steps) {
-			if target, ok := wf.Steps[item.Step].On[workflow.OutcomeDeclined]; ok && target != "end" {
-				if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
-					return pollFailed, item, werr
-				}
+		if target, ok := pending.On[workflow.OutcomeDeclined]; ok && target != "end" {
+			if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
+				return pollFailed, item, werr
 			}
 		}
 		return pollDeclined, item, nil
 	default:
-		if item.Step >= 0 && item.Step < len(wf.Steps) {
-			step := wf.Steps[item.Step]
-			if d := step.ParsedTimeout(); d > 0 && !item.CreatedAt.IsZero() && time.Since(item.CreatedAt) > d {
-				if target, ok := step.On[workflow.OutcomeExpired]; ok && target != "end" {
-					if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
-						return pollFailed, item, werr
-					}
+		if d := pending.ParsedTimeout(); d > 0 && !item.CreatedAt.IsZero() && time.Since(item.CreatedAt) > d {
+			if target, ok := pending.On[workflow.OutcomeExpired]; ok && target != "end" {
+				if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
+					return pollFailed, item, werr
 				}
-				return pollExpired, item, nil
 			}
+			return pollExpired, item, nil
 		}
 		return pollPending, item, nil
 	}
+}
+
+// advanceToNextGate runs the workflow forward from `from` to the next waiting step or
+// the end. When the next step is a named chain approver it invites them; a wait step or
+// a manager gate needs no invite. It returns the item to persist: advanced at a new
+// gate, or approved when the flow completes.
+func advanceToNextGate(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, wf workflow.Workflow, item watchItem, hold calendar.Hold, from int) (pollResult, watchItem, error) {
+	gate, err := walkSteps(ctx, prov, notifier, item.Provider, wf, from, hold)
+	if err != nil {
+		return pollFailed, item, err
+	}
+	if gate < 0 {
+		return pollApproved, item, nil
+	}
+	next := wf.Steps[gate]
+	item.Step = gate
+	item.CreatedAt = time.Now()
+	if next.Verb == workflow.VerbApprove && next.Approver != "" {
+		if _, uerr := prov.UpdateHold(ctx, inviteRequired(hold, calendar.Person{Email: next.Approver})); uerr != nil {
+			return pollFailed, item, fmt.Errorf("invite next approver: %w", uerr)
+		}
+		item.Approver = next.Approver
+	} else {
+		item.Approver = ""
+	}
+	return pollAdvanced, item, nil
 }
 
 // gateResponse reports the current gate's approver response. In a chain it checks the
