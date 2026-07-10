@@ -16,12 +16,27 @@ import (
 )
 
 // resolveNotifier returns the configured comms notifier, or nil when none is set. A
-// Slack bot token in VAMOOSE_SLACK_BOT_TOKEN enables the Slack notifier.
+// Slack bot token (VAMOOSE_SLACK_BOT_TOKEN) enables Slack, and SMTP settings
+// (VAMOOSE_SMTP_HOST and friends) enable email. When both are set, a message routes by
+// its channel: an address goes to email, anything else to Slack.
 func resolveNotifier() comms.Notifier {
+	var slack, email comms.Notifier
 	if token := os.Getenv("VAMOOSE_SLACK_BOT_TOKEN"); token != "" {
-		return comms.NewSlackNotifier(token)
+		slack = comms.NewSlackNotifier(token)
 	}
-	return nil
+	if host := os.Getenv("VAMOOSE_SMTP_HOST"); host != "" {
+		email = comms.NewEmailNotifier(comms.EmailConfig{
+			Host:     host,
+			Port:     os.Getenv("VAMOOSE_SMTP_PORT"),
+			Username: os.Getenv("VAMOOSE_SMTP_USERNAME"),
+			Password: os.Getenv("VAMOOSE_SMTP_PASSWORD"),
+			From:     os.Getenv("VAMOOSE_SMTP_FROM"),
+		})
+	}
+	if slack == nil && email == nil {
+		return nil
+	}
+	return comms.Route(slack, email)
 }
 
 // workflowsDir returns the user workflow directory under the config directory.
@@ -260,7 +275,7 @@ func createNote(ctx context.Context, prov calendar.Provider, step workflow.Step,
 // the run's context without the workflow hardcoding it.
 func sendMessage(ctx context.Context, notifier comms.Notifier, step workflow.Step, hold calendar.Hold) error {
 	if notifier == nil {
-		return fmt.Errorf("message step needs a comms backend: set VAMOOSE_SLACK_BOT_TOKEN")
+		return fmt.Errorf("message step needs a comms backend: set VAMOOSE_SLACK_BOT_TOKEN or VAMOOSE_SMTP_HOST")
 	}
 	text := step.Subject
 	if text == "" {

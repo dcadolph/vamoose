@@ -389,6 +389,33 @@ func TestRunWorkflowWaitGate(t *testing.T) {
 	}
 }
 
+// TestResolveNotifier confirms the notifier is nil when nothing is configured and set
+// when a comms backend is present.
+func TestResolveNotifier(t *testing.T) {
+	t.Run("none", func(t *testing.T) {
+		t.Setenv("VAMOOSE_SLACK_BOT_TOKEN", "")
+		t.Setenv("VAMOOSE_SMTP_HOST", "")
+		if resolveNotifier() != nil {
+			t.Error("want nil when no comms backend is configured")
+		}
+	})
+	t.Run("email only", func(t *testing.T) {
+		t.Setenv("VAMOOSE_SLACK_BOT_TOKEN", "")
+		t.Setenv("VAMOOSE_SMTP_HOST", "smtp.example.com")
+		t.Setenv("VAMOOSE_SMTP_FROM", "vamoose@x.com")
+		if resolveNotifier() == nil {
+			t.Error("want a notifier when SMTP is configured")
+		}
+	})
+	t.Run("slack only", func(t *testing.T) {
+		t.Setenv("VAMOOSE_SMTP_HOST", "")
+		t.Setenv("VAMOOSE_SLACK_BOT_TOKEN", "xoxb-token")
+		if resolveNotifier() == nil {
+			t.Error("want a notifier when a Slack token is set")
+		}
+	})
+}
+
 // TestWhenSummary confirms the dry-run guard summary renders each condition and stays
 // empty for an unset guard.
 func TestWhenSummary(t *testing.T) {
