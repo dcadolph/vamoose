@@ -184,17 +184,18 @@ func runSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifi
 		return err
 	}
 	if gate >= 0 {
-		return gateOnApproval(providerName, wf, gate, hold, watch)
+		return gateWaiting(providerName, wf, gate, hold, watch)
 	}
 	return nil
 }
 
 // walkSteps runs the workflow's immediate steps from `from` against an existing hold,
-// following each step's next or fall-through, until it reaches an approve gate or the
-// end. Notify fans out to the team, note marks the requester's calendar, message posts
-// to a channel, and cancel deletes the hold. A step whose when guard denies is skipped.
-// It returns the index of the approve gate it stopped at, or -1 when the flow ran to
-// completion, so a caller can gate the run or advance the next chain link.
+// following each step's next or fall-through, until it reaches a waiting step (an
+// approve gate or a wait delay) or the end. Notify fans out to the team, note marks the
+// requester's calendar, message posts to a channel, and cancel deletes the hold. A step
+// whose when guard denies is skipped. It returns the index of the waiting step it
+// stopped at, or -1 when the flow ran to completion, so a caller can gate the run or
+// advance the next step.
 func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, providerName string, wf workflow.Workflow, from int, hold calendar.Hold) (int, error) {
 	visited := make(map[int]bool)
 	for i := from; i >= 0 && i < len(wf.Steps); i = wf.Next(i, "") {
@@ -205,9 +206,10 @@ func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notif
 		if !wf.Steps[i].When.Allows(time.Now(), len(hold.Attendees)) {
 			continue
 		}
-		switch wf.Steps[i].Verb {
-		case workflow.VerbApprove:
+		if wf.Steps[i].Verb.Waits() {
 			return i, nil
+		}
+		switch wf.Steps[i].Verb {
 		case workflow.VerbNotify:
 			if err := promoteHold(ctx, prov, hold); err != nil {
 				return -1, err
@@ -294,26 +296,39 @@ func resolveApprover(ctx context.Context, prov calendar.Provider, step workflow.
 	return resolveManager(ctx, prov, managerFlag)
 }
 
-// gateOnApproval stops the workflow at its approval step. When watching, it records
-// the run at that step, with the approver it waits on, so the daemon advances it once
-// that approver accepts.
-func gateOnApproval(providerName string, wf workflow.Workflow, stepIdx int, hold calendar.Hold, watch bool) error {
+// gateWaiting stops the workflow at a waiting step, an approval or a wait delay. When
+// watching, it records the run at that step, with the approver for an approve gate, so
+// the daemon advances it once the approver accepts or the delay passes.
+func gateWaiting(providerName string, wf workflow.Workflow, stepIdx int, hold calendar.Hold, watch bool) error {
+	step := wf.Steps[stepIdx]
+	isWait := step.Verb == workflow.VerbWait
 	if !watch {
-		fmt.Fprintln(os.Stdout, "Waiting on approval. Run 'vamoose check' to poll, or add --watch and run 'vamoose daemon' to advance on approval.")
+		if isWait {
+			fmt.Fprintln(os.Stdout, "This workflow pauses here. Add --watch and run 'vamoose daemon' to advance it after the delay.")
+		} else {
+			fmt.Fprintln(os.Stdout, "Waiting on approval. Run 'vamoose check' to poll, or add --watch and run 'vamoose daemon' to advance on approval.")
+		}
 		return nil
 	}
-	if err := addWatch(watchItem{
+	item := watchItem{
 		Provider:  providerName,
 		HoldID:    hold.ID,
 		Workflow:  wf.Name,
 		Step:      stepIdx,
-		Approver:  managerAttendee(hold).Person.Email,
 		Subject:   hold.Subject,
 		CreatedAt: time.Now(),
-	}); err != nil {
+	}
+	if !isWait {
+		item.Approver = managerAttendee(hold).Person.Email
+	}
+	if err := addWatch(item); err != nil {
 		return fmt.Errorf("add watch: %w", err)
 	}
-	fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to advance the workflow when approved.")
+	if isWait {
+		fmt.Fprintf(os.Stdout, "Waiting %s. Run 'vamoose daemon' to advance the workflow after the delay.\n", step.For)
+	} else {
+		fmt.Fprintln(os.Stdout, "Watching for approval. Run 'vamoose daemon' to advance the workflow when approved.")
+	}
 	return nil
 }
 
@@ -373,7 +388,7 @@ func previewWorkflow(w io.Writer, wf workflow.Workflow, hold calendar.Hold) {
 			fmt.Fprintf(w, "  approve, then %s%s\n", branchSummary(s), whenSummary(s.When))
 			continue
 		}
-		fmt.Fprintf(w, "  %s%s%s\n", stepLabel(s), messageTarget(s), whenSummary(s.When))
+		fmt.Fprintf(w, "  %s%s%s%s\n", stepLabel(s), messageTarget(s), waitFor(s), whenSummary(s.When))
 	}
 }
 
@@ -381,6 +396,14 @@ func previewWorkflow(w io.Writer, wf workflow.Workflow, hold calendar.Hold) {
 func messageTarget(s workflow.Step) string {
 	if s.Verb == workflow.VerbMessage && s.Channel != "" {
 		return " -> " + s.Channel
+	}
+	return ""
+}
+
+// waitFor describes a wait step's delay for the dry-run preview.
+func waitFor(s workflow.Step) string {
+	if s.Verb == workflow.VerbWait && s.For != "" {
+		return " for " + s.For
 	}
 	return ""
 }

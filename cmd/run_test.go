@@ -361,6 +361,34 @@ func TestRunWorkflowExplicitFirstApprover(t *testing.T) {
 	}
 }
 
+// TestRunWorkflowWaitGate confirms a wait step records the run at that step for the
+// daemon, with no approver, and does not run the following steps yet.
+func TestRunWorkflowWaitGate(t *testing.T) {
+	isolateConfig(t)
+	start, end := testWindow()
+	prov := &mockProvider{}
+	wf := workflow.Workflow{Name: "wait-then-notify", Steps: []workflow.Step{
+		{Verb: workflow.VerbHold},
+		{Verb: workflow.VerbWait, For: "48h"},
+		{Verb: workflow.VerbNotify, Team: calendar.RoleOptional},
+	}}
+	if err := runWorkflowOn(context.Background(), prov, "graph", wf, runOptions{
+		Subject: "Off", Start: start, End: end, AllDay: true, Watch: true,
+	}); err != nil {
+		t.Fatalf("runWorkflowOn: %v", err)
+	}
+	if prov.updated != nil {
+		t.Error("notify ran before the wait elapsed")
+	}
+	watches, _ := loadWatches()
+	if len(watches) != 1 {
+		t.Fatalf("watches = %d, want 1", len(watches))
+	}
+	if w := watches[0]; w.Step != 1 || w.Approver != "" {
+		t.Errorf("watch = step %d approver %q, want step 1 with no approver", w.Step, w.Approver)
+	}
+}
+
 // TestWhenSummary confirms the dry-run guard summary renders each condition and stays
 // empty for an unset guard.
 func TestWhenSummary(t *testing.T) {
