@@ -208,9 +208,10 @@ func runSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifi
 // following each step's next or fall-through, until it reaches a waiting step (an
 // approve gate or a wait delay) or the end. Notify fans out to the team, note marks the
 // requester's calendar, message posts to a channel, and cancel deletes the hold. A step
-// whose when guard denies is skipped. It returns the index of the waiting step it
-// stopped at, or -1 when the flow ran to completion, so a caller can gate the run or
-// advance the next step.
+// whose when guard denies is skipped. On success it returns the index of the waiting
+// step it stopped at, or -1 when the flow ran to completion, so a caller can gate the
+// run or advance the next step. On error it returns the index of the step that failed,
+// so the daemon can checkpoint and resume there rather than repeating completed steps.
 func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, providerName string, wf workflow.Workflow, from int, hold calendar.Hold) (int, error) {
 	visited := make(map[int]bool)
 	for i := from; i >= 0 && i < len(wf.Steps); i = wf.Next(i, "") {
@@ -228,19 +229,19 @@ func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notif
 		switch wf.Steps[i].Verb {
 		case workflow.VerbNotify:
 			if err := promoteHold(ctx, prov, hold); err != nil {
-				return -1, err
+				return i, err
 			}
 		case workflow.VerbNote:
 			if err := createNote(ctx, prov, wf.Steps[i], hold); err != nil {
-				return -1, err
+				return i, err
 			}
 		case workflow.VerbMessage:
 			if err := sendMessage(ctx, notifier, wf.Steps[i], hold); err != nil {
-				return -1, err
+				return i, err
 			}
 		case workflow.VerbCancel:
 			if err := prov.DeleteHold(ctx, hold.ID); err != nil {
-				return -1, fmt.Errorf("cancel hold: %w", err)
+				return i, fmt.Errorf("cancel hold: %w", err)
 			}
 			forgetHold(holdRef{Provider: providerName, ID: hold.ID})
 			fmt.Fprintf(os.Stdout, "Canceled hold %s.\n", hold.ID)

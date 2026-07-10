@@ -28,6 +28,9 @@ type mockProvider struct {
 	mgrErr error
 	// created records the last hold passed to CreateHold.
 	created *calendar.Hold
+	// createErr is returned by CreateHold when set, without recording the hold, to
+	// simulate a step failing transiently.
+	createErr error
 	// updated records the last hold passed to UpdateHold.
 	updated *calendar.Hold
 	// deleted records the last id passed to DeleteHold.
@@ -41,6 +44,9 @@ func (m *mockProvider) Manager(context.Context) (calendar.Person, error) {
 func (m *mockProvider) Team(context.Context) ([]calendar.Person, error) { return m.team, nil }
 
 func (m *mockProvider) CreateHold(_ context.Context, h calendar.Hold) (calendar.Hold, error) {
+	if m.createErr != nil {
+		return calendar.Hold{}, m.createErr
+	}
 	if h.ID == "" {
 		h.ID = "created-id"
 	}
@@ -295,6 +301,144 @@ func TestAdvanceRunWait(t *testing.T) {
 	}
 	if last.updated == nil {
 		t.Error("notify should have run after the manager approved")
+	}
+}
+
+// TestAdvanceRunResumesAfterTransientFailure drives the checkpoint: an accepted branch
+// runs notify, then its note step fails transiently. The daemon records where it stopped,
+// and the next poll resumes at the note without repeating the notify. It isolates HOME to
+// load a user workflow, so it is not parallel.
+func TestAdvanceRunResumesAfterTransientFailure(t *testing.T) {
+	isolateConfig(t)
+	dir, err := workflowsDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The accepted branch notifies the team, then notes it: two side effects, the note
+	// second, so a note failure must not re-run the notify on retry.
+	wf := `{"name":"notify-then-note","steps":[
+		{"id":"hold","verb":"hold"},
+		{"id":"gate","verb":"approve","manager":true,"on":{"accepted":"tell","declined":"end"}},
+		{"id":"tell","verb":"notify","team":"optional"},
+		{"id":"mark","verb":"note","subject":"Logged","next":"end"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "notify-then-note.json"), []byte(wf), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const noteStep = 3
+
+	accepted := managerHold(calendar.ResponseAccepted)
+	accepted.ID = "id"
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "notify-then-note", Step: 1}
+
+	// First poll: notify runs, the note fails, and the branch checkpoints at the note.
+	flaky := &mockProvider{
+		hold:      accepted,
+		team:      []calendar.Person{{Email: "peer@x.com"}},
+		createErr: errors.New("calendar busy"),
+	}
+	res, ckpt, err := advanceRun(context.Background(), flaky, item)
+	if res != pollFailed || err == nil {
+		t.Fatalf("first poll res = %v, err = %v; want pollFailed and an error", res, err)
+	}
+	if flaky.updated == nil {
+		t.Fatal("notify should have run on the first poll")
+	}
+	if flaky.created != nil {
+		t.Fatal("the failed note should not have been recorded")
+	}
+	if ckpt.Resume != noteStep {
+		t.Fatalf("checkpoint Resume = %d, want %d (the note step)", ckpt.Resume, noteStep)
+	}
+	if ckpt.Step != 1 {
+		t.Errorf("checkpoint Step = %d, want 1 (still the gate)", ckpt.Step)
+	}
+
+	// Second poll with the checkpoint: the note succeeds and the notify does not repeat.
+	ok := &mockProvider{hold: accepted, team: []calendar.Person{{Email: "peer@x.com"}}}
+	res2, done, err2 := advanceRun(context.Background(), ok, ckpt)
+	if res2 != pollApproved || err2 != nil {
+		t.Fatalf("retry res = %v, err = %v; want pollApproved", res2, err2)
+	}
+	if ok.updated != nil {
+		t.Error("notify repeated on the retry; the checkpoint should have skipped it")
+	}
+	if ok.created == nil {
+		t.Error("the note should have been created on the retry")
+	}
+	if done.Resume != 0 {
+		t.Errorf("checkpoint should clear after completion, got Resume = %d", done.Resume)
+	}
+}
+
+// TestAdvanceRunResumeIgnoresGateFlip confirms a checkpointed branch runs to completion
+// even when the gate response flips between polls: once the team was notified, a late
+// decline must neither switch to the declined branch nor re-notify. The declined branch
+// cancels the hold, so a wrong switch would delete it, which the test asserts never
+// happens. It isolates HOME, so it is not parallel.
+func TestAdvanceRunResumeIgnoresGateFlip(t *testing.T) {
+	isolateConfig(t)
+	dir, err := workflowsDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Accepted notifies then notes; declined cancels. The note is the flaky second step.
+	wf := `{"name":"flip","steps":[
+		{"id":"hold","verb":"hold"},
+		{"id":"gate","verb":"approve","manager":true,"on":{"accepted":"tell","declined":"scrap"}},
+		{"id":"tell","verb":"notify","team":"optional"},
+		{"id":"mark","verb":"note","subject":"Logged","next":"end"},
+		{"id":"scrap","verb":"cancel"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "flip.json"), []byte(wf), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const noteStep = 3
+
+	accepted := managerHold(calendar.ResponseAccepted)
+	accepted.ID = "id"
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "flip", Step: 1}
+
+	// Poll 1: accepted; notify runs, the note fails, so the branch checkpoints at the note.
+	p1 := &mockProvider{
+		hold:      accepted,
+		team:      []calendar.Person{{Email: "peer@x.com"}},
+		createErr: errors.New("calendar busy"),
+	}
+	_, ckpt, _ := advanceRun(context.Background(), p1, item)
+	if ckpt.Resume != noteStep {
+		t.Fatalf("checkpoint Resume = %d, want %d (the note step)", ckpt.Resume, noteStep)
+	}
+
+	// Poll 2: the response has flipped to declined. The committed accepted branch must
+	// still finish: the note runs, the notify does not repeat, and the hold is not
+	// canceled by the declined branch.
+	flip := &mockProvider{
+		hold: managerHold(calendar.ResponseDeclined),
+		team: []calendar.Person{{Email: "peer@x.com"}},
+	}
+	res, done, err := advanceRun(context.Background(), flip, ckpt)
+	if err != nil {
+		t.Fatalf("resume after flip errored: %v", err)
+	}
+	if res != pollApproved {
+		t.Errorf("resume res = %v, want pollApproved (the committed branch completes)", res)
+	}
+	if flip.created == nil {
+		t.Error("the note should have completed on resume")
+	}
+	if flip.updated != nil {
+		t.Error("the notify should not repeat on resume")
+	}
+	if flip.deleted != "" {
+		t.Error("the declined branch must not run: the hold was canceled")
+	}
+	if done.Resume != 0 {
+		t.Errorf("checkpoint should clear after completion, got Resume = %d", done.Resume)
 	}
 }
 

@@ -18,6 +18,11 @@ type watchItem struct {
 	Workflow string `json:"workflow"`
 	// Step is the index of the pending step, the approval gate the daemon waits on.
 	Step int `json:"step"`
+	// Resume, when nonzero, is the step index at which to continue the branch the gate
+	// opened after a transient failure ran it partway. It lets a retry pick up at the
+	// failed step instead of repeating completed side effects. Zero starts the branch
+	// from the gate.
+	Resume int `json:"resume,omitempty"`
 	// Approver is the email the current gate waits on, so the daemon checks the right
 	// person in a multi-approver chain. Empty falls back to the first required attendee.
 	Approver string `json:"approver,omitempty"`

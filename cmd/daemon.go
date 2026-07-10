@@ -147,10 +147,12 @@ func label(w watchItem) string {
 
 // advanceRun advances a watched workflow run: it loads the workflow and acts on the
 // current waiting step. A wait step advances once its delay elapses; an approve step
-// advances on the approver's response, or its timeout. Advancing runs the steps up to
-// the next waiting step, inviting the next approver when the chain continues, and
-// returns the watch item to persist, unchanged unless the run advances. The provider is
-// injected so the logic is testable.
+// advances on the approver's response, or its timeout. Advancing runs the branch the
+// gate opens up to the next waiting step, inviting the next approver when the chain
+// continues, and returns the watch item to persist, unchanged unless the run advances.
+// A branch that fails partway checkpoints its progress on the item so the next poll
+// resumes at the failed step rather than repeating completed side effects. The provider
+// is injected so the logic is testable.
 func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (pollResult, watchItem, error) {
 	wf, err := workflowLoader().Load(item.Workflow)
 	if err != nil {
@@ -164,50 +166,78 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 	if item.Step < 0 || item.Step >= len(wf.Steps) {
 		return pollPending, item, nil
 	}
-	pending := wf.Steps[item.Step]
 
-	// A wait step advances once its delay has passed.
-	if pending.Verb == workflow.VerbWait {
-		if d := pending.ParsedFor(); d <= 0 || item.CreatedAt.IsZero() || time.Since(item.CreatedAt) < d {
-			return pollPending, item, nil
-		}
-		return advanceToNextGate(ctx, prov, notifier, wf, item, hold, wf.Next(item.Step, ""))
+	// A prior poll ran this branch partway before a transient failure. Earlier steps
+	// already took effect, so the branch is committed: resume at the checkpoint and run
+	// it to completion, without re-reading the gate, so a response that changed since
+	// (a late decline after the team was already notified) cannot switch branches or
+	// repeat completed steps. Completing drops the watch.
+	if item.Resume > 0 {
+		return advanceToNextGate(ctx, prov, notifier, wf, item, hold, item.Resume, pollApproved)
 	}
 
+	from, onEnd, waiting := branchPlan(wf, item, hold)
+	if waiting {
+		return pollPending, item, nil
+	}
+	return advanceToNextGate(ctx, prov, notifier, wf, item, hold, from, onEnd)
+}
+
+// branchPlan decides which branch the pending gate opens and how completing it reads.
+// It returns the branch's first step, the poll result to report when the branch runs to
+// the end (approved for a wait or acceptance, declined or expired for those outcomes),
+// and whether the gate is still waiting, meaning there is no branch to run yet. A wait
+// step opens once its delay passes; an approve step opens on the approver's accept or
+// decline, or on its timeout. An accept with no explicit branch falls through to the next
+// step; a decline or expiry with no branch runs nothing and simply ends.
+func branchPlan(wf workflow.Workflow, item watchItem, hold calendar.Hold) (from int, onEnd pollResult, waiting bool) {
+	pending := wf.Steps[item.Step]
+	if pending.Verb == workflow.VerbWait {
+		if d := pending.ParsedFor(); d <= 0 || item.CreatedAt.IsZero() || time.Since(item.CreatedAt) < d {
+			return -1, pollPending, true
+		}
+		return wf.Next(item.Step, ""), pollApproved, false
+	}
 	switch gateResponse(hold, item) {
 	case calendar.ResponseAccepted:
-		return advanceToNextGate(ctx, prov, notifier, wf, item, hold, wf.Next(item.Step, workflow.OutcomeAccepted))
+		return wf.Next(item.Step, workflow.OutcomeAccepted), pollApproved, false
 	case calendar.ResponseDeclined:
-		if target, ok := pending.On[workflow.OutcomeDeclined]; ok && target != "end" {
-			if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
-				return pollFailed, item, werr
-			}
-		}
-		return pollDeclined, item, nil
+		return branchStart(wf, pending, workflow.OutcomeDeclined), pollDeclined, false
 	default:
 		if d := pending.ParsedTimeout(); d > 0 && !item.CreatedAt.IsZero() && time.Since(item.CreatedAt) > d {
-			if target, ok := pending.On[workflow.OutcomeExpired]; ok && target != "end" {
-				if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
-					return pollFailed, item, werr
-				}
-			}
-			return pollExpired, item, nil
+			return branchStart(wf, pending, workflow.OutcomeExpired), pollExpired, false
 		}
-		return pollPending, item, nil
+		return -1, pollPending, true
 	}
 }
 
-// advanceToNextGate runs the workflow forward from `from` to the next waiting step or
-// the end. When the next step is a named chain approver it invites them; a wait step or
-// a manager gate needs no invite. It returns the item to persist: advanced at a new
-// gate, or approved when the flow completes.
-func advanceToNextGate(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, wf workflow.Workflow, item watchItem, hold calendar.Hold, from int) (pollResult, watchItem, error) {
+// branchStart returns the first step of an approve step's named outcome branch, or -1
+// when the branch is absent or ends at once, in which case the outcome completes with no
+// steps to run. Unlike an accepted outcome, a decline or expiry does not fall through to
+// the following step.
+func branchStart(wf workflow.Workflow, step workflow.Step, outcome string) int {
+	target, ok := step.On[outcome]
+	if !ok || target == "end" {
+		return -1
+	}
+	return wf.StepIndex(target)
+}
+
+// advanceToNextGate runs the branch forward from `from` to the next waiting step or the
+// end, checkpointing progress on the item so a transient failure resumes at the failed
+// step instead of restarting. When the next step is a named chain approver it invites
+// them; a wait step or a manager gate needs no invite. It returns the item to persist:
+// advanced at a new gate, the branch's end result (onEnd) when the flow completes, or
+// failed with the resume checkpoint set when a step errors.
+func advanceToNextGate(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, wf workflow.Workflow, item watchItem, hold calendar.Hold, from int, onEnd pollResult) (pollResult, watchItem, error) {
 	gate, err := walkSteps(ctx, prov, notifier, item.Provider, wf, from, hold)
 	if err != nil {
+		item.Resume = gate
 		return pollFailed, item, err
 	}
+	item.Resume = 0
 	if gate < 0 {
-		return pollApproved, item, nil
+		return onEnd, item, nil
 	}
 	next := wf.Steps[gate]
 	item.Step = gate
