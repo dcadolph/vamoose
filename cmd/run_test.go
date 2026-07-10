@@ -234,3 +234,36 @@ func TestRunWorkflowEventNeedsSubject(t *testing.T) {
 		t.Error("hold created despite missing subject")
 	}
 }
+
+// TestRunStepsWhenGuard confirms a step whose when guard denies is skipped and one
+// whose guard allows runs. It gates on attendee count so the result is deterministic
+// without a clock.
+func TestRunStepsWhenGuard(t *testing.T) {
+	isolateConfig(t)
+	wf := workflow.Workflow{Name: "guarded", Steps: []workflow.Step{
+		{ID: "hold", Verb: workflow.VerbHold},
+		{ID: "notify", Verb: workflow.VerbNotify, When: workflow.When{MinAttendees: 2}, Next: "end"},
+	}}
+	boss := calendar.Attendee{Person: calendar.Person{Email: "boss@x.com"}, Role: calendar.RoleRequired}
+	other := calendar.Attendee{Person: calendar.Person{Email: "other@x.com"}, Role: calendar.RoleRequired}
+
+	// One attendee: the guard denies, so notify is skipped.
+	small := &mockProvider{team: []calendar.Person{{Email: "peer@x.com"}}}
+	held := calendar.Hold{ID: "h1", Attendees: []calendar.Attendee{boss}}
+	if err := runSteps(context.Background(), small, "graph", wf, wf.Next(0, ""), held, false); err != nil {
+		t.Fatalf("runSteps small: %v", err)
+	}
+	if small.updated != nil {
+		t.Error("notify ran despite the guard denying")
+	}
+
+	// Two attendees: the guard allows, so notify runs.
+	big := &mockProvider{team: []calendar.Person{{Email: "peer@x.com"}}}
+	full := calendar.Hold{ID: "h2", Attendees: []calendar.Attendee{boss, other}}
+	if err := runSteps(context.Background(), big, "graph", wf, wf.Next(0, ""), full, false); err != nil {
+		t.Fatalf("runSteps big: %v", err)
+	}
+	if big.updated == nil {
+		t.Error("notify was skipped despite the guard allowing")
+	}
+}

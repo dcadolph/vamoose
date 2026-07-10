@@ -168,8 +168,9 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 // runSteps walks the workflow from step `from` against an existing hold, following
 // each step's next or fall-through. Notify fans out to the team, note marks the
 // requester's calendar, cancel deletes the hold, and an approval gate stops
-// execution, recording the run for the daemon when watching. The run command calls
-// it after creation; the daemon calls it again from the branch once approval lands.
+// execution, recording the run for the daemon when watching. A step whose when guard
+// denies at execution time is skipped. The run command calls it after creation; the
+// daemon calls it again from the branch once approval lands.
 func runSteps(ctx context.Context, prov calendar.Provider, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
 	visited := make(map[int]bool)
 	for i := from; i >= 0 && i < len(wf.Steps); i = wf.Next(i, "") {
@@ -177,6 +178,9 @@ func runSteps(ctx context.Context, prov calendar.Provider, providerName string, 
 			return nil
 		}
 		visited[i] = true
+		if !wf.Steps[i].When.Allows(time.Now(), len(hold.Attendees)) {
+			continue
+		}
 		switch wf.Steps[i].Verb {
 		case workflow.VerbApprove:
 			return gateOnApproval(providerName, wf, i, hold, watch)
