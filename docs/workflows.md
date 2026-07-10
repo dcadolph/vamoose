@@ -35,7 +35,8 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 | -------- | ----------------- | -------------------------------------------------------------------- |
 | `verb`   | all               | The action (see below). Required.                                    |
 | `showAs` | hold, away, event | Free/busy: `free`, `busy`, `tentative`, `oof`. Defaults per verb.    |
-| `manager`| approve           | Wait on the manager, from the directory or `--manager`.              |
+| `manager`| approve           | Wait on the directory manager (or `--manager`). The first approver.  |
+| `approver`| approve          | Name a later approver by email in a multi-approver chain.            |
 | `team`   | notify            | Role for the team. Must be `optional`.                               |
 | `id`     | any               | Names the step so branches can target it.                            |
 | `on`     | approve           | Branch by outcome: `{"accepted": id, "declined": id, "expired": id}`. |
@@ -48,7 +49,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 ## Verbs
 
 - `hold` creates the event shown free, inviting the manager when an `approve` step follows.
-- `approve` waits for the manager to accept the invite.
+- `approve` waits for an approver to accept the invite; chain several for multi-level approval.
 - `notify` adds the team as optional attendees.
 - `note` creates a short event on your own calendar to mark an outcome, such as a decline.
 - `away` marks out of office with no attendees.
@@ -61,7 +62,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 A workflow must:
 
 - start with exactly one creating step (`hold`, `away`, or `event`)
-- have at most one `approve` step, and only in a `hold`-led workflow
+- put any `approve` steps in a `hold`-led workflow, naming later chain approvers with `approver`
 - run `notify` after `approve`, never before
 - keep the `notify` team `optional`, so it never blocks a teammate's calendar
 
@@ -106,6 +107,31 @@ An `approve` step can set a `timeout` and an `expired` branch, so a workflow act
   ]
 }
 ```
+
+## Multiple approvers
+
+Chain `approve` steps so a workflow needs more than one sign-off, in order. The first approve waits
+on the manager (`manager: true` or `--manager`); each later approve names its approver by email with
+`approver`, since the directory knows only the one manager. vamoose invites the next approver only
+after the previous one accepts, so the director is not asked until the manager has signed off.
+
+The built-in `pto-two-level` needs the manager, then a named director, before the team is told. Edit
+the director email for your team:
+
+```json
+{
+  "name": "pto-two-level",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "manager", "verb": "approve", "manager": true },
+    { "id": "director", "verb": "approve", "approver": "director@example.com" },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}
+```
+
+Run it with `--watch` and `vamoose daemon` so each acceptance advances the chain automatically. A
+decline at any gate stops the workflow, or takes that gate's `declined` branch if it has one.
 
 ## Guards
 

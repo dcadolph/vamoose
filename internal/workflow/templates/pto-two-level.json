@@ -1,0 +1,10 @@
+{
+  "name": "pto-two-level",
+  "description": "Time off needing two approvals: the manager, then a named director, before the team is told.",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "manager", "verb": "approve", "manager": true },
+    { "id": "director", "verb": "approve", "approver": "director@example.com" },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}
