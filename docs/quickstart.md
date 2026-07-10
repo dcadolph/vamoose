@@ -67,7 +67,7 @@ That is the built-in `pto` workflow: hold, approve, notify.
 
 ## 5. Let it advance on its own
 
-Add `--watch` and run the daemon in the background; it promotes the team the moment your manager approves:
+Add `--watch` and run the daemon in the background. It promotes the team the moment your manager approves:
 
 ```sh
 vamoose off next week --subject "Out: beach week" --manager boss@work.com --watch

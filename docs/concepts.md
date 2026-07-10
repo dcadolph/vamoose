@@ -16,7 +16,7 @@ The built-in `pto` workflow is three steps: create the hold, wait for the manage
 
 ## Approval
 
-vamoose does not add an approval product. The **approval signal is the manager accepting the calendar invite.** The hold invites the manager as a required attendee; when they accept, that is approval, and when they decline, that is rejection. A workflow can require more than one approver in sequence, such as a manager then a director.
+vamoose does not add an approval product. The **approval signal is the manager accepting the calendar invite.** The hold invites the manager as a required attendee. When they accept, that is approval, and when they decline, that is rejection. A workflow can require more than one approver in sequence, such as a manager then a director.
 
 ## Promote
 
@@ -42,4 +42,4 @@ One behavior is not uniform: **approval detection**. Microsoft Graph, Google, an
 
 ## Surfaces
 
-The same core is driven from several **surfaces**: the CLI, a local MCP server for Claude, a Slack app, and the background daemon. They are thin clients; the workflow logic is the same underneath. See [Slack](slack.md) and [Claude](claude-guide.md).
+The same core is driven from several **surfaces**: the CLI, a local MCP server for Claude, a Slack app, and the background daemon. They are thin clients. The workflow logic is the same underneath. See [Slack](slack.md) and [Claude](claude-guide.md).

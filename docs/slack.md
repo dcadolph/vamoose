@@ -86,4 +86,4 @@ Per-user mode is opt-in. Without `VAMOOSE_SLACK_PER_USER`, the server runs singl
 
 ## Scope
 
-Per-user mode is experimental and not yet vetted against a live Slack workspace. The standalone `vamoose daemon` advances the CLI's own watches; per-user watches are advanced by the Slack server's poll loop instead, since only it holds each user's credentials.
+Per-user mode is experimental and not yet vetted against a live Slack workspace. The standalone `vamoose daemon` advances the CLI's own watches. Per-user watches are advanced by the Slack server's poll loop instead, since only it holds each user's credentials.

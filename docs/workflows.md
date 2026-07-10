@@ -50,14 +50,14 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`, or pipe it to `va
 ## Verbs
 
 - `hold` creates the event shown free, inviting the manager when an `approve` step follows.
-- `approve` waits for an approver to accept the invite; chain several for multi-level approval.
+- `approve` waits for an approver to accept the invite. Chain several for multi-level approval.
 - `notify` adds the team as optional attendees.
 - `note` creates a short event on your own calendar to mark an outcome, such as a decline.
 - `away` marks out of office with no attendees.
 - `event` creates a plain event, with attendees from `--attendees`.
 - `cancel` deletes the hold.
 - `message` posts to a comms channel, such as a Slack channel, to announce the outcome.
-- `wait` pauses the workflow for a duration; the daemon advances past it once the time passes.
+- `wait` pauses the workflow for a duration. The daemon advances past it once the time passes.
 
 ## Rules
 
@@ -131,7 +131,7 @@ A wait can sit before or after an approval, so a workflow can pause and then ask
 
 ## Recurring
 
-`vamoose schedule` reruns a workflow on an interval, so a routine happens on its own. This differs from a `wait` step, which pauses a single run; a schedule starts a fresh run each interval. Give it a duration and a relative window that is resolved at each run:
+`vamoose schedule` reruns a workflow on an interval, so a routine happens on its own. This differs from a `wait` step, which pauses a single run. A schedule starts a fresh run each interval. Give it a duration and a relative window that is resolved at each run:
 
 ```sh
 vamoose schedule add pto --every 168h --phrase "next week" --manager boss@work.com
@@ -144,7 +144,7 @@ Intervals are Go durations, so weekly is `168h`. Day-of-week and time-of-day sch
 ## Multiple approvers
 
 Chain `approve` steps so a workflow needs more than one sign-off, in order. The first approve waits
-on the manager (`manager: true` or `--manager`); each later approve names its approver by email with
+on the manager (`manager: true` or `--manager`). Each later approve names its approver by email with
 `approver`, since the directory knows only the one manager. vamoose invites the next approver only
 after the previous one accepts, so the director is not asked until the manager has signed off.
 
@@ -193,7 +193,7 @@ The built-in `pto-notify-weekdays` approves time off but tells the team only on 
 }
 ```
 
-A skipped step does not run later; the guard drops it for this run.
+A skipped step does not run later. The guard drops it for this run.
 
 ## Messages
 

@@ -64,7 +64,7 @@ export VAMOOSE_CALDAV_USERNAME=you@fastmail.com
 export VAMOOSE_CALDAV_PASSWORD=xxxx-xxxx-xxxx-xxxx
 ```
 
-Set a target calendar with `VAMOOSE_CALDAV_CALENDAR="Work"`; the default is the first calendar that accepts events. Like Google and iCloud, a CalDAV host has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`.
+Set a target calendar with `VAMOOSE_CALDAV_CALENDAR="Work"`. The default is the first calendar that accepts events. Like Google and iCloud, a CalDAV host has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`.
 
 Unlike iCloud, a standard CalDAV host reports the manager's accept or decline over CalDAV, so `check` and the daemon detect approval with no extra setup.
 

@@ -8,9 +8,9 @@ vamoose is built in three layers with hard boundaries: thin surfaces, a core tha
 
 **Surfaces** parse input and call the core, and hold no business logic:
 
-- the **CLI** (`cmd/`), the primary surface;
-- the **MCP server** (`vamoose mcp`, `internal/mcp`) that exposes the commands to Claude;
-- the **Slack app** (`vamoose slack`, `internal/slack`) with slash commands and approval buttons;
+- the **CLI** (`cmd/`), the primary surface.
+- the **MCP server** (`vamoose mcp`, `internal/mcp`) that exposes the commands to Claude.
+- the **Slack app** (`vamoose slack`, `internal/slack`) with slash commands and approval buttons.
 - the **daemon** (`vamoose daemon`) that advances watched runs on a poll loop.
 
 **Core** is the request lifecycle, the workflow engine, and state. `internal/workflow` holds the workflow model, validation, and the built-in JSON templates. The command layer runs a workflow's steps against a calendar, and the daemon advances a watched run when its gate opens. All logic lives here, so every surface behaves the same.
@@ -20,7 +20,7 @@ vamoose is built in three layers with hard boundaries: thin surfaces, a core tha
 ## The three adapters
 
 - **Calendar** creates and reads holds, behind one `Provider` interface in `internal/calendar`. Four backends implement it: Microsoft Graph (`internal/graph`), Google (`internal/google`), and Apple iCloud and any CalDAV host (`internal/caldav`). Each maps its own values to the neutral model. A registry (`cmd/provider.go`) selects one by name, so a new backend is one package and one registration.
-- **Directory** resolves your manager and team. Microsoft Graph has one; Google, iCloud, and CalDAV do not, so you pass `--manager` and set the team by hand. On Apple, native approval detection uses macOS EventKit (`internal/eventkit`).
+- **Directory** resolves your manager and team. Microsoft Graph has one. Google, iCloud, and CalDAV do not, so you pass `--manager` and set the team by hand. On Apple, native approval detection uses macOS EventKit (`internal/eventkit`).
 - **Comms** sends a message for a `message` step, behind a `Notifier` interface in `internal/comms`: Slack (`chat.postMessage`) or email (SMTP), routed by the channel.
 
 ## The workflow engine
@@ -32,7 +32,7 @@ Running with `--watch` records the hold at its gate in a watch list. The daemon 
 ## Package layout
 
 - `cmd/` is the CLI: command handlers, the provider registry, workflow execution, and the daemon.
-- `internal/calendar` is the neutral model and the `Provider` interface; `internal/graph`, `internal/google`, and `internal/caldav` implement it.
+- `internal/calendar` is the neutral model and the `Provider` interface. `internal/graph`, `internal/google`, and `internal/caldav` implement it.
 - `internal/workflow` is the workflow model, validation, and templates.
 - `internal/comms`, `internal/slack`, `internal/mcp`, and `internal/eventkit` are the comms, Slack, MCP, and EventKit adapters.
 - `internal/auth` and `internal/googleauth` handle OAuth and token storage.
