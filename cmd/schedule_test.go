@@ -28,6 +28,38 @@ func TestScheduleStore(t *testing.T) {
 	}
 }
 
+// TestScheduleAddRemove drives the schedule command: add validates the workflow and
+// interval, list persists, and remove drops by index. It isolates the config dir.
+func TestScheduleAddRemove(t *testing.T) {
+	isolateConfig(t)
+	if err := scheduleAdd(context.Background(), []string{"pto", "--every", "168h", "--phrase", "next week", "--manager", "boss@x.com"}); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	items, _ := loadSchedules()
+	if len(items) != 1 || items[0].Workflow != "pto" || items[0].Phrase != "next week" {
+		t.Fatalf("schedules = %+v", items)
+	}
+	// A missing interval fails.
+	if err := scheduleAdd(context.Background(), []string{"pto", "--phrase", "today"}); err == nil {
+		t.Error("want an error without --every")
+	}
+	// A missing phrase fails.
+	if err := scheduleAdd(context.Background(), []string{"pto", "--every", "24h"}); err == nil {
+		t.Error("want an error without --phrase")
+	}
+	// An unknown workflow fails.
+	if err := scheduleAdd(context.Background(), []string{"ghost", "--every", "1h", "--phrase", "today"}); err == nil {
+		t.Error("want an error for an unknown workflow")
+	}
+	// Remove the one schedule.
+	if err := scheduleRemove([]string{"0"}); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if got, _ := loadSchedules(); len(got) != 0 {
+		t.Errorf("after remove = %d, want 0", len(got))
+	}
+}
+
 // TestFireSchedules confirms a due schedule runs and advances to its next interval,
 // while a future one is left alone.
 func TestFireSchedules(t *testing.T) {

@@ -34,6 +34,7 @@ Commands:
   away      Mark yourself out of office over a date range.
   event     Create a quick calendar event, optionally inviting others.
   daemon    Poll watched holds and auto-promote them when the manager approves.
+  schedule  Rerun a workflow on an interval: schedule [add|list|remove].
   service   Print a launchd or systemd manifest to run the daemon unattended.
   mcp       Serve vamoose to Claude over the Model Context Protocol (stdio).
   slack     Serve the vamoose Slack app: run vamoose from slash commands.

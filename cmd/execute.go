@@ -50,6 +50,8 @@ func Execute(args []string) int {
 		return run(runCalendars(ctx, rest))
 	case "team":
 		return run(runTeam(ctx, rest))
+	case "schedule":
+		return run(runSchedule(ctx, rest))
 	case "doctor":
 		return run(runDoctor(ctx, rest))
 	case "version", "-v", "--version":

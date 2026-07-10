@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -82,6 +85,111 @@ func saveSchedules(items []scheduleItem) error {
 		return err
 	}
 	return os.WriteFile(path, b, 0o600)
+}
+
+// addSchedule appends a schedule to the list.
+func addSchedule(item scheduleItem) error {
+	items, err := loadSchedules()
+	if err != nil {
+		return err
+	}
+	return saveSchedules(append(items, item))
+}
+
+// runSchedule dispatches the schedule subcommands: add, list, and remove.
+func runSchedule(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("schedule: use add, list, or remove")
+	}
+	switch args[0] {
+	case "add":
+		return scheduleAdd(ctx, args[1:])
+	case "list":
+		return scheduleList()
+	case "remove", "rm":
+		return scheduleRemove(args[1:])
+	default:
+		return fmt.Errorf("schedule: unknown subcommand %q; use add, list, or remove", args[0])
+	}
+}
+
+// scheduleAdd records a workflow to rerun on an interval. The daemon fires it.
+func scheduleAdd(_ context.Context, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("schedule add: name a workflow to schedule")
+	}
+	name := args[0]
+	fs := flag.NewFlagSet("schedule add", flag.ContinueOnError)
+	var (
+		every    = fs.String("every", "", "Interval between runs, e.g. 168h (required)")
+		phrase   = fs.String("phrase", "", "Relative date window resolved each run, e.g. \"next week\" (required)")
+		subject  = fs.String("subject", "", "Event subject")
+		manager  = fs.String("manager", "", "Approver email for a directory-less backend")
+		provider = fs.String("provider", "", "Calendar provider; overrides VAMOOSE_PROVIDER")
+	)
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if _, err := workflowLoader().Load(name); err != nil {
+		return fmt.Errorf("schedule add: %w", err)
+	}
+	if d, err := time.ParseDuration(*every); err != nil || d <= 0 {
+		return fmt.Errorf("schedule add: --every must be a positive duration such as 168h")
+	}
+	if *phrase == "" {
+		return fmt.Errorf("schedule add: --phrase is required, the date window to run for, e.g. \"next week\"")
+	}
+	item := scheduleItem{
+		Workflow: name, Provider: *provider, Every: *every,
+		NextRun: time.Now(), Phrase: *phrase, Subject: *subject, Manager: *manager,
+	}
+	if err := addSchedule(item); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stdout, "Scheduled %q every %s for %q. Run 'vamoose daemon' to fire it.\n", name, *every, *phrase)
+	return nil
+}
+
+// scheduleList prints the current schedules with their index for removal.
+func scheduleList() error {
+	items, err := loadSchedules()
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		fmt.Fprintln(os.Stdout, "No schedules. Add one with 'vamoose schedule add <workflow> --every <dur> --phrase <window>'.")
+		return nil
+	}
+	for i, s := range items {
+		fmt.Fprintf(os.Stdout, "%d  %s  every %s  next %s  %q\n",
+			i, s.Workflow, s.Every, s.NextRun.Format(time.RFC3339), s.Phrase)
+	}
+	return nil
+}
+
+// scheduleRemove drops the schedule at the given index from schedule list.
+func scheduleRemove(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("schedule remove: give the index from 'schedule list'")
+	}
+	idx, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("schedule remove: %q is not an index", args[0])
+	}
+	items, err := loadSchedules()
+	if err != nil {
+		return err
+	}
+	if idx < 0 || idx >= len(items) {
+		return fmt.Errorf("schedule remove: no schedule at index %d", idx)
+	}
+	removed := items[idx].Workflow
+	items = append(items[:idx], items[idx+1:]...)
+	if err := saveSchedules(items); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stdout, "Removed schedule %d (%s).\n", idx, removed)
+	return nil
 }
 
 // scheduleRunner runs a due schedule. It is injected so the daemon loop is testable.
