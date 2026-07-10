@@ -1,0 +1,9 @@
+{
+  "name": "notify-later",
+  "description": "Hold the time now and tell the team after a delay, not the instant it is booked.",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "wait", "verb": "wait", "for": "24h" },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}

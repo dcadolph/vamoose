@@ -45,6 +45,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 | `next`   | any               | The step id to run next, or `end`. Defaults to the following step.   |
 | `subject`| note, event, message | Event title, or the text for a message step.                     |
 | `channel`| message           | Where a message step posts, such as a Slack channel. Required.       |
+| `for`    | wait              | How long a wait step pauses, as a duration like `48h`. Required.     |
 
 ## Verbs
 
@@ -56,6 +57,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 - `event` creates a plain event, with attendees from `--attendees`.
 - `cancel` deletes the hold.
 - `message` posts to a comms channel, such as a Slack channel, to announce the outcome.
+- `wait` pauses the workflow for a duration; the daemon advances past it once the time passes.
 
 ## Rules
 
@@ -107,6 +109,25 @@ An `approve` step can set a `timeout` and an `expired` branch, so a workflow act
   ]
 }
 ```
+
+## Delays
+
+A `wait` step pauses a workflow for a set time, so it acts later without you rerunning it. Give it a `for` duration. Run the workflow with `--watch` and `vamoose daemon` advances past the wait once the time passes, then runs the following steps.
+
+The built-in `notify-later` books the time now and tells the team a day later, rather than the instant it is held:
+
+```json
+{
+  "name": "notify-later",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "wait", "verb": "wait", "for": "24h" },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}
+```
+
+A wait can sit before or after an approval, so a workflow can pause and then ask for sign-off, or hold after approval before fanning out. Workflows that repeat on a schedule are a separate, later feature.
 
 ## Multiple approvers
 
