@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,8 +28,11 @@ type pollResult int
 const (
 	// pollPending means the manager has not yet responded.
 	pollPending pollResult = iota
-	// pollApproved means the manager accepted; the hold was promoted if configured.
+	// pollApproved means every approver accepted and the workflow ran to completion.
 	pollApproved
+	// pollAdvanced means an approver accepted and the chain moved to the next approver,
+	// so the hold stays watched at the new gate.
+	pollAdvanced
 	// pollDeclined means the manager declined.
 	pollDeclined
 	// pollExpired means the approve step's timeout elapsed and the expired branch ran.
@@ -108,19 +112,22 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 			remaining = append(remaining, w)
 			continue
 		}
-		switch res, aerr := advanceRun(ctx, prov, w); res {
+		switch res, updated, aerr := advanceRun(ctx, prov, w); res {
 		case pollApproved:
 			logger.Printf("%s: approved and advanced", label(w))
+		case pollAdvanced:
+			logger.Printf("%s: %s approved; now awaiting %s", label(w), w.Approver, updated.Approver)
+			remaining = append(remaining, updated)
 		case pollDeclined:
 			logger.Printf("%s: declined; no longer watching", label(w))
 		case pollExpired:
 			logger.Printf("%s: expired; ran the timeout branch", label(w))
 		case pollPending:
-			logger.Printf("%s: waiting on the manager", label(w))
-			remaining = append(remaining, w)
+			logger.Printf("%s: waiting on approval", label(w))
+			remaining = append(remaining, updated)
 		case pollFailed:
 			logger.Printf("%s: %v", label(w), aerr)
-			remaining = append(remaining, w)
+			remaining = append(remaining, updated)
 		}
 	}
 	if err := saveWatches(remaining); err != nil {
@@ -137,45 +144,89 @@ func label(w watchItem) string {
 }
 
 // advanceRun advances a watched workflow run: it loads the workflow, checks the
-// manager's response, and on approval runs the steps past the gate (notify and any
-// other steps that follow it). The provider is injected so the logic is testable.
-func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (pollResult, error) {
+// current gate's approver, and on acceptance runs the steps up to the next gate. When
+// the next gate is another approver, it invites them and returns the updated watch
+// item so the daemon keeps watching that gate; when the flow completes it returns
+// approved. The provider is injected so the logic is testable. It returns the watch
+// item to persist, which is unchanged except when the chain advances.
+func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (pollResult, watchItem, error) {
 	wf, err := workflowLoader().Load(item.Workflow)
 	if err != nil {
-		return pollFailed, err
+		return pollFailed, item, err
 	}
 	hold, err := prov.GetHold(ctx, item.HoldID)
 	if err != nil {
-		return pollFailed, err
+		return pollFailed, item, err
 	}
 	notifier := resolveNotifier()
-	switch managerAttendee(hold).Response {
+	switch gateResponse(hold, item) {
 	case calendar.ResponseAccepted:
-		if err := runSteps(ctx, prov, notifier, item.Provider, wf, wf.Next(item.Step, workflow.OutcomeAccepted), hold, false); err != nil {
-			return pollFailed, err
+		gate, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.Next(item.Step, workflow.OutcomeAccepted), hold)
+		if werr != nil {
+			return pollFailed, item, werr
 		}
-		return pollApproved, nil
+		if gate < 0 {
+			return pollApproved, item, nil
+		}
+		// The chain continues: invite the next approver and watch that gate.
+		next := calendar.Person{Email: wf.Steps[gate].Approver}
+		if _, uerr := prov.UpdateHold(ctx, inviteRequired(hold, next)); uerr != nil {
+			return pollFailed, item, fmt.Errorf("invite next approver: %w", uerr)
+		}
+		item.Step = gate
+		item.Approver = next.Email
+		item.CreatedAt = time.Now()
+		return pollAdvanced, item, nil
 	case calendar.ResponseDeclined:
 		if item.Step >= 0 && item.Step < len(wf.Steps) {
 			if target, ok := wf.Steps[item.Step].On[workflow.OutcomeDeclined]; ok && target != "end" {
-				if err := runSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold, false); err != nil {
-					return pollFailed, err
+				if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
+					return pollFailed, item, werr
 				}
 			}
 		}
-		return pollDeclined, nil
+		return pollDeclined, item, nil
 	default:
 		if item.Step >= 0 && item.Step < len(wf.Steps) {
 			step := wf.Steps[item.Step]
 			if d := step.ParsedTimeout(); d > 0 && !item.CreatedAt.IsZero() && time.Since(item.CreatedAt) > d {
 				if target, ok := step.On[workflow.OutcomeExpired]; ok && target != "end" {
-					if err := runSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold, false); err != nil {
-						return pollFailed, err
+					if _, werr := walkSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold); werr != nil {
+						return pollFailed, item, werr
 					}
 				}
-				return pollExpired, nil
+				return pollExpired, item, nil
 			}
 		}
-		return pollPending, nil
+		return pollPending, item, nil
 	}
+}
+
+// gateResponse reports the current gate's approver response. In a chain it checks the
+// specific approver the watch item records; for an older single-approver watch it
+// falls back to the first required attendee.
+func gateResponse(hold calendar.Hold, item watchItem) calendar.Response {
+	if item.Approver == "" {
+		return managerAttendee(hold).Response
+	}
+	switch {
+	case hold.ApprovedBy(item.Approver):
+		return calendar.ResponseAccepted
+	case hold.DeclinedBy(item.Approver):
+		return calendar.ResponseDeclined
+	default:
+		return calendar.ResponseNotResponded
+	}
+}
+
+// inviteRequired returns the hold with person added as a required attendee, skipping a
+// duplicate, so the daemon can invite the next approver in a chain.
+func inviteRequired(hold calendar.Hold, person calendar.Person) calendar.Hold {
+	for _, a := range hold.Attendees {
+		if strings.EqualFold(a.Person.Email, person.Email) {
+			return hold
+		}
+	}
+	hold.Attendees = append(hold.Attendees, calendar.Attendee{Person: person, Role: calendar.RoleRequired})
+	return hold
 }

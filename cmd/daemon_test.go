@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -104,7 +105,7 @@ func TestAdvanceRun(t *testing.T) {
 				team:   []calendar.Person{{Email: "peer@x.com"}},
 			}
 			item := watchItem{Provider: "graph", HoldID: "id", Workflow: test.Workflow, Step: 1}
-			res, _ := advanceRun(context.Background(), prov, item)
+			res, _, _ := advanceRun(context.Background(), prov, item)
 			if res != test.WantRes {
 				t.Errorf("%s: advanceRun = %v, want %v", test.Name, res, test.WantRes)
 			}
@@ -130,7 +131,7 @@ func TestAdvanceRunBranching(t *testing.T) {
 		team: []calendar.Person{{Email: "peer@x.com"}},
 	}
 	item := watchItem{Provider: "graph", HoldID: "id", Workflow: wf, Step: 1}
-	if res, _ := advanceRun(context.Background(), accepted, item); res != pollApproved {
+	if res, _, _ := advanceRun(context.Background(), accepted, item); res != pollApproved {
 		t.Errorf("accepted res = %v, want approved", res)
 	}
 	if accepted.updated == nil {
@@ -142,7 +143,7 @@ func TestAdvanceRunBranching(t *testing.T) {
 
 	// Declined follows the declined branch: create a note, no team notify.
 	declined := &mockProvider{hold: managerHold(calendar.ResponseDeclined)}
-	if res, _ := advanceRun(context.Background(), declined, item); res != pollDeclined {
+	if res, _, _ := advanceRun(context.Background(), declined, item); res != pollDeclined {
 		t.Errorf("declined res = %v, want declined", res)
 	}
 	if declined.created == nil {
@@ -165,7 +166,7 @@ func TestAdvanceRunTimeout(t *testing.T) {
 	pending.ID = "id"
 	expired := &mockProvider{hold: pending}
 	item := watchItem{Provider: "graph", HoldID: "id", Workflow: wf, Step: 1, CreatedAt: time.Now().Add(-100 * time.Hour)}
-	if res, err := advanceRun(context.Background(), expired, item); res != pollExpired || err != nil {
+	if res, _, err := advanceRun(context.Background(), expired, item); res != pollExpired || err != nil {
 		t.Errorf("expired res = %v, err = %v; want pollExpired, nil", res, err)
 	}
 	if expired.deleted == "" {
@@ -175,12 +176,88 @@ func TestAdvanceRunTimeout(t *testing.T) {
 	// Within the timeout: still pending, nothing canceled.
 	fresh := &mockProvider{hold: managerHold(calendar.ResponseNotResponded)}
 	recent := watchItem{Provider: "graph", HoldID: "id", Workflow: wf, Step: 1, CreatedAt: time.Now().Add(-time.Hour)}
-	if res, _ := advanceRun(context.Background(), fresh, recent); res != pollPending {
+	if res, _, _ := advanceRun(context.Background(), fresh, recent); res != pollPending {
 		t.Errorf("recent res = %v, want pollPending", res)
 	}
 	if fresh.deleted != "" {
 		t.Error("within the timeout nothing should be canceled")
 	}
+}
+
+// TestAdvanceRunChain drives a two-approver chain: the first acceptance invites the
+// second approver and keeps watching, and the second acceptance completes the flow and
+// notifies the team. It isolates HOME to load a user workflow, so it is not parallel.
+func TestAdvanceRunChain(t *testing.T) {
+	isolateConfig(t)
+	dir, err := workflowsDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wf := `{"name":"two-level","steps":[
+		{"id":"hold","verb":"hold"},
+		{"id":"a1","verb":"approve","manager":true},
+		{"id":"a2","verb":"approve","approver":"dir@x.com"},
+		{"id":"notify","verb":"notify","team":"optional","next":"end"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "two-level.json"), []byte(wf), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Gate 1: the manager accepted; the director is invited and the gate advances.
+	hold1 := calendar.Hold{ID: "id", Attendees: []calendar.Attendee{
+		{Person: calendar.Person{Email: "boss@x.com"}, Role: calendar.RoleRequired, Response: calendar.ResponseAccepted},
+	}}
+	prov := &mockProvider{hold: hold1, team: []calendar.Person{{Email: "peer@x.com"}}}
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "two-level", Step: 1, Approver: "boss@x.com"}
+	res, updated, err := advanceRun(context.Background(), prov, item)
+	if err != nil || res != pollAdvanced {
+		t.Fatalf("gate 1 res = %v, err = %v; want pollAdvanced", res, err)
+	}
+	if updated.Step != 2 || updated.Approver != "dir@x.com" {
+		t.Errorf("advanced to step %d approver %q, want step 2 dir@x.com", updated.Step, updated.Approver)
+	}
+	if prov.updated == nil || !hasRequired(prov.updated.Attendees, "dir@x.com") {
+		t.Fatalf("director not invited as required: %+v", prov.updated)
+	}
+	if hasAttendee(prov.updated.Attendees, "peer@x.com") {
+		t.Error("the team was notified before the chain completed")
+	}
+
+	// Gate 2: the director accepted; the workflow completes and notifies the team.
+	hold2 := calendar.Hold{ID: "id", Attendees: []calendar.Attendee{
+		{Person: calendar.Person{Email: "boss@x.com"}, Role: calendar.RoleRequired, Response: calendar.ResponseAccepted},
+		{Person: calendar.Person{Email: "dir@x.com"}, Role: calendar.RoleRequired, Response: calendar.ResponseAccepted},
+	}}
+	prov2 := &mockProvider{hold: hold2, team: []calendar.Person{{Email: "peer@x.com"}}}
+	res2, _, err2 := advanceRun(context.Background(), prov2, updated)
+	if err2 != nil || res2 != pollApproved {
+		t.Fatalf("gate 2 res = %v, err = %v; want pollApproved", res2, err2)
+	}
+	if prov2.updated == nil || !hasAttendee(prov2.updated.Attendees, "peer@x.com") {
+		t.Error("notify should have promoted the team on completion")
+	}
+}
+
+// hasRequired reports whether the attendees include a required attendee with the email.
+func hasRequired(attendees []calendar.Attendee, email string) bool {
+	for _, a := range attendees {
+		if a.Person.Email == email && a.Role == calendar.RoleRequired {
+			return true
+		}
+	}
+	return false
+}
+
+// hasAttendee reports whether the attendees include the email in any role.
+func hasAttendee(attendees []calendar.Attendee, email string) bool {
+	for _, a := range attendees {
+		if a.Person.Email == email {
+			return true
+		}
+	}
+	return false
 }
 
 // TestWatchPathOverride confirms VAMOOSE_WATCH_FILE overrides the default location,

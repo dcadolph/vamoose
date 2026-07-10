@@ -109,7 +109,7 @@ func TestGoogleApprovalFlow(t *testing.T) {
 	}
 
 	item := watchItem{Provider: "google", HoldID: "evt-1", Workflow: "pto", Step: 1}
-	if res, _ := advanceRun(ctx, prov, item); res != pollPending {
+	if res, _, _ := advanceRun(ctx, prov, item); res != pollPending {
 		t.Fatalf("before approval = %v, want pending", res)
 	}
 
@@ -117,7 +117,7 @@ func TestGoogleApprovalFlow(t *testing.T) {
 	accepted = true
 	mu.Unlock()
 
-	res, err := advanceRun(ctx, prov, item)
+	res, _, err := advanceRun(ctx, prov, item)
 	if err != nil {
 		t.Fatalf("advanceRun: %v", err)
 	}

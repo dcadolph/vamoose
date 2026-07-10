@@ -175,17 +175,31 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	return runSteps(ctx, prov, resolveNotifier(), providerName, wf, wf.Next(0, ""), created, opt.Watch)
 }
 
-// runSteps walks the workflow from step `from` against an existing hold, following
-// each step's next or fall-through. Notify fans out to the team, note marks the
-// requester's calendar, cancel deletes the hold, and an approval gate stops
-// execution, recording the run for the daemon when watching. A step whose when guard
-// denies at execution time is skipped. The run command calls it after creation; the
-// daemon calls it again from the branch once approval lands.
+// runSteps walks the workflow from `from` for the run command: it runs the immediate
+// steps and, when it reaches an approve gate, records the run for the daemon if
+// watching. The daemon calls walkSteps directly to advance a chain gate to gate.
 func runSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
+	gate, err := walkSteps(ctx, prov, notifier, providerName, wf, from, hold)
+	if err != nil {
+		return err
+	}
+	if gate >= 0 {
+		return gateOnApproval(providerName, wf, gate, hold, watch)
+	}
+	return nil
+}
+
+// walkSteps runs the workflow's immediate steps from `from` against an existing hold,
+// following each step's next or fall-through, until it reaches an approve gate or the
+// end. Notify fans out to the team, note marks the requester's calendar, message posts
+// to a channel, and cancel deletes the hold. A step whose when guard denies is skipped.
+// It returns the index of the approve gate it stopped at, or -1 when the flow ran to
+// completion, so a caller can gate the run or advance the next chain link.
+func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, providerName string, wf workflow.Workflow, from int, hold calendar.Hold) (int, error) {
 	visited := make(map[int]bool)
 	for i := from; i >= 0 && i < len(wf.Steps); i = wf.Next(i, "") {
 		if visited[i] {
-			return nil
+			return -1, nil
 		}
 		visited[i] = true
 		if !wf.Steps[i].When.Allows(time.Now(), len(hold.Attendees)) {
@@ -193,29 +207,29 @@ func runSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifi
 		}
 		switch wf.Steps[i].Verb {
 		case workflow.VerbApprove:
-			return gateOnApproval(providerName, wf, i, hold, watch)
+			return i, nil
 		case workflow.VerbNotify:
 			if err := promoteHold(ctx, prov, hold); err != nil {
-				return err
+				return -1, err
 			}
 		case workflow.VerbNote:
 			if err := createNote(ctx, prov, wf.Steps[i], hold); err != nil {
-				return err
+				return -1, err
 			}
 		case workflow.VerbMessage:
 			if err := sendMessage(ctx, notifier, wf.Steps[i], hold); err != nil {
-				return err
+				return -1, err
 			}
 		case workflow.VerbCancel:
 			if err := prov.DeleteHold(ctx, hold.ID); err != nil {
-				return fmt.Errorf("cancel hold: %w", err)
+				return -1, fmt.Errorf("cancel hold: %w", err)
 			}
 			forgetHold(holdRef{Provider: providerName, ID: hold.ID})
 			fmt.Fprintf(os.Stdout, "Canceled hold %s.\n", hold.ID)
-			return nil
+			return -1, nil
 		}
 	}
-	return nil
+	return -1, nil
 }
 
 // createNote creates a short informational event on the requester's own calendar,
