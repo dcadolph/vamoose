@@ -8,10 +8,7 @@
 
 The moose does the paperwork. You go to the beach.
 
-> **v0.8.0.** Four backends (Microsoft Graph, Google Calendar, Apple iCloud, and any
-> CalDAV host) behind a conditional workflow engine with branching, timeouts, guards, and
-> channel messages, driven from the CLI, Claude, or Slack, with tokens in the OS keychain.
-> Install: `brew install dcadolph/tap/vamoose`.
+Four calendar backends behind one workflow engine, driven from your terminal, Claude, or Slack. Install with `brew install dcadolph/tap/vamoose`.
 
 Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
 wait for a nod, then re-send the event to the team so nobody schedules over you.
@@ -232,18 +229,9 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 ## Roadmap
 
 - A hosted, always-on server so per-user Slack and background advance run without a laptop.
-- Multi-level approval: a chain of approvers, not just a single manager.
-- Notify the team by Slack or email, not only as calendar attendees.
+- Workflows that repeat on a schedule, beyond the one-shot wait step.
 - Auto-promote via Graph change-notification webhooks instead of polling.
 - Set the scheduled out-of-office auto-reply for the time-off window.
-
-## Status
-
-v0.8.0. Four backends (Graph, Google, iCloud, CalDAV), a conditional workflow engine with
-branching, timeouts, step guards, and channel messages, CLI/Claude/Slack surfaces, and
-OS-keychain tokens. Google and iCloud are live-vetted end to end, including iCloud approval
-through EventKit. The Slack app, Microsoft Graph, and generic CalDAV are covered by tests,
-with live validation the remaining step.
 
 ## License
 
