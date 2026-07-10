@@ -13,6 +13,16 @@ import (
 	"time"
 )
 
+const (
+	// minScheduleEvery is the smallest interval a schedule may use. It keeps a
+	// misconfigured or hostile schedule from running the daemon's workflow in a tight
+	// loop.
+	minScheduleEvery = time.Minute
+	// maxSchedules caps how many schedules may be stored, a backstop against an
+	// automated caller registering unbounded recurring runs.
+	maxSchedules = 100
+)
+
 // scheduleItem is a workflow the daemon reruns on an interval.
 type scheduleItem struct {
 	// Workflow is the name of the workflow to run.
@@ -93,6 +103,14 @@ func addSchedule(item scheduleItem) error {
 	if err != nil {
 		return err
 	}
+	if len(items) >= maxSchedules {
+		return fmt.Errorf("schedule limit reached (%d); remove one with 'vamoose schedule remove'", maxSchedules)
+	}
+	for _, s := range items {
+		if s.Workflow == item.Workflow && s.Provider == item.Provider && s.Every == item.Every && s.Phrase == item.Phrase {
+			return fmt.Errorf("an identical schedule already exists for %q", item.Workflow)
+		}
+	}
 	return saveSchedules(append(items, item))
 }
 
@@ -133,8 +151,8 @@ func scheduleAdd(_ context.Context, args []string) error {
 	if _, err := workflowLoader().Load(name); err != nil {
 		return fmt.Errorf("schedule add: %w", err)
 	}
-	if d, err := time.ParseDuration(*every); err != nil || d <= 0 {
-		return fmt.Errorf("schedule add: --every must be a positive duration such as 168h")
+	if d, err := time.ParseDuration(*every); err != nil || d < minScheduleEvery {
+		return fmt.Errorf("schedule add: --every must be a duration of at least %s, such as 168h", minScheduleEvery)
 	}
 	if *phrase == "" {
 		return fmt.Errorf("schedule add: --phrase is required, the date window to run for, e.g. \"next week\"")

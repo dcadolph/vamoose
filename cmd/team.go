@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,13 +80,20 @@ func clearTeamConfig() error {
 	return nil
 }
 
-// peopleFromEmails builds people from a list of email addresses, dropping blanks.
+// peopleFromEmails builds people from a list of email addresses, dropping blank and
+// malformed entries so a bad or hostile address is never sent an invite.
 func peopleFromEmails(emails []string) []calendar.Person {
 	out := make([]calendar.Person, 0, len(emails))
 	for _, e := range emails {
-		if e = strings.TrimSpace(e); e != "" {
-			out = append(out, calendar.Person{Email: e})
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
 		}
+		addr, err := mail.ParseAddress(e)
+		if err != nil {
+			continue
+		}
+		out = append(out, calendar.Person{Email: addr.Address})
 	}
 	return out
 }

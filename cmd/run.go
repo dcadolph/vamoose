@@ -219,6 +219,7 @@ func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notif
 		}
 		visited[i] = true
 		if !wf.Steps[i].When.Allows(time.Now(), len(hold.Attendees)) {
+			fmt.Fprintf(os.Stderr, "vamoose: skipping step %d (%s): its when guard does not allow now\n", i, wf.Steps[i].Verb)
 			continue
 		}
 		if wf.Steps[i].Verb.Waits() {

@@ -395,7 +395,59 @@ func (w Workflow) Validate() error {
 			return fmt.Errorf("%w: step %d: next targets unknown step %q", ErrInvalid, i, s.Next)
 		}
 	}
+	if w.hasCycle() {
+		return fmt.Errorf("%w: %q loops: its next or branch targets form a cycle", ErrInvalid, w.Name)
+	}
 	return nil
+}
+
+// hasCycle reports whether following next and branch targets from any step leads back
+// to a step already on the current path. Such a loop would make a run either spin or,
+// because walkSteps stops at the first repeat, silently drop the rest of the flow, so
+// Validate rejects it.
+func (w Workflow) hasCycle() bool {
+	const (
+		white = iota
+		gray
+		black
+	)
+	color := make([]int, len(w.Steps))
+	var visit func(i int) bool
+	visit = func(i int) bool {
+		color[i] = gray
+		for _, j := range w.jumpTargets(i) {
+			if color[j] == gray || (color[j] == white && visit(j)) {
+				return true
+			}
+		}
+		color[i] = black
+		return false
+	}
+	for i := range w.Steps {
+		if color[i] == white && visit(i) {
+			return true
+		}
+	}
+	return false
+}
+
+// jumpTargets returns the distinct step indices step i can move to at run time: its
+// fall-through or explicit next, and each of its branch outcomes. Targets of "end" and
+// unknown ids are omitted.
+func (w Workflow) jumpTargets(i int) []int {
+	seen := make(map[int]bool)
+	var out []int
+	add := func(n int) {
+		if n >= 0 && !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	add(w.Next(i, ""))
+	for outcome := range w.Steps[i].On {
+		add(w.Next(i, outcome))
+	}
+	return out
 }
 
 // StepIndex returns the index of the step with the given id, or -1 when none match.

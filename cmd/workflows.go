@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
@@ -118,8 +117,20 @@ func workflowRemove(args []string) error {
 	return nil
 }
 
-// safeWorkflowName reports whether name is safe to use as a file name: non-empty and
-// free of path separators or dots, so it cannot escape the workflow directory.
+// safeWorkflowName reports whether name is safe to use as a file name: a short run of
+// letters, digits, hyphens, and underscores. That excludes path separators, dots, NUL
+// and other control bytes, and unicode separator lookalikes, so a name can neither
+// escape the workflow directory nor create a surprising file.
 func safeWorkflowName(name string) bool {
-	return name != "" && !strings.ContainsAny(name, `/\.`)
+	if name == "" || len(name) > 64 {
+		return false
+	}
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }

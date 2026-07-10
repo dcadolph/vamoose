@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -47,16 +48,20 @@ func TestWorkflowAddRemove(t *testing.T) {
 	}
 }
 
-// TestSafeWorkflowName covers the name guard against path traversal.
+// TestSafeWorkflowName covers the name guard against path traversal and unsafe bytes.
 func TestSafeWorkflowName(t *testing.T) {
 	t.Parallel()
 	tests := map[string]bool{
-		"pto": true, "team-heads-up": true,
+		"pto": true, "team-heads-up": true, "flow_1": true,
 		"": false, "../secrets": false, "a/b": false, "dot.name": false,
+		"a\x00b": false, "café": false, "a⁄b": false,
 	}
 	for name, want := range tests {
 		if got := safeWorkflowName(name); got != want {
 			t.Errorf("safeWorkflowName(%q) = %v, want %v", name, got, want)
 		}
+	}
+	if safeWorkflowName(strings.Repeat("a", 65)) {
+		t.Error("safeWorkflowName should reject an over-long name")
 	}
 }

@@ -155,6 +155,23 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+// TestValidateRejectsCycle confirms a workflow whose next targets loop is rejected, so
+// a run can neither spin nor silently drop the steps past the first repeat.
+func TestValidateRejectsCycle(t *testing.T) {
+	t.Parallel()
+	wf := Workflow{
+		Name: "loop",
+		Steps: []Step{
+			{Verb: VerbHold},
+			{Verb: VerbNote, ID: "a", Next: "b"},
+			{Verb: VerbNote, ID: "b", Next: "a"},
+		},
+	}
+	if err := wf.Validate(); !errors.Is(err, ErrInvalid) {
+		t.Errorf("Validate cycle = %v, want ErrInvalid", err)
+	}
+}
+
 func TestVerbClass(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

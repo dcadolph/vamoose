@@ -10,6 +10,17 @@ import (
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
 
+// TestPeopleFromEmails confirms blanks and malformed addresses are dropped and a
+// name-form address is normalized to its bare address, so a bad entry is never invited.
+func TestPeopleFromEmails(t *testing.T) {
+	t.Parallel()
+	got := peopleFromEmails([]string{" a@x.com ", "", "not-an-email", "Bob <bob@x.com>", "b@@c"})
+	want := []calendar.Person{{Email: "a@x.com"}, {Email: "bob@x.com"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("peopleFromEmails = %+v, want %+v", got, want)
+	}
+}
+
 func TestMergeTeam(t *testing.T) {
 	t.Parallel()
 	dirPeople := []calendar.Person{{Email: "peer@x.com"}}
@@ -45,15 +56,6 @@ func TestMergeTeam(t *testing.T) {
 				t.Errorf("count = %d, want %d", len(people), test.WantCount)
 			}
 		})
-	}
-}
-
-func TestPeopleFromEmails(t *testing.T) {
-	t.Parallel()
-	got := peopleFromEmails([]string{" a@x.com ", "", "b@x.com", "   "})
-	want := []calendar.Person{{Email: "a@x.com"}, {Email: "b@x.com"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("peopleFromEmails = %+v, want %+v", got, want)
 	}
 }
 

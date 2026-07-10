@@ -51,3 +51,27 @@ func TestServe(t *testing.T) {
 		}
 	}
 }
+
+// TestMissingRequired confirms required-field validation reads the schema and flags the
+// first absent or empty required argument, and tolerates a schema with no required list.
+func TestMissingRequired(t *testing.T) {
+	t.Parallel()
+	schema := map[string]any{"type": "object", "required": []string{"name", "phrase"}}
+	tests := []struct {
+		Args string
+		Want string
+	}{
+		{`{"name":"pto","phrase":"next week"}`, ""},
+		{`{"phrase":"next week"}`, "name"},
+		{`{"name":"","phrase":"next week"}`, "name"},
+		{`{}`, "name"},
+	}
+	for i, test := range tests {
+		if got := missingRequired(schema, json.RawMessage(test.Args)); got != test.Want {
+			t.Errorf("test %d: missingRequired = %q, want %q", i, got, test.Want)
+		}
+	}
+	if got := missingRequired(map[string]any{"type": "object"}, json.RawMessage(`{}`)); got != "" {
+		t.Errorf("no-required schema = %q, want empty", got)
+	}
+}

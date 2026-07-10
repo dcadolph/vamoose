@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"testing"
@@ -120,5 +121,34 @@ func TestFireSchedulesAdvancesOnError(t *testing.T) {
 	out := fireSchedules(context.Background(), now, schedules, runner, logger)
 	if !out[0].NextRun.Equal(now.Add(time.Hour)) {
 		t.Errorf("next run = %v, want now+1h even after an error", out[0].NextRun)
+	}
+}
+
+// TestScheduleGuards covers the interval floor, duplicate rejection, and the count cap
+// that keep an automated caller from flooding the daemon. It isolates the config dir.
+func TestScheduleGuards(t *testing.T) {
+	isolateConfig(t)
+	// A sub-minute interval is rejected.
+	if err := scheduleAdd(context.Background(), []string{"pto", "--every", "30s", "--phrase", "today"}); err == nil {
+		t.Error("want an error for a sub-minute interval")
+	}
+	// An identical schedule is rejected the second time.
+	item := scheduleItem{Workflow: "pto", Every: "168h", Phrase: "next week"}
+	if err := addSchedule(item); err != nil {
+		t.Fatalf("first add: %v", err)
+	}
+	if err := addSchedule(item); err == nil {
+		t.Error("want an error adding an identical schedule")
+	}
+	// The count is capped.
+	full := make([]scheduleItem, maxSchedules)
+	for i := range full {
+		full[i] = scheduleItem{Workflow: fmt.Sprintf("w%d", i), Every: "168h", Phrase: "next week"}
+	}
+	if err := saveSchedules(full); err != nil {
+		t.Fatal(err)
+	}
+	if err := addSchedule(scheduleItem{Workflow: "one-more", Every: "168h", Phrase: "next week"}); err == nil {
+		t.Error("want an error when the schedule count is at the cap")
 	}
 }

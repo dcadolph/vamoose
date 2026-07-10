@@ -188,12 +188,54 @@ func (s *Server) callTool(ctx context.Context, id, params json.RawMessage) rpcRe
 		// method-not-found: the tools/call method itself is valid.
 		return s.fail(id, -32602, "unknown tool: "+p.Name)
 	}
+	if miss := missingRequired(t.InputSchema, p.Arguments); miss != "" {
+		return s.fail(id, -32602, "missing required argument: "+miss)
+	}
 	out, err := t.Handler(ctx, p.Arguments)
 	text := out
 	if err != nil && text == "" {
 		text = err.Error()
 	}
 	return s.ok(id, toolResult(text, err != nil))
+}
+
+// missingRequired returns the name of the first property the schema marks required but
+// the arguments omit or leave empty, or an empty string when all are present. It reads
+// the "required" list from the tool's own input schema, so validation tracks the schema
+// rather than a separate copy.
+func missingRequired(schema map[string]any, args json.RawMessage) string {
+	if schema == nil {
+		return ""
+	}
+	var required []string
+	switch req := schema["required"].(type) {
+	case []string:
+		required = req
+	case []any:
+		for _, r := range req {
+			if name, ok := r.(string); ok {
+				required = append(required, name)
+			}
+		}
+	}
+	if len(required) == 0 {
+		return ""
+	}
+	var m map[string]any
+	if len(args) > 0 {
+		_ = json.Unmarshal(args, &m)
+	}
+	for _, name := range required {
+		switch v := m[name].(type) {
+		case nil:
+			return name
+		case string:
+			if v == "" {
+				return name
+			}
+		}
+	}
+	return ""
 }
 
 // toolResult builds a tools/call result with a single text content block.
