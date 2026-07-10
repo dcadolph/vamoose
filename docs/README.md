@@ -1,6 +1,13 @@
-<div class="vamoose-hero" markdown>
+---
+hide:
+  - navigation
+  - toc
+---
 
-![vamoose](assets/vamoose-mark.png){ .hero-logo }
+<div class="hero-split" markdown>
+<div class="hero-copy" markdown>
+
+![vamoose](assets/vamoose-mark.png){ .hero-mark }
 
 # vamoose
 
@@ -11,37 +18,35 @@
 [Get started](quickstart.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/dcadolph/vamoose){ .md-button }
 
-</div>
-
-<div class="vamoose-terminal">
-<div class="vamoose-terminal-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="title">vamoose</span></div>
-<div class="vamoose-terminal-body"><span class="prompt">$</span> <span class="cmd">vamoose off next week --subject "Out: beach week"</span>
-<span class="out">Hold created and sent to boss@work.com for approval. Hold id: AAMk…</span>
-<span class="prompt">$</span> <span class="cmd">vamoose check</span>
-<span class="out">Approved by boss@work.com.</span>
-<span class="prompt">$</span> <span class="cmd">vamoose promote</span>
-<span class="out">Added 4 team members as optional from the directory. Everyone notified.</span></div>
-</div>
-
-<div class="vamoose-install" markdown>
-
 ```sh
 brew install dcadolph/tap/vamoose
 ```
 
 </div>
-
-## How it works
-
-<div class="vamoose-steps">
-<div class="step"><span class="num">1</span><strong>Request</strong>Block the dates shown free, so no calendar is touched, and invite your manager.</div>
-<div class="step"><span class="num">2</span><strong>Approve</strong>Your manager accepts the invite. That acceptance is the approval, no extra tool.</div>
-<div class="step"><span class="num">3</span><strong>Notify</strong>The team is added as optional attendees, so everyone sees you are out.</div>
+<div class="hero-visual">
+<div class="term">
+<div class="term-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="term-title">vamoose</span></div>
+<div class="term-body"><span class="p">$</span> <span class="c">vamoose off next week --subject "Out: beach week"</span>
+<span class="o">Hold created, sent to boss@work.com for approval.</span>
+<span class="p">$</span> <span class="c">vamoose check</span>
+<span class="o">Approved by boss@work.com ✓</span>
+<span class="p">$</span> <span class="c">vamoose promote</span>
+<span class="o">Added 4 teammates as optional. Everyone notified ✓</span></div>
+</div>
+</div>
 </div>
 
-## Why vamoose
+## How it works { .section-head }
 
-<div class="grid cards" markdown>
+<div class="flow">
+<div class="flow-step"><span class="num">1</span><div class="flow-text"><strong>Request</strong><span>Block the dates shown free, so no calendar is touched, and invite your manager.</span></div></div>
+<div class="flow-step"><span class="num">2</span><div class="flow-text"><strong>Approve</strong><span>Your manager accepts the invite. That acceptance is the approval, no extra tool.</span></div></div>
+<div class="flow-step"><span class="num">3</span><div class="flow-text"><strong>Notify</strong><span>The team is added as optional attendees, so everyone sees you are out.</span></div></div>
+</div>
+
+## Why vamoose { .section-head }
+
+<div class="grid cards vamoose-features" markdown>
 
 -   :material-calendar-sync:{ .lg .middle } __Any calendar__
 
@@ -81,9 +86,11 @@ brew install dcadolph/tap/vamoose
 
 </div>
 
-## Start here
+## Start here { .section-head }
 
-- [Quickstart](quickstart.md): zero to your first approved hold in a few minutes.
-- [Concepts](concepts.md): how holds, approval, and workflows fit together.
-- [Commands](commands.md): every command, flag, and environment variable.
-- [Workflows](workflows.md): design your own, with branching, delays, and guards.
+| Guide                        | What's in it                                         &nbsp; |
+| ---------------------------- | ----------------------------------------------------------- |
+| [Quickstart](quickstart.md)  | Zero to your first approved hold in a few minutes.          |
+| [Concepts](concepts.md)      | How holds, approval, and workflows fit together.            |
+| [Commands](commands.md)      | Every command, flag, and environment variable.              |
+| [Workflows](workflows.md)    | Design your own, with branching, delays, and guards.        |
