@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/dcadolph/vamoose/internal/secret"
 )
 
 // ErrNotLinked reports that a Slack user has not linked a calendar.
@@ -67,17 +69,33 @@ type UserLinkStore interface {
 // linkKey builds the storage key for a workspace user.
 func linkKey(teamID, userID string) string { return teamID + ":" + userID }
 
-// UserLinkFileStore persists user links as a JSON map in a 0600 file.
+// UserLinkFileStore persists user links as a JSON map in a 0600 file, sealed with
+// AES-256-GCM when an encryption box is set.
 type UserLinkFileStore struct {
-	// path is the JSON file location.
+	// path is the file location.
 	path string
+	// box seals and opens the file when set, for a headless host; nil keeps plaintext.
+	box *secret.Box
 	// mu guards concurrent reads and writes.
 	mu sync.Mutex
 }
 
-// NewUserLinkFileStore returns a user link store backed by the file at path.
+// NewUserLinkFileStore returns a plaintext user link store backed by the file at path.
 func NewUserLinkFileStore(path string) *UserLinkFileStore {
 	return &UserLinkFileStore{path: path}
+}
+
+// NewUserLinkStore returns a user link store that encrypts links at rest when
+// VAMOOSE_SECRET_KEY is set, for a hosted server, otherwise a plaintext 0600 file.
+func NewUserLinkStore(path string) (*UserLinkFileStore, error) {
+	box, err := secret.FromEnv(os.Getenv)
+	if errors.Is(err, secret.ErrNoKey) {
+		return &UserLinkFileStore{path: path}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &UserLinkFileStore{path: path, box: box}, nil
 }
 
 // SaveLink records a user's linked calendar, creating parent directories.
@@ -136,7 +154,8 @@ func (s *UserLinkFileStore) List() ([]LinkID, error) {
 	return ids, nil
 }
 
-// load reads the link map, returning an empty map when the file is absent.
+// load reads the link map, decrypting when a box is set, and returns an empty map when
+// the file is absent.
 func (s *UserLinkFileStore) load() (map[string]UserLink, error) {
 	b, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -145,6 +164,12 @@ func (s *UserLinkFileStore) load() (map[string]UserLink, error) {
 	if err != nil {
 		return nil, err
 	}
+	if s.box != nil {
+		b, err = s.box.Open(b)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt user links: %w", err)
+		}
+	}
 	m := map[string]UserLink{}
 	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, fmt.Errorf("parse user links: %w", err)
@@ -152,14 +177,25 @@ func (s *UserLinkFileStore) load() (map[string]UserLink, error) {
 	return m, nil
 }
 
-// store writes the link map to the 0600 file.
+// store writes the link map to the 0600 file, encrypting when a box is set.
 func (s *UserLinkFileStore) store(m map[string]UserLink) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(m, "", "  ")
+	var b []byte
+	var err error
+	if s.box != nil {
+		b, err = json.Marshal(m)
+	} else {
+		b, err = json.MarshalIndent(m, "", "  ")
+	}
 	if err != nil {
 		return err
+	}
+	if s.box != nil {
+		if b, err = s.box.Seal(b); err != nil {
+			return err
+		}
 	}
 	return os.WriteFile(s.path, b, 0o600)
 }

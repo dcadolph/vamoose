@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dcadolph/vamoose/internal/secret"
 	"github.com/dcadolph/vamoose/internal/slack"
 )
 
@@ -128,13 +129,18 @@ func slackTokenStore() (*slack.FileStore, error) {
 	return slack.NewFileStore(filepath.Join(dir, "vamoose", "slack-tokens.json")), nil
 }
 
-// slackUserLinkStore returns a file-backed store for per-user calendar links.
+// slackUserLinkStore returns a store for per-user calendar links, encrypted at rest
+// when VAMOOSE_SECRET_KEY is set (for a hosted server), otherwise a plaintext file.
 func slackUserLinkStore() (*slack.UserLinkFileStore, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
 	}
-	return slack.NewUserLinkFileStore(filepath.Join(dir, "vamoose", "slack-user-links.json")), nil
+	name := "slack-user-links.json"
+	if os.Getenv(secret.KeyEnv) != "" {
+		name = "slack-user-links.enc"
+	}
+	return slack.NewUserLinkStore(filepath.Join(dir, "vamoose", name))
 }
 
 // slackUserWatchEnv returns the VAMOOSE_WATCH_FILE environment for a linked user, so
