@@ -30,7 +30,7 @@ func registerTools(srv *mcp.Server) {
 		Name:        "whoami",
 		Description: "Print the signed-in user, manager, and resolved team.",
 		InputSchema: objectSchema(nil, map[string]any{
-			"provider": strProp("Calendar provider: graph or google"),
+			"provider": strProp("Calendar provider: graph, google, icloud, or caldav"),
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
 			m := parseArgs(raw)
@@ -45,7 +45,7 @@ func registerTools(srv *mcp.Server) {
 			"end":      strProp("End date as YYYY-MM-DD or an RFC3339 time"),
 			"subject":  strProp("Event subject"),
 			"manager":  strProp("Manager email; omit to resolve from the directory"),
-			"provider": strProp("Calendar provider: graph or google"),
+			"provider": strProp("Calendar provider: graph, google, icloud, or caldav"),
 			"watch":    boolProp("Auto-promote to the team once approved"),
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
@@ -65,7 +65,7 @@ func registerTools(srv *mcp.Server) {
 		Description: "Show whether the manager has approved the latest or given hold.",
 		InputSchema: objectSchema(nil, map[string]any{
 			"id":       strProp("Hold id; omit for the most recent hold"),
-			"provider": strProp("Calendar provider: graph or google"),
+			"provider": strProp("Calendar provider: graph, google, icloud, or caldav"),
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
 			return execSelf(ctx, withID([]string{"check"}, parseArgs(raw))...)
@@ -76,7 +76,7 @@ func registerTools(srv *mcp.Server) {
 		Description: "Add the team as optional attendees to an approved hold.",
 		InputSchema: objectSchema(nil, map[string]any{
 			"id":       strProp("Hold id; omit for the most recent hold"),
-			"provider": strProp("Calendar provider: graph or google"),
+			"provider": strProp("Calendar provider: graph, google, icloud, or caldav"),
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
 			return execSelf(ctx, withID([]string{"promote"}, parseArgs(raw))...)
@@ -87,7 +87,7 @@ func registerTools(srv *mcp.Server) {
 		Description: "Cancel a hold and notify its attendees.",
 		InputSchema: objectSchema(nil, map[string]any{
 			"id":       strProp("Hold id; omit for the most recent hold"),
-			"provider": strProp("Calendar provider: graph or google"),
+			"provider": strProp("Calendar provider: graph, google, icloud, or caldav"),
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
 			return execSelf(ctx, withID([]string{"cancel"}, parseArgs(raw))...)
@@ -100,7 +100,7 @@ func registerTools(srv *mcp.Server) {
 			"start":    strProp("Start date as YYYY-MM-DD or an RFC3339 time"),
 			"end":      strProp("End date as YYYY-MM-DD or an RFC3339 time"),
 			"subject":  strProp("Event subject (default: Out of office)"),
-			"provider": strProp("Calendar provider: graph or google"),
+			"provider": strProp("Calendar provider: graph, google, icloud, or caldav"),
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
 			m := parseArgs(raw)
@@ -120,7 +120,7 @@ func registerTools(srv *mcp.Server) {
 			"subject":   strProp("Event subject"),
 			"attendees": strProp("Comma-separated attendee emails to invite"),
 			"free":      boolProp("Show the event as free instead of busy"),
-			"provider":  strProp("Calendar provider: graph or google"),
+			"provider":  strProp("Calendar provider: graph, google, icloud, or caldav"),
 		}),
 		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
 			m := parseArgs(raw)
@@ -134,6 +134,126 @@ func registerTools(srv *mcp.Server) {
 			return execSelf(ctx, withProvider(args, m)...)
 		},
 	})
+	registerWorkflowTools(srv)
+}
+
+// registerWorkflowTools exposes the workflow engine to an agent: discover the available
+// workflows, preview a run without touching the calendar, run any workflow, and manage
+// recurring schedules. These make vamoose a workflow layer an agent can drive, beyond
+// the fixed time-off tools.
+func registerWorkflowTools(srv *mcp.Server) {
+	srv.Register(mcp.Tool{
+		Name:        "list_workflows",
+		Description: "List every workflow that can be run, built-in and user-defined, with its description. Call this first to discover what run_workflow and preview_workflow can run.",
+		InputSchema: objectSchema(nil, map[string]any{}),
+		Handler: func(ctx context.Context, _ json.RawMessage) (string, error) {
+			return execSelf(ctx, "workflows")
+		},
+	})
+	srv.Register(mcp.Tool{
+		Name:        "preview_workflow",
+		Description: "Show the plan a workflow would carry out for a date window, without creating or changing anything. Use this to explain what will happen before calling run_workflow.",
+		InputSchema: objectSchema([]string{"workflow"}, workflowRunProps()),
+		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
+			return execSelf(ctx, runWorkflowArgs(parseArgs(raw), true)...)
+		},
+	})
+	srv.Register(mcp.Tool{
+		Name:        "run_workflow",
+		Description: "Run a named workflow over a date phrase or explicit dates: it creates the hold and runs the steps up to any approval gate. Set watch so the daemon advances it once approved. Prefer preview_workflow first.",
+		InputSchema: objectSchema([]string{"workflow"}, mergeProps(workflowRunProps(), map[string]any{
+			"watch": boolProp("Watch for approval so the daemon advances the workflow once the manager accepts"),
+		})),
+		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
+			return execSelf(ctx, runWorkflowArgs(parseArgs(raw), false)...)
+		},
+	})
+	srv.Register(mcp.Tool{
+		Name:        "list_schedules",
+		Description: "List the recurring workflow schedules and when each next runs.",
+		InputSchema: objectSchema(nil, map[string]any{}),
+		Handler: func(ctx context.Context, _ json.RawMessage) (string, error) {
+			return execSelf(ctx, "schedule", "list")
+		},
+	})
+	srv.Register(mcp.Tool{
+		Name:        "schedule_workflow",
+		Description: "Schedule a workflow to rerun on an interval, such as weekly. The daemon fires it, resolving the date phrase fresh each run. Intervals are Go durations, so weekly is 168h.",
+		InputSchema: objectSchema([]string{"workflow", "every", "phrase"}, map[string]any{
+			"workflow": strProp("Workflow name to rerun (see list_workflows)"),
+			"every":    strProp("Interval between runs as a Go duration, e.g. 168h for weekly"),
+			"phrase":   strProp("Date phrase resolved each run, e.g. \"next week\""),
+			"subject":  strProp("Event subject"),
+			"manager":  strProp("Approver email for a directory-less backend"),
+			"provider": strProp("Calendar provider: graph, google, icloud, or caldav"),
+		}),
+		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
+			return execSelf(ctx, scheduleWorkflowArgs(parseArgs(raw))...)
+		},
+	})
+}
+
+// workflowRunProps returns the shared input schema for previewing and running a
+// workflow: the workflow name, a date window, and the common run options.
+func workflowRunProps() map[string]any {
+	return map[string]any{
+		"workflow":  strProp("Workflow name, e.g. pto, notify-only, away (see list_workflows)"),
+		"phrase":    strProp("Date phrase like \"next week\" or \"tomorrow\""),
+		"start":     strProp("Start date as YYYY-MM-DD; overrides the phrase"),
+		"end":       strProp("End date as YYYY-MM-DD; overrides the phrase"),
+		"subject":   strProp("Event subject; defaults per workflow"),
+		"manager":   strProp("Approver email for a directory-less backend"),
+		"attendees": strProp("Comma-separated attendees, for an event workflow"),
+		"provider":  strProp("Calendar provider: graph, google, icloud, or caldav"),
+	}
+}
+
+// runWorkflowArgs builds the run command line from tool arguments. When preview is set
+// it dry-runs and never watches, so a preview cannot touch the calendar.
+func runWorkflowArgs(m map[string]any, preview bool) []string {
+	args := []string{"run", argString(m, "workflow")}
+	if p := argString(m, "phrase"); p != "" {
+		args = append(args, p)
+	}
+	for _, f := range []struct{ key, flag string }{
+		{"start", "--start"}, {"end", "--end"}, {"subject", "--subject"},
+		{"manager", "--manager"}, {"attendees", "--attendees"},
+	} {
+		if v := argString(m, f.key); v != "" {
+			args = append(args, f.flag, v)
+		}
+	}
+	if preview {
+		args = append(args, "--dry-run")
+	} else if argBool(m, "watch") {
+		args = append(args, "--watch")
+	}
+	return withProvider(args, m)
+}
+
+// scheduleWorkflowArgs builds the schedule-add command line from tool arguments.
+func scheduleWorkflowArgs(m map[string]any) []string {
+	args := []string{"schedule", "add", argString(m, "workflow"), "--every", argString(m, "every"), "--phrase", argString(m, "phrase")}
+	if v := argString(m, "subject"); v != "" {
+		args = append(args, "--subject", v)
+	}
+	if v := argString(m, "manager"); v != "" {
+		args = append(args, "--manager", v)
+	}
+	return withProvider(args, m)
+}
+
+// mergeProps returns a new map combining base and extra, so schemas can share a common
+// set of properties and add their own.
+func mergeProps(base, extra map[string]any) map[string]any {
+	out := make(map[string]any, len(base)+len(extra))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+	return out
 }
 
 // execSelf runs this binary with the given arguments and returns the combined
