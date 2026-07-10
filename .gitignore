@@ -29,3 +29,6 @@ Thumbs.db
 
 # Local Claude scratch
 .claude/
+
+# mkdocs build output
+site/

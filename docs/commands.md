@@ -1,4 +1,4 @@
-<p align="center"><img src="../assets/vamoose-mapmoose.png" alt="vamoose" width="100%"></p>
+<p align="center"><img src="assets/vamoose-mapmoose.png" alt="vamoose" width="100%"></p>
 
 # Commands
 

@@ -1,6 +1,16 @@
-<p align="center"><img src="../assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
+<p align="center"><img src="assets/vamoose-banner.png" alt="vamoose" width="100%"></p>
 
-# vamoose docs
+<p align="center">Calendar workflows, minus the tedium.</p>
+
+The moose does the paperwork. You go to the beach. vamoose puts four calendar backends behind one workflow engine, driven from your terminal, Claude, or Slack.
+
+```sh
+brew install dcadolph/tap/vamoose
+```
+
+<p align="center"><img src="assets/vamoose-demo.gif" alt="vamoose demo" width="100%"></p>
+
+## Guides
 
 | Guide                            | What                                                              &nbsp; |
 | -------------------------------- | ----------------------------------------------------------------------- |
@@ -13,4 +23,4 @@
 | [Claude](claude-guide.md)        | The MCP server and the skill.                                           |
 | [Architecture](architecture.md)  | Surfaces, core, and adapters.                                           |
 
-New here? Start with the [Quickstart](quickstart.md), then [Concepts](concepts.md). The [main README](../README.md) is the overview.
+New here? Start with the [Quickstart](quickstart.md), then [Concepts](concepts.md).

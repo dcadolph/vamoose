@@ -1,0 +1,59 @@
+site_name: vamoose
+site_description: Calendar workflows, minus the tedium.
+site_url: https://dcadolph.github.io/vamoose/
+repo_url: https://github.com/dcadolph/vamoose
+repo_name: dcadolph/vamoose
+edit_uri: edit/main/docs/
+docs_dir: docs
+use_directory_urls: false
+
+theme:
+  name: material
+  logo: assets/vamoose-mark.png
+  favicon: assets/vamoose-mark.png
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.top
+    - navigation.tracking
+    - navigation.sections
+    - content.code.copy
+    - search.highlight
+    - search.suggest
+
+nav:
+  - Home: README.md
+  - Quickstart: quickstart.md
+  - Concepts: concepts.md
+  - Commands: commands.md
+  - Workflows: workflows.md
+  - Providers: providers.md
+  - Slack: slack.md
+  - Claude: claude-guide.md
+  - Architecture: architecture.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dcadolph/vamoose

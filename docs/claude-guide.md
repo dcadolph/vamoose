@@ -1,4 +1,4 @@
-<p align="center"><img src="../assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
+<p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # vamoose with Claude
 
