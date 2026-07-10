@@ -78,8 +78,8 @@ func TestValidate(t *testing.T) {
 			{Verb: VerbHold}, {Verb: VerbNotify}, {Verb: VerbApprove},
 		}},
 		Want: ErrInvalid,
-	}, { // Test 12: More than one approve step is invalid.
-		Name: "two approvals",
+	}, { // Test 12: A later approve without a named approver is invalid.
+		Name: "chain approve without approver",
 		Workflow: Workflow{Name: "x", Steps: []Step{
 			{Verb: VerbHold}, {Verb: VerbApprove}, {Verb: VerbApprove}, {Verb: VerbNotify},
 		}},
@@ -380,6 +380,45 @@ func daySet(days ...time.Weekday) map[time.Weekday]bool {
 		m[d] = true
 	}
 	return m
+}
+
+// TestValidateMultiApprove covers the multi-approver chain rules: a chain is valid
+// when later approves name an explicit approver, and invalid otherwise.
+func TestValidateMultiApprove(t *testing.T) {
+	t.Parallel()
+	hold := Step{ID: "hold", Verb: VerbHold}
+	notify := Step{Verb: VerbNotify, Team: calendar.RoleOptional}
+	tests := []struct {
+		Name    string
+		Chain   []Step
+		WantErr bool
+	}{{ // Test 0: Manager then an explicit approver is valid.
+		Chain: []Step{{Verb: VerbApprove, Manager: true}, {Verb: VerbApprove, Approver: "dir@x.com"}},
+	}, { // Test 1: A later approve without an approver is invalid.
+		Chain: []Step{{Verb: VerbApprove, Manager: true}, {Verb: VerbApprove}}, WantErr: true,
+	}, { // Test 2: A later approve using the manager is invalid.
+		Chain:   []Step{{Verb: VerbApprove, Manager: true}, {Verb: VerbApprove, Manager: true, Approver: "dir@x.com"}},
+		WantErr: true,
+	}, { // Test 3: An approver on a non-approve step is invalid.
+		Chain: []Step{{Verb: VerbApprove, Manager: true}, {Verb: VerbNotify, Approver: "x@x.com"}}, WantErr: true,
+	}, { // Test 4: A three-link chain with explicit approvers is valid.
+		Chain: []Step{
+			{Verb: VerbApprove, Manager: true},
+			{Verb: VerbApprove, Approver: "dir@x.com"},
+			{Verb: VerbApprove, Approver: "vp@x.com"},
+		},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			steps := append([]Step{hold}, test.Chain...)
+			steps = append(steps, notify)
+			wf := Workflow{Name: "chain", Steps: steps}
+			if err := wf.Validate(); (err != nil) != test.WantErr {
+				t.Errorf("Validate err = %v, wantErr %v", err, test.WantErr)
+			}
+		})
+	}
 }
 
 // TestValidateMessage covers the message-step channel rules.

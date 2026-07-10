@@ -101,8 +101,11 @@ type Step struct {
 	// default: free for hold and event, out of office for away.
 	ShowAs calendar.ShowAs `json:"showAs,omitempty"`
 	// Manager, on an approve step, waits on the manager resolved from the directory
-	// or the --manager flag. Reserved for future per-approver selection.
+	// or the --manager flag. Only the first approve in a chain may use it.
 	Manager bool `json:"manager,omitempty"`
+	// Approver, on an approve step, names an explicit approver by email, used for the
+	// later links of a multi-approver chain where the directory knows only the manager.
+	Approver string `json:"approver,omitempty"`
 	// Team sets the role used when a notify step adds the team. Empty means optional.
 	Team calendar.Role `json:"team,omitempty"`
 	// Subject overrides the event title for a note or event step, or the message text
@@ -283,6 +286,9 @@ func (w Workflow) Validate() error {
 		if s.Channel != "" && s.Verb != VerbMessage {
 			return fmt.Errorf("%w: step %d: only a message step may set a channel", ErrInvalid, i)
 		}
+		if s.Approver != "" && s.Verb != VerbApprove {
+			return fmt.Errorf("%w: step %d: only an approve step may set an approver", ErrInvalid, i)
+		}
 		if s.ID != "" {
 			if ids[s.ID] {
 				return fmt.Errorf("%w: duplicate step id %q", ErrInvalid, s.ID)
@@ -325,6 +331,14 @@ func (w Workflow) Validate() error {
 		}
 		if s.Verb == VerbApprove {
 			approves++
+			if approves > 1 {
+				if s.Approver == "" {
+					return fmt.Errorf("%w: step %d: a later approve must name an approver by email; only the first uses the manager", ErrInvalid, i)
+				}
+				if s.Manager {
+					return fmt.Errorf("%w: step %d: only the first approve may use the directory manager", ErrInvalid, i)
+				}
+			}
 			if firstApprove < 0 {
 				firstApprove = i
 			}
@@ -336,9 +350,6 @@ func (w Workflow) Validate() error {
 	if creators != 1 {
 		return fmt.Errorf("%w: %q needs exactly one creating step (hold/away/event) but has %d",
 			ErrInvalid, w.Name, creators)
-	}
-	if approves > 1 {
-		return fmt.Errorf("%w: %q allows only one approve step", ErrInvalid, w.Name)
 	}
 	if firstApprove >= 0 && w.Steps[0].Verb != VerbHold {
 		return fmt.Errorf("%w: approval requires a hold: %q starts with %s", ErrInvalid, w.Name, w.Steps[0].Verb)
