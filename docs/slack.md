@@ -20,7 +20,8 @@ This is a single-workspace app. The server runs as your vamoose, with your backe
 2. **Slash Commands**: create `/vamoose` with request URL `https://<your-url>/slack/commands`.
 3. **Interactivity & Shortcuts**: turn it on with request URL `https://<your-url>/slack/interactivity`.
 4. **Basic Information**: copy the **Signing Secret**.
-5. Install the app to your workspace.
+5. **Basic Information → Display Information**: upload `assets/vamoose-slack-icon.png` as the app icon. It is the white moose on black, square at 1024x1024, so Slack shows it on the bot's messages and in the app directory.
+6. Install the app to your workspace.
 
 Run the server with your calendar backend and the signing secret set:
 
