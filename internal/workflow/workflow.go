@@ -9,6 +9,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
@@ -90,6 +91,9 @@ type Step struct {
 	// expired branch runs, as a Go duration such as "72h". It requires an expired
 	// branch in On.
 	Timeout string `json:"timeout,omitempty"`
+	// When guards the step: it runs only when the guard's conditions hold at
+	// execution time, otherwise the flow skips it. The zero value never gates.
+	When When `json:"when,omitempty"`
 	// ShowAs overrides the free/busy status for creating steps. Empty uses the verb
 	// default: free for hold and event, out of office for away.
 	ShowAs calendar.ShowAs `json:"showAs,omitempty"`
@@ -114,6 +118,119 @@ func (s Step) ParsedTimeout() time.Duration {
 		return 0
 	}
 	return d
+}
+
+// When gates a step. The step runs only when every condition it sets holds; an unset
+// condition does not constrain, so the zero value always allows the step. Unlike On,
+// which branches an approve step by its outcome, When can gate any step.
+type When struct {
+	// DayOfWeek limits the step to the named days, as a comma-separated set of
+	// three-letter days or inclusive ranges, such as "mon-fri" or "sat,sun". Empty
+	// allows any day. It is evaluated against the execution-time clock.
+	DayOfWeek string `json:"dayOfWeek,omitempty"`
+	// MinAttendees requires the hold to have at least this many attendees. Zero does
+	// not constrain.
+	MinAttendees int `json:"minAttendees,omitempty"`
+	// MaxAttendees requires the hold to have at most this many attendees. Zero does
+	// not constrain.
+	MaxAttendees int `json:"maxAttendees,omitempty"`
+}
+
+// Allows reports whether the guard permits the step to run at time at with the given
+// attendee count. An unset condition does not constrain, so the zero value always
+// allows. A malformed day set denies; Validate rejects such a guard up front.
+func (w When) Allows(at time.Time, attendees int) bool {
+	if w.DayOfWeek != "" {
+		days, err := parseDays(w.DayOfWeek)
+		if err != nil || !days[at.Weekday()] {
+			return false
+		}
+	}
+	if w.MinAttendees > 0 && attendees < w.MinAttendees {
+		return false
+	}
+	if w.MaxAttendees > 0 && attendees > w.MaxAttendees {
+		return false
+	}
+	return true
+}
+
+// validate checks the guard is well formed: a parseable day set and non-negative,
+// consistent attendee bounds.
+func (w When) validate() error {
+	if w.DayOfWeek != "" {
+		if _, err := parseDays(w.DayOfWeek); err != nil {
+			return fmt.Errorf("invalid dayOfWeek %q: %w", w.DayOfWeek, err)
+		}
+	}
+	if w.MinAttendees < 0 {
+		return fmt.Errorf("minAttendees cannot be negative")
+	}
+	if w.MaxAttendees < 0 {
+		return fmt.Errorf("maxAttendees cannot be negative")
+	}
+	if w.MinAttendees > 0 && w.MaxAttendees > 0 && w.MinAttendees > w.MaxAttendees {
+		return fmt.Errorf("minAttendees %d exceeds maxAttendees %d", w.MinAttendees, w.MaxAttendees)
+	}
+	return nil
+}
+
+// parseDay maps a three-letter day abbreviation to its weekday, case-insensitive.
+func parseDay(name string) (time.Weekday, bool) {
+	switch strings.ToLower(name) {
+	case "sun":
+		return time.Sunday, true
+	case "mon":
+		return time.Monday, true
+	case "tue":
+		return time.Tuesday, true
+	case "wed":
+		return time.Wednesday, true
+	case "thu":
+		return time.Thursday, true
+	case "fri":
+		return time.Friday, true
+	case "sat":
+		return time.Saturday, true
+	default:
+		return 0, false
+	}
+}
+
+// parseDays parses a day-of-week set such as "mon-fri" or "sat,sun" into the weekdays
+// it names. Tokens are comma-separated; each is a single day or an inclusive range
+// like "mon-fri" that wraps past Saturday. It errors on an unknown day or an empty set.
+func parseDays(spec string) (map[time.Weekday]bool, error) {
+	set := make(map[time.Weekday]bool)
+	for _, tok := range strings.Split(spec, ",") {
+		tok = strings.TrimSpace(tok)
+		if tok == "" {
+			continue
+		}
+		lo, hi, isRange := strings.Cut(tok, "-")
+		start, ok := parseDay(lo)
+		if !ok {
+			return nil, fmt.Errorf("unknown day %q", lo)
+		}
+		if !isRange {
+			set[start] = true
+			continue
+		}
+		end, ok := parseDay(hi)
+		if !ok {
+			return nil, fmt.Errorf("unknown day %q", hi)
+		}
+		for d := start; ; d = (d + 1) % 7 {
+			set[d] = true
+			if d == end {
+				break
+			}
+		}
+	}
+	if len(set) == 0 {
+		return nil, fmt.Errorf("no days named")
+	}
+	return set, nil
 }
 
 // Workflow is a named sequence of steps forming a small graph.
@@ -180,6 +297,12 @@ func (w Workflow) Validate() error {
 		}
 		if _, ok := s.On[OutcomeExpired]; ok && s.Timeout == "" {
 			return fmt.Errorf("%w: step %d: an expired branch needs a timeout", ErrInvalid, i)
+		}
+		if err := s.When.validate(); err != nil {
+			return fmt.Errorf("%w: step %d: %w", ErrInvalid, i, err)
+		}
+		if s.Verb.Creates() && s.When != (When{}) {
+			return fmt.Errorf("%w: step %d: the creating step cannot have a when guard", ErrInvalid, i)
 		}
 		if s.Verb.Creates() {
 			creators++

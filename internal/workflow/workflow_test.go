@@ -3,7 +3,9 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
@@ -248,4 +250,134 @@ func TestValidateTimeout(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestValidateWhen covers the when-guard rules on a non-creating step.
+func TestValidateWhen(t *testing.T) {
+	t.Parallel()
+	hold := Step{ID: "hold", Verb: VerbHold}
+	tests := []struct {
+		Notify  Step
+		WantErr bool
+	}{{ // Test 0: A valid day-of-week guard passes.
+		Notify: Step{Verb: VerbNotify, When: When{DayOfWeek: "mon-fri"}},
+	}, { // Test 1: A valid attendee-count guard passes.
+		Notify: Step{Verb: VerbNotify, When: When{MinAttendees: 1, MaxAttendees: 5}},
+	}, { // Test 2: An unparseable day set fails.
+		Notify: Step{Verb: VerbNotify, When: When{DayOfWeek: "someday"}}, WantErr: true,
+	}, { // Test 3: Min greater than max fails.
+		Notify: Step{Verb: VerbNotify, When: When{MinAttendees: 5, MaxAttendees: 2}}, WantErr: true,
+	}, { // Test 4: A negative bound fails.
+		Notify: Step{Verb: VerbNotify, When: When{MaxAttendees: -1}}, WantErr: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			wf := Workflow{Name: "t", Steps: []Step{hold, test.Notify}}
+			if err := wf.Validate(); (err != nil) != test.WantErr {
+				t.Errorf("Validate err = %v, wantErr %v", err, test.WantErr)
+			}
+		})
+	}
+}
+
+// TestValidateWhenOnCreator confirms guarding the creating step is rejected, since a
+// workflow must create its hold.
+func TestValidateWhenOnCreator(t *testing.T) {
+	t.Parallel()
+	wf := Workflow{Name: "t", Steps: []Step{
+		{ID: "hold", Verb: VerbHold, When: When{DayOfWeek: "mon-fri"}},
+		{Verb: VerbNotify},
+	}}
+	if err := wf.Validate(); !errors.Is(err, ErrInvalid) {
+		t.Errorf("Validate err = %v, want ErrInvalid", err)
+	}
+}
+
+// TestParseDays covers the day-of-week set parser: ranges, lists, wrapping, and the
+// error cases.
+func TestParseDays(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Spec    string
+		Want    map[time.Weekday]bool
+		WantErr bool
+	}{{ // Test 0: A weekday range expands inclusively.
+		Spec: "mon-fri", Want: daySet(time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday),
+	}, { // Test 1: A comma list names individual days.
+		Spec: "sat,sun", Want: daySet(time.Saturday, time.Sunday),
+	}, { // Test 2: A single day.
+		Spec: "wed", Want: daySet(time.Wednesday),
+	}, { // Test 3: A mixed list and range, case-insensitive with spaces.
+		Spec: "Mon, wed-thu", Want: daySet(time.Monday, time.Wednesday, time.Thursday),
+	}, { // Test 4: A range wraps past Saturday.
+		Spec: "fri-mon", Want: daySet(time.Friday, time.Saturday, time.Sunday, time.Monday),
+	}, { // Test 5: An unknown day errors.
+		Spec: "mon-funday", WantErr: true,
+	}, { // Test 6: An empty spec errors.
+		Spec: "", WantErr: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			got, err := parseDays(test.Spec)
+			if (err != nil) != test.WantErr {
+				t.Fatalf("parseDays(%q) err = %v, wantErr %v", test.Spec, err, test.WantErr)
+			}
+			if test.WantErr {
+				return
+			}
+			if !reflect.DeepEqual(got, test.Want) {
+				t.Errorf("parseDays(%q) = %v, want %v", test.Spec, got, test.Want)
+			}
+		})
+	}
+}
+
+// TestWhenAllows covers the guard evaluation across day-of-week and attendee bounds.
+func TestWhenAllows(t *testing.T) {
+	t.Parallel()
+	wed := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
+	sat := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		When      When
+		At        time.Time
+		Attendees int
+		Want      bool
+	}{{ // Test 0: An empty guard always allows.
+		When: When{}, At: sat, Want: true,
+	}, { // Test 1: A weekday guard allows on a weekday.
+		When: When{DayOfWeek: "mon-fri"}, At: wed, Want: true,
+	}, { // Test 2: A weekday guard denies on the weekend.
+		When: When{DayOfWeek: "mon-fri"}, At: sat, Want: false,
+	}, { // Test 3: Min attendees met.
+		When: When{MinAttendees: 3}, At: wed, Attendees: 3, Want: true,
+	}, { // Test 4: Min attendees not met.
+		When: When{MinAttendees: 3}, At: wed, Attendees: 2, Want: false,
+	}, { // Test 5: Max attendees respected.
+		When: When{MaxAttendees: 2}, At: wed, Attendees: 2, Want: true,
+	}, { // Test 6: Max attendees exceeded.
+		When: When{MaxAttendees: 2}, At: wed, Attendees: 3, Want: false,
+	}, { // Test 7: All conditions must hold together.
+		When: When{DayOfWeek: "mon-fri", MinAttendees: 2, MaxAttendees: 5}, At: wed, Attendees: 3, Want: true,
+	}, { // Test 8: One failing condition denies.
+		When: When{DayOfWeek: "mon-fri", MinAttendees: 2}, At: sat, Attendees: 3, Want: false,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := test.When.Allows(test.At, test.Attendees); got != test.Want {
+				t.Errorf("Allows = %v, want %v", got, test.Want)
+			}
+		})
+	}
+}
+
+// daySet builds a weekday set for comparing parseDays output.
+func daySet(days ...time.Weekday) map[time.Weekday]bool {
+	m := make(map[time.Weekday]bool, len(days))
+	for _, d := range days {
+		m[d] = true
+	}
+	return m
 }
