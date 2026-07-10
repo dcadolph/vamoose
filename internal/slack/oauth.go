@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -119,10 +120,14 @@ func newStateStore(now func() time.Time) *stateStore {
 	return &stateStore{states: make(map[string]time.Time), now: now, ttl: 10 * time.Minute}
 }
 
-// issue returns a new random state token that expires after the ttl.
+// issue returns a new random state token that expires after the ttl. It returns the
+// empty string if the system entropy source fails, which fails the OAuth flow closed:
+// an empty state never validates on the callback.
 func (s *stateStore) issue() string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return ""
+	}
 	tok := hex.EncodeToString(b)
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"sync"
 	"time"
 )
@@ -56,10 +57,14 @@ func newLinkStateStore(now func() time.Time) *linkStateStore {
 	return &linkStateStore{states: make(map[string]linkState), now: now, ttl: 10 * time.Minute}
 }
 
-// issue records a pending link and returns its state token.
+// issue records a pending link and returns its state token. It returns the empty string
+// if the system entropy source fails, which fails the link flow closed: an empty state
+// never validates on the callback.
 func (s *linkStateStore) issue(team, user, provider string) string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return ""
+	}
 	tok := hex.EncodeToString(b)
 	s.mu.Lock()
 	defer s.mu.Unlock()
