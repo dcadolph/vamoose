@@ -159,15 +159,19 @@ func TestHoldID(t *testing.T) {
 }
 
 // TestApprovalButtons confirms an approval-awaiting hold posts Approve and Decline
-// buttons carrying the hold id.
+// buttons whose signed value binds the resolved approver.
 func TestApprovalButtons(t *testing.T) {
 	t.Parallel()
+	sink, _ := mockSlackAPI(t)
 	srv, ch := captureServer(t)
 	runner := func(context.Context, []string, []string) (string, error) {
 		return "Hold created and sent to boss@x.com for approval.\nHold id: EVT1", nil
 	}
-	s := NewServer("shh", runner)
-	s.runCommand(srv.URL, []string{"off", "next", "week"}, nil, "", "")
+	s := NewServer("shh", runner,
+		WithOAuth("cid", "csec", sink.URL, memTokens{"T1": "xoxb"}),
+		WithOAuthBaseURL(sink.URL),
+	)
+	s.runCommand(srv.URL, []string{"off", "next", "week"}, nil, "T1", "")
 	body := <-ch
 	if !bytes.Contains(body, []byte(actionApprove)) || !bytes.Contains(body, []byte(actionDecline)) {
 		t.Errorf("approve/decline actions missing: %s", body)
@@ -175,8 +179,8 @@ func TestApprovalButtons(t *testing.T) {
 	if !bytes.Contains(body, []byte(`"in_channel"`)) {
 		t.Errorf("approval message should be in_channel: %s", body)
 	}
-	if p, ok := s.decodeApprovalValue(buttonValue(t, body)); !ok || p.H != "EVT1" {
-		t.Errorf("button value did not decode to hold EVT1: ok=%v p=%+v", ok, p)
+	if p, ok := s.decodeApprovalValue(buttonValue(t, body)); !ok || p.H != "EVT1" || p.A != "UBOSS" {
+		t.Errorf("button value did not decode to hold EVT1 approver UBOSS: ok=%v p=%+v", ok, p)
 	}
 }
 
@@ -342,22 +346,34 @@ func TestSlashRejectsDisallowed(t *testing.T) {
 	}
 }
 
-// TestPerUserWithholdsButtonsWithoutApprover confirms that in per-user mode, when the
-// approver cannot be resolved (no workspace token here), the buttons are withheld so no
-// unverified click can run as the owner.
-func TestPerUserWithholdsButtonsWithoutApprover(t *testing.T) {
+// TestWithholdsButtonsWithoutApprover confirms that in both per-user and single-tenant
+// mode, when the approver cannot be resolved (no workspace token here), the buttons are
+// withheld so no unverified click can act.
+func TestWithholdsButtonsWithoutApprover(t *testing.T) {
 	t.Parallel()
-	srv, ch := captureServer(t)
-	runner := func(context.Context, []string, []string) (string, error) {
-		return "Hold created and sent to boss@x.com for approval.\nHold id: EVT1", nil
+	tests := []struct {
+		Name  string
+		Owner string
+	}{
+		{"per-user", "U1"},
+		{"single-tenant", ""},
 	}
-	s := NewServer("shh", runner)
-	s.runCommand(srv.URL, []string{"off"}, nil, "T1", "U1")
-	body := <-ch
-	if bytes.Contains(body, []byte(actionApprove)) {
-		t.Errorf("approval buttons should be withheld without a verified approver: %s", body)
-	}
-	if !bytes.Contains(body, []byte("calendar invite")) {
-		t.Errorf("want the calendar-invite fallback message, got: %s", body)
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			t.Parallel()
+			srv, ch := captureServer(t)
+			runner := func(context.Context, []string, []string) (string, error) {
+				return "Hold created and sent to boss@x.com for approval.\nHold id: EVT1", nil
+			}
+			s := NewServer("shh", runner)
+			s.runCommand(srv.URL, []string{"off"}, nil, "T1", test.Owner)
+			body := <-ch
+			if bytes.Contains(body, []byte(actionApprove)) {
+				t.Errorf("approval buttons should be withheld without a verified approver: %s", body)
+			}
+			if !bytes.Contains(body, []byte("calendar invite")) {
+				t.Errorf("want the calendar-invite fallback message, got: %s", body)
+			}
+		})
 	}
 }

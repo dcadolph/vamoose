@@ -257,11 +257,11 @@ func (s *Server) runCommand(responseURL string, args, env []string, ownerTeam, o
 	}
 	if id := holdID(out); id != "" && strings.Contains(strings.ToLower(out), "approval") {
 		approver := s.resolveApproverID(ctx, ownerTeam, out)
-		// In per-user mode the buttons run as the hold owner, so without a verified
-		// approver anyone could approve. Withhold the buttons and fall back to the
-		// calendar invite the approver can accept, which the per-user poll advances.
-		if ownerUser != "" && approver == "" {
-			log.Printf("slack: withholding approval buttons for hold %s: could not resolve the approver (needs the users:read.email scope and the approver in the workspace)", id)
+		// A click runs promote or cancel, so without a verified approver anyone in the
+		// channel could approve. Withhold the buttons in every mode and fall back to the
+		// calendar invite the approver can accept, which the daemon or poll loop advances.
+		if approver == "" {
+			log.Printf("slack: withholding approval buttons for hold %s: could not resolve the approver to a Slack user (needs the users:read.email scope and the approver in the workspace)", id)
 			s.post(responseURL, map[string]any{
 				"response_type": "in_channel",
 				"text":          firstLine(out) + " The approver can accept the calendar invite to approve.",
@@ -335,8 +335,10 @@ func (s *Server) decodeApprovalValue(value string) (approvalPayload, bool) {
 }
 
 // approverRe extracts the approver email from a hold's start message so a click can be
-// checked against the person the workflow sent the hold to.
-var approverRe = regexp.MustCompile(`(?i)sent to (\S+@\S+) for approval`)
+// checked against the person the workflow sent the hold to. It anchors to the start of
+// the line the create step prints, so a crafted hold subject echoed mid-line cannot
+// inject a different approver email.
+var approverRe = regexp.MustCompile(`(?im)^Hold created and sent to (\S+@\S+) for approval`)
 
 // resolveApproverID pulls the approver email from the command output and resolves it to
 // a Slack user id through users.lookupByEmail, so a click can be verified. It returns the
