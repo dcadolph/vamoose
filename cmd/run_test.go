@@ -251,7 +251,7 @@ func TestRunStepsWhenGuard(t *testing.T) {
 	// One attendee: the guard denies, so notify is skipped.
 	small := &mockProvider{team: []calendar.Person{{Email: "peer@x.com"}}}
 	held := calendar.Hold{ID: "h1", Attendees: []calendar.Attendee{boss}}
-	if err := runSteps(context.Background(), small, nil, "graph", wf, wf.Next(0, ""), held, false); err != nil {
+	if err := runSteps(context.Background(), small, stepDeps{}, "graph", wf, wf.Next(0, ""), held, false); err != nil {
 		t.Fatalf("runSteps small: %v", err)
 	}
 	if small.updated != nil {
@@ -261,7 +261,7 @@ func TestRunStepsWhenGuard(t *testing.T) {
 	// Two attendees: the guard allows, so notify runs.
 	big := &mockProvider{team: []calendar.Person{{Email: "peer@x.com"}}}
 	full := calendar.Hold{ID: "h2", Attendees: []calendar.Attendee{boss, other}}
-	if err := runSteps(context.Background(), big, nil, "graph", wf, wf.Next(0, ""), full, false); err != nil {
+	if err := runSteps(context.Background(), big, stepDeps{}, "graph", wf, wf.Next(0, ""), full, false); err != nil {
 		t.Fatalf("runSteps big: %v", err)
 	}
 	if big.updated == nil {
@@ -284,7 +284,7 @@ func TestRunStepsMessage(t *testing.T) {
 	})
 	prov := &mockProvider{}
 	held := calendar.Hold{ID: "h1", Subject: "Out: beach week"}
-	if err := runSteps(context.Background(), prov, notifier, "graph", wf, wf.Next(0, ""), held, false); err != nil {
+	if err := runSteps(context.Background(), prov, stepDeps{notifier: notifier}, "graph", wf, wf.Next(0, ""), held, false); err != nil {
 		t.Fatalf("runSteps: %v", err)
 	}
 	if gotChannel != "#team" || gotText != "Out: beach week" {
@@ -301,7 +301,7 @@ func TestRunStepsMessageNoNotifier(t *testing.T) {
 		{Verb: workflow.VerbMessage, Channel: "#team", Next: "end"},
 	}}
 	prov := &mockProvider{}
-	err := runSteps(context.Background(), prov, nil, "graph", wf, wf.Next(0, ""), calendar.Hold{Subject: "x"}, false)
+	err := runSteps(context.Background(), prov, stepDeps{}, "graph", wf, wf.Next(0, ""), calendar.Hold{Subject: "x"}, false)
 	if err == nil {
 		t.Fatal("want an error when no notifier is configured")
 	}

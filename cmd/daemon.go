@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dcadolph/vamoose/internal/audit"
 	"github.com/dcadolph/vamoose/internal/calendar"
-	"github.com/dcadolph/vamoose/internal/comms"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
 
@@ -162,7 +162,7 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 	if err != nil {
 		return pollFailed, item, err
 	}
-	notifier := resolveNotifier()
+	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder()}
 	if item.Step < 0 || item.Step >= len(wf.Steps) {
 		return pollPending, item, nil
 	}
@@ -173,14 +173,46 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 	// (a late decline after the team was already notified) cannot switch branches or
 	// repeat completed steps. Completing drops the watch.
 	if item.Resume > 0 {
-		return advanceToNextGate(ctx, prov, notifier, wf, item, hold, item.Resume, pollApproved)
+		return advanceToNextGate(ctx, prov, deps, wf, item, hold, item.Resume, pollApproved)
 	}
 
 	from, onEnd, waiting := branchPlan(wf, item, hold)
 	if waiting {
 		return pollPending, item, nil
 	}
-	return advanceToNextGate(ctx, prov, notifier, wf, item, hold, from, onEnd)
+	recordGateOutcome(ctx, deps.recorder, wf, item, hold, onEnd)
+	return advanceToNextGate(ctx, prov, deps, wf, item, hold, from, onEnd)
+}
+
+// recordGateOutcome records the audit event for a gate that just resolved: an approval,
+// decline, or expiry, naming the approver. A wait step elapsing is not an approval, so it
+// records nothing.
+func recordGateOutcome(ctx context.Context, rec audit.Recorder, wf workflow.Workflow, item watchItem, hold calendar.Hold, onEnd pollResult) {
+	if wf.Steps[item.Step].Verb == workflow.VerbWait {
+		return
+	}
+	var action audit.Action
+	switch onEnd {
+	case pollDeclined:
+		action = audit.ActionDeclined
+	case pollExpired:
+		action = audit.ActionExpired
+	default:
+		action = audit.ActionApproved
+	}
+	recordAudit(ctx, rec, audit.Event{
+		Workflow: wf.Name, Provider: item.Provider, HoldID: item.HoldID,
+		Action: action, Actor: gateActor(hold, item),
+	})
+}
+
+// gateActor returns the email of the approver the current gate waits on, for the audit
+// record: the chain approver the item names, or the first required attendee.
+func gateActor(hold calendar.Hold, item watchItem) string {
+	if item.Approver != "" {
+		return item.Approver
+	}
+	return managerAttendee(hold).Person.Email
 }
 
 // branchPlan decides which branch the pending gate opens and how completing it reads.
@@ -229,8 +261,8 @@ func branchStart(wf workflow.Workflow, step workflow.Step, outcome string) int {
 // them; a wait step or a manager gate needs no invite. It returns the item to persist:
 // advanced at a new gate, the branch's end result (onEnd) when the flow completes, or
 // failed with the resume checkpoint set when a step errors.
-func advanceToNextGate(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, wf workflow.Workflow, item watchItem, hold calendar.Hold, from int, onEnd pollResult) (pollResult, watchItem, error) {
-	gate, err := walkSteps(ctx, prov, notifier, item.Provider, wf, from, hold)
+func advanceToNextGate(ctx context.Context, prov calendar.Provider, deps stepDeps, wf workflow.Workflow, item watchItem, hold calendar.Hold, from int, onEnd pollResult) (pollResult, watchItem, error) {
+	gate, err := walkSteps(ctx, prov, deps, item.Provider, wf, from, hold)
 	if err != nil {
 		item.Resume = gate
 		return pollFailed, item, err
@@ -250,6 +282,10 @@ func advanceToNextGate(ctx context.Context, prov calendar.Provider, notifier com
 	} else {
 		item.Approver = ""
 	}
+	recordAudit(ctx, deps.recorder, audit.Event{
+		Workflow: wf.Name, Provider: item.Provider, HoldID: item.HoldID,
+		Action: audit.ActionAdvanced, Detail: item.Approver,
+	})
 	return pollAdvanced, item, nil
 }
 

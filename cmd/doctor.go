@@ -115,6 +115,7 @@ func doctorChecks(getenv func(string) string) []doctorCheck {
 		doctorCheck{Label: "Slack messaging (VAMOOSE_SLACK_BOT_TOKEN)", OK: set("VAMOOSE_SLACK_BOT_TOKEN"), Optional: true, Hint: "set for message steps to Slack"},
 		doctorCheck{Label: "Email messaging (VAMOOSE_SMTP_HOST)", OK: set("VAMOOSE_SMTP_HOST"), Optional: true, Hint: "set for message steps to email"},
 		doctorCheck{Label: "Secrets: " + secrets, OK: true, Optional: true},
+		doctorCheck{Label: "Run history: recorded to the audit log (see 'vamoose history')", OK: true, Optional: true},
 	)
 	return checks
 }

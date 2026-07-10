@@ -29,6 +29,7 @@ Commands:
   request   Create a time-off hold and invite your manager to approve it.
   off       Request time off from a date phrase, e.g. "off next week".
   check     Show whether your manager has approved the hold.
+  history   Show the recorded run history: what each hold did and who approved it.
   promote   Add your team as optional attendees once approved.
   cancel    Cancel a hold and notify its attendees.
   away      Mark yourself out of office over a date range.

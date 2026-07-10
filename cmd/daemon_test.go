@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dcadolph/vamoose/internal/audit"
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
 
@@ -460,6 +461,41 @@ func hasAttendee(attendees []calendar.Attendee, email string) bool {
 		}
 	}
 	return false
+}
+
+// TestAdvanceRunRecordsAudit confirms the daemon writes run-history events: the approval
+// naming the approver, and the team notification. It isolates HOME so the audit file is
+// the test's own.
+func TestAdvanceRunRecordsAudit(t *testing.T) {
+	isolateConfig(t)
+	prov := &mockProvider{
+		hold: managerHold(calendar.ResponseAccepted),
+		team: []calendar.Person{{Email: "peer@x.com"}},
+	}
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "pto", Step: 1}
+	if res, _, _ := advanceRun(context.Background(), prov, item); res != pollApproved {
+		t.Fatalf("res = %v, want pollApproved", res)
+	}
+	store, err := auditStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := store.Events()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawApproved, sawNotified bool
+	for _, e := range events {
+		if e.Action == audit.ActionApproved && e.Actor == "mgr@x.com" {
+			sawApproved = true
+		}
+		if e.Action == audit.ActionNotified {
+			sawNotified = true
+		}
+	}
+	if !sawApproved || !sawNotified {
+		t.Errorf("audit events = %+v; want approved by mgr@x.com and notified", events)
+	}
 }
 
 // TestWatchPathOverride confirms VAMOOSE_WATCH_FILE overrides the default location,

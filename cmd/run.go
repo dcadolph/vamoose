@@ -10,10 +10,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dcadolph/vamoose/internal/audit"
 	"github.com/dcadolph/vamoose/internal/calendar"
 	"github.com/dcadolph/vamoose/internal/comms"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
+
+// stepDeps carries the side-effect adapters the executor uses: the comms notifier for
+// message steps, and the audit recorder for run history. Either may be nil, in which
+// case that side effect is skipped.
+type stepDeps struct {
+	// notifier posts message steps to a comms channel.
+	notifier comms.Notifier
+	// recorder appends run-history events.
+	recorder audit.Recorder
+}
 
 // resolveNotifier returns the configured comms notifier, or nil when none is set. A
 // Slack bot token (VAMOOSE_SLACK_BOT_TOKEN) enables Slack, and SMTP settings
@@ -187,14 +198,18 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	}
 	fmt.Fprintln(os.Stdout, startedMessage(wf, created))
 
-	return runSteps(ctx, prov, resolveNotifier(), providerName, wf, wf.Next(0, ""), created, opt.Watch)
+	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder()}
+	recordAudit(ctx, deps.recorder, audit.Event{
+		Workflow: wf.Name, Provider: providerName, HoldID: created.ID, Action: audit.ActionCreated,
+	})
+	return runSteps(ctx, prov, deps, providerName, wf, wf.Next(0, ""), created, opt.Watch)
 }
 
 // runSteps walks the workflow from `from` for the run command: it runs the immediate
 // steps and, when it reaches an approve gate, records the run for the daemon if
 // watching. The daemon calls walkSteps directly to advance a chain gate to gate.
-func runSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
-	gate, err := walkSteps(ctx, prov, notifier, providerName, wf, from, hold)
+func runSteps(ctx context.Context, prov calendar.Provider, deps stepDeps, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
+	gate, err := walkSteps(ctx, prov, deps, providerName, wf, from, hold)
 	if err != nil {
 		return err
 	}
@@ -212,7 +227,7 @@ func runSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifi
 // step it stopped at, or -1 when the flow ran to completion, so a caller can gate the
 // run or advance the next step. On error it returns the index of the step that failed,
 // so the daemon can checkpoint and resume there rather than repeating completed steps.
-func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, providerName string, wf workflow.Workflow, from int, hold calendar.Hold) (int, error) {
+func walkSteps(ctx context.Context, prov calendar.Provider, deps stepDeps, providerName string, wf workflow.Workflow, from int, hold calendar.Hold) (int, error) {
 	visited := make(map[int]bool)
 	for i := from; i >= 0 && i < len(wf.Steps); i = wf.Next(i, "") {
 		if visited[i] {
@@ -231,24 +246,39 @@ func walkSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notif
 			if err := promoteHold(ctx, prov, hold); err != nil {
 				return i, err
 			}
+			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionNotified, ""))
 		case workflow.VerbNote:
 			if err := createNote(ctx, prov, wf.Steps[i], hold); err != nil {
 				return i, err
 			}
+			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionNoted, wf.Steps[i].Subject))
 		case workflow.VerbMessage:
-			if err := sendMessage(ctx, notifier, wf.Steps[i], hold); err != nil {
+			if err := sendMessage(ctx, deps.notifier, wf.Steps[i], hold); err != nil {
 				return i, err
 			}
+			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionMessaged, wf.Steps[i].Channel))
 		case workflow.VerbCancel:
 			if err := prov.DeleteHold(ctx, hold.ID); err != nil {
 				return i, fmt.Errorf("cancel hold: %w", err)
 			}
 			forgetHold(holdRef{Provider: providerName, ID: hold.ID})
+			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionCanceled, ""))
 			fmt.Fprintf(os.Stdout, "Canceled hold %s.\n", hold.ID)
 			return -1, nil
 		}
 	}
 	return -1, nil
+}
+
+// stepEvent builds an audit event for a workflow side-effect step.
+func stepEvent(wf workflow.Workflow, providerName string, hold calendar.Hold, action audit.Action, detail string) audit.Event {
+	return audit.Event{
+		Workflow: wf.Name,
+		Provider: providerName,
+		HoldID:   hold.ID,
+		Action:   action,
+		Detail:   detail,
+	}
 }
 
 // createNote creates a short informational event on the requester's own calendar,

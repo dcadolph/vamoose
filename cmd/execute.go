@@ -28,6 +28,8 @@ func Execute(args []string) int {
 		return run(runOff(ctx, rest))
 	case "check":
 		return run(runCheck(ctx, rest))
+	case "history":
+		return run(runHistory(ctx, rest))
 	case "promote":
 		return run(runPromote(ctx, rest))
 	case "cancel":
