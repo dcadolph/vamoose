@@ -42,7 +42,8 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 | `timeout`| approve           | Duration to wait (e.g. `72h`) before the `expired` branch runs.      |
 | `when`   | any but the first | Guard that skips the step unless its conditions hold. See Guards.    |
 | `next`   | any               | The step id to run next, or `end`. Defaults to the following step.   |
-| `subject`| note, event       | Event title for a note or event step.                               |
+| `subject`| note, event, message | Event title, or the text for a message step.                     |
+| `channel`| message           | Where a message step posts, such as a Slack channel. Required.       |
 
 ## Verbs
 
@@ -53,6 +54,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there over
 - `away` marks out of office with no attendees.
 - `event` creates a plain event, with attendees from `--attendees`.
 - `cancel` deletes the hold.
+- `message` posts to a comms channel, such as a Slack channel, to announce the outcome.
 
 ## Rules
 
@@ -133,3 +135,31 @@ The built-in `pto-notify-weekdays` approves time off but tells the team only on 
 ```
 
 A skipped step does not run later; the guard drops it for this run.
+
+## Messages
+
+A `message` step posts to a comms channel, such as a Slack channel, so a workflow announces
+its outcome where the team already is, not only on the calendar. Set a `channel` on the step.
+The message text is the step's `subject`, or the hold's subject when the step sets none, so an
+announcement carries the run's context without the workflow hardcoding it.
+
+Messaging needs a comms backend. For Slack, create a bot token with the `chat:write` scope and
+export it:
+
+```sh
+export VAMOOSE_SLACK_BOT_TOKEN=xoxb-...
+```
+
+The built-in `pto-announce` approves time off, announces it to a channel, then notifies the team:
+
+```json
+{
+  "name": "pto-announce",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "approval", "verb": "approve", "manager": true, "on": { "accepted": "announce" } },
+    { "id": "announce", "verb": "message", "channel": "#out-of-office", "next": "notify" },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}
+```

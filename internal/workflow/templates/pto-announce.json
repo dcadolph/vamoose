@@ -1,0 +1,10 @@
+{
+  "name": "pto-announce",
+  "description": "Time off a manager approves, then announce it to a channel and notify the team.",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "approval", "verb": "approve", "manager": true, "on": { "accepted": "announce" } },
+    { "id": "announce", "verb": "message", "channel": "#out-of-office", "next": "notify" },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}
