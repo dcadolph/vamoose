@@ -16,7 +16,7 @@
 
 The moose does the paperwork. You go to the beach.
 
-Four calendar backends behind one workflow engine, driven from your terminal, Claude, or Slack. Install with `brew install dcadolph/tap/vamoose`.
+Four calendar backends behind one workflow engine that branches, approves, waits, and recurs, driven from your terminal, Claude, or Slack, and authorable by an AI agent over MCP. Install with `brew install dcadolph/tap/vamoose`.
 
 Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
 wait for a nod, then re-send the event to the team so nobody schedules over you.

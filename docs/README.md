@@ -43,29 +43,41 @@ brew install dcadolph/tap/vamoose
 
 <div class="grid cards" markdown>
 
--   :material-calendar-sync:{ .lg .middle } __Four backends, one engine__
+-   :material-calendar-sync:{ .lg .middle } __Any calendar__
 
     ---
 
-    Microsoft Graph, Google, Apple iCloud, and any CalDAV host. Switch providers, change nothing.
+    Microsoft Graph, Google, Apple iCloud, and any CalDAV host, behind one interface. Switch providers, change nothing.
 
--   :material-source-branch:{ .lg .middle } __Real workflows__
-
-    ---
-
-    Approval chains, timeouts, day-of-week and attendee guards, delays, and branching, written as JSON you can read and share.
-
--   :material-forum:{ .lg .middle } __Where you already work__
+-   :material-sitemap:{ .lg .middle } __A real workflow engine__
 
     ---
 
-    Drive it from the CLI, Claude over MCP, or Slack with Approve and Decline buttons.
+    Branch on outcomes, gate on approval, guard by day or headcount. A state machine in JSON, not a dumb calendar rule.
 
--   :material-bullhorn:{ .lg .middle } __Tell the team__
+-   :material-account-check:{ .lg .middle } __Approvals that mean it__
 
     ---
 
-    Fan out to the team as optional attendees, and announce the outcome to a Slack channel or email.
+    Manager, then director, in sequence. Timeouts that act on silence, decline paths, and the accept-the-invite signal, no approval product to buy.
+
+-   :material-timer-sand:{ .lg .middle } __Acts on time__
+
+    ---
+
+    Wait steps pause a run; schedules rerun a whole workflow weekly. It moves on its own, in the background.
+
+-   :material-robot-happy:{ .lg .middle } __Drivable by AI__
+
+    ---
+
+    Over MCP, an agent discovers, previews, runs, schedules, and even authors workflows. The calendar-workflow layer for Claude.
+
+-   :material-bullhorn:{ .lg .middle } __Tells everyone__
+
+    ---
+
+    Fan out to the team as optional attendees, and announce the outcome to a Slack channel or by email.
 
 </div>
 
