@@ -73,13 +73,19 @@ func doctorChecks(getenv func(string) string) []doctorCheck {
 			checks = append(checks, doctorCheck{Label: "VAMOOSE_CLIENT_ID (Entra app client id)", OK: set("VAMOOSE_CLIENT_ID"), Hint: "register an Entra app and export its client id"})
 		}
 	case providerGoogle:
-		if set("VAMOOSE_GOOGLE_ACCESS_TOKEN") {
+		switch {
+		case set("VAMOOSE_GOOGLE_ACCESS_TOKEN"):
 			checks = append(checks, doctorCheck{Label: "Google access token set", OK: true})
-		} else {
-			checks = append(checks,
-				doctorCheck{Label: "VAMOOSE_GOOGLE_CLIENT_ID", OK: set("VAMOOSE_GOOGLE_CLIENT_ID"), Hint: "create an OAuth desktop client id"},
-				doctorCheck{Label: "VAMOOSE_GOOGLE_CLIENT_SECRET", OK: set("VAMOOSE_GOOGLE_CLIENT_SECRET"), Hint: "export the OAuth desktop client secret"},
-			)
+		default:
+			_, _, ok := googleClientCredsFrom(getenv)
+			switch {
+			case ok && set("VAMOOSE_GOOGLE_CLIENT_ID"):
+				checks = append(checks, doctorCheck{Label: "Google OAuth client: your override (run 'vamoose login')", OK: true})
+			case ok:
+				checks = append(checks, doctorCheck{Label: "Google OAuth client: built-in (run 'vamoose login')", OK: true})
+			default:
+				checks = append(checks, doctorCheck{Label: "Google OAuth client", OK: false, Hint: "set VAMOOSE_GOOGLE_CLIENT_ID and VAMOOSE_GOOGLE_CLIENT_SECRET, or use a release build with a built-in client"})
+			}
 		}
 	case providerICloud:
 		checks = append(checks,

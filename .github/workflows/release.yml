@@ -33,12 +33,18 @@ jobs:
       - name: Cross-build and package
         env:
           TAG: ${{ github.ref_name }}
+          # Built-in Google OAuth desktop client, so users sign in with `vamoose login`
+          # without registering their own Cloud project. Empty when the secrets are
+          # unset, which leaves the built-in client off and changes no behavior.
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           VER="${TAG#v}"
+          pkg="github.com/dcadolph/vamoose/cmd"
           mkdir -p build dist
           gox -osarch="darwin/amd64 darwin/arm64 linux/amd64 linux/arm64" \
-            -ldflags="-s -w -X github.com/dcadolph/vamoose/cmd.version=${VER}" \
+            -ldflags="-s -w -X '${pkg}.version=${VER}' -X '${pkg}.builtinGoogleClientID=${GOOGLE_CLIENT_ID}' -X '${pkg}.builtinGoogleClientSecret=${GOOGLE_CLIENT_SECRET}'" \
             -output="build/vamoose_{{.OS}}_{{.Arch}}" .
           for f in build/vamoose_*; do
             base="${f#build/vamoose_}"

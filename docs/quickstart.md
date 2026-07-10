@@ -16,18 +16,17 @@ Or build from source with Go 1.26 or newer:
 go install github.com/dcadolph/vamoose@latest
 ```
 
-## 2. Pick a calendar backend
+## 2. Sign in
 
-vamoose works with Microsoft Graph (Outlook, Microsoft 365, Teams), Google Calendar, Apple iCloud, and any standard CalDAV host. Set one and export its credentials. Google is the quickest to try:
+vamoose works with Microsoft Graph (Outlook, Microsoft 365, Teams), Google Calendar, Apple iCloud, and any standard CalDAV host. Google is the quickest to try, and it needs no project of your own: vamoose ships with a built-in OAuth client, so you just sign in.
 
 ```sh
 export VAMOOSE_PROVIDER=google
-export VAMOOSE_GOOGLE_CLIENT_ID=<oauth-desktop-client-id>
-export VAMOOSE_GOOGLE_CLIENT_SECRET=<oauth-desktop-client-secret>
 export VAMOOSE_TIMEZONE=America/Chicago
+vamoose login
 ```
 
-Every backend's setup is in [providers](providers.md).
+Your browser opens once to grant access, and the token is cached for later commands. Prefer your own OAuth client, or running an enterprise Google Workspace that allowlists apps? Export `VAMOOSE_GOOGLE_CLIENT_ID` and `VAMOOSE_GOOGLE_CLIENT_SECRET` and vamoose uses those instead. Every backend's setup is in [providers](providers.md).
 
 ## 3. Check your setup
 

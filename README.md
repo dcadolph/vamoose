@@ -105,18 +105,20 @@ first to confirm auth and directory access before creating any holds.
 
 ### Google Calendar
 
-For `--provider google`, create an OAuth **desktop app** client in the Google Cloud
-console, enable the Google Calendar API, and export its credentials:
+For `--provider google`, just sign in. vamoose ships with a built-in OAuth client,
+so there is no Google Cloud project to create:
 
 ```sh
 export VAMOOSE_PROVIDER=google
-export VAMOOSE_GOOGLE_CLIENT_ID=<oauth-desktop-client-id>
-export VAMOOSE_GOOGLE_CLIENT_SECRET=<oauth-desktop-client-secret>
+vamoose login
 ```
 
-The first command opens your browser for consent on a local loopback address, then
-caches and refreshes tokens after that. Google Calendar has no directory, so pass
-your approver with `--manager` and set your team with `vamoose team set`.
+`login` opens your browser for consent on a local loopback address, then caches and
+refreshes tokens after that. To bring your own client (self-hosting, or an enterprise
+Google Workspace that allowlists apps), set `VAMOOSE_GOOGLE_CLIENT_ID` and
+`VAMOOSE_GOOGLE_CLIENT_SECRET` and vamoose uses those instead. Google Calendar has no
+directory, so pass your approver with `--manager` and set your team with
+`vamoose team set`.
 
 ### Apple iCloud
 

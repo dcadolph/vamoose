@@ -135,11 +135,17 @@ Serve the vamoose Slack app: run vamoose from slash commands, with Approve and D
 
 ## Info
 
+### login
+
+`vamoose login [--provider <name>]`
+
+Sign in to the selected calendar provider and confirm access. For Google it uses the built-in OAuth client, so no Cloud project is needed: your browser opens once for consent and the token is cached for later commands. Graph signs in with the device-code prompt; iCloud and CalDAV verify the credentials you exported.
+
 ### whoami
 
 `vamoose whoami`
 
-Print the signed-in user, manager, and resolved team. Run it first to confirm auth and directory access.
+Print the signed-in user, manager, and resolved team. Run it after `vamoose login` to confirm auth and directory access.
 
 ### team
 
@@ -181,12 +187,12 @@ Microsoft Graph:
 | `VAMOOSE_CLIENT_ID` | Entra application (client) id.                                          |
 | `VAMOOSE_TENANT`    | Entra tenant id, or `organizations`. Default `organizations`.           |
 
-Google Calendar:
+Google Calendar (a built-in OAuth client is used by default; set both to bring your own):
 
 | Variable                       | Purpose                                               &nbsp; |
 | ------------------------------ | ------------------------------------------------------------ |
-| `VAMOOSE_GOOGLE_CLIENT_ID`     | OAuth desktop client id.                                     |
-| `VAMOOSE_GOOGLE_CLIENT_SECRET` | OAuth desktop client secret.                                 |
+| `VAMOOSE_GOOGLE_CLIENT_ID`     | OAuth desktop client id. Optional override.                  |
+| `VAMOOSE_GOOGLE_CLIENT_SECRET` | OAuth desktop client secret. Optional override.              |
 
 Apple iCloud:
 

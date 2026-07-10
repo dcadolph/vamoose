@@ -22,17 +22,25 @@ The first command opens a device-code prompt. Tokens cache under your config dir
 
 ## Google Calendar
 
-Use `--provider google`. Create an OAuth **desktop app** client in the Google Cloud console, enable the Google Calendar API, and export:
+Use `--provider google`, then sign in:
 
 ```sh
 export VAMOOSE_PROVIDER=google
+vamoose login
+```
+
+vamoose ships with a built-in OAuth desktop client, so there is no Google Cloud project to create. `login` opens your browser for consent on a local loopback address, then caches and refreshes tokens.
+
+**Bring your own client.** Prefer your own OAuth client, self-hosting, or running an enterprise Google Workspace that allowlists third-party apps? Create an OAuth **desktop app** client in the Google Cloud console, enable the Google Calendar API, and export it; vamoose then uses your client instead of the built-in one:
+
+```sh
 export VAMOOSE_GOOGLE_CLIENT_ID=<oauth-desktop-client-id>
 export VAMOOSE_GOOGLE_CLIENT_SECRET=<oauth-desktop-client-secret>
 ```
 
-The first command opens your browser for consent on a local loopback address, then caches and refreshes tokens.
+For your own unverified client, add the signing-in account under Google Auth Platform, Audience, Test users, or consent is denied.
 
-Google Calendar has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`. Add the signing-in account under Google Auth Platform, Audience, Test users, or consent is denied.
+Google Calendar has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`.
 
 ## Apple iCloud (CalDAV)
 
@@ -70,4 +78,4 @@ Unlike iCloud, a standard CalDAV host reports the manager's accept or decline ov
 
 ## Tokens
 
-Tokens are cached per provider under your user config directory and refreshed on use. Run `vamoose whoami` to confirm auth and directory access before creating holds.
+Tokens are cached per provider under your user config directory and refreshed on use. Run `vamoose login` to sign in and cache a token, then `vamoose whoami` to confirm auth and directory access before creating holds.

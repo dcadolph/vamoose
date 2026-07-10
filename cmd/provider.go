@@ -96,13 +96,9 @@ func newGoogleProvider(s calendar.Settings) (calendar.Provider, error) {
 		source := func(context.Context) (string, error) { return tok, nil }
 		return google.NewProvider(google.TokenSource(source), google.WithTimeZone(s.TimeZone)), nil
 	}
-	clientID := os.Getenv("VAMOOSE_GOOGLE_CLIENT_ID")
-	if clientID == "" {
-		return nil, fmt.Errorf("VAMOOSE_GOOGLE_CLIENT_ID not set: create an OAuth desktop client and export its id")
-	}
-	clientSecret := os.Getenv("VAMOOSE_GOOGLE_CLIENT_SECRET")
-	if clientSecret == "" {
-		return nil, fmt.Errorf("VAMOOSE_GOOGLE_CLIENT_SECRET not set: export the OAuth desktop client secret")
+	clientID, clientSecret, ok := googleClientCreds()
+	if !ok {
+		return nil, fmt.Errorf("no Google client configured: run 'vamoose login', or set VAMOOSE_GOOGLE_CLIENT_ID and VAMOOSE_GOOGLE_CLIENT_SECRET")
 	}
 	store, err := auth.NewStore(providerGoogle)
 	if err != nil {

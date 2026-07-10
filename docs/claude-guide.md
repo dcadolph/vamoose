@@ -10,10 +10,10 @@ Drive vamoose from Claude two ways: the MCP server for direct tool calls, and th
 
 ### Setup
 
-Authenticate once so the server reuses your cached token:
+Sign in once so the server reuses your cached token. This is interactive (it may open a browser), which an MCP subprocess cannot do, so run it yourself first:
 
 ```sh
-vamoose whoami
+vamoose login
 ```
 
 Then point an MCP client at the binary. For Claude Desktop, add this to its config
