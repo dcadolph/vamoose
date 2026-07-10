@@ -40,4 +40,23 @@ func TestProviderTokenInjection(t *testing.T) {
 			t.Fatalf("newGraphProvider = (%v, %v), want provider, nil", p, err)
 		}
 	})
+
+	// Test 3: A CalDAV URL with credentials builds a provider.
+	t.Run("caldav configured", func(t *testing.T) {
+		t.Setenv("VAMOOSE_CALDAV_URL", "https://caldav.fastmail.com")
+		t.Setenv("VAMOOSE_CALDAV_USERNAME", "me@fastmail.com")
+		t.Setenv("VAMOOSE_CALDAV_PASSWORD", "app-pass")
+		p, err := newCalDAVProvider(settings)
+		if err != nil || p == nil {
+			t.Fatalf("newCalDAVProvider = (%v, %v), want provider, nil", p, err)
+		}
+	})
+
+	// Test 4: Without a URL, CalDAV reports the config error.
+	t.Run("caldav unconfigured", func(t *testing.T) {
+		t.Setenv("VAMOOSE_CALDAV_URL", "")
+		if _, err := newCalDAVProvider(settings); err == nil {
+			t.Error("want error when the CalDAV URL is unset, got nil")
+		}
+	})
 }

@@ -24,6 +24,8 @@ const (
 	providerGoogle = "google"
 	// providerICloud is the Apple iCloud CalDAV provider name.
 	providerICloud = "icloud"
+	// providerCalDAV is the generic CalDAV provider name for any standard host.
+	providerCalDAV = "caldav"
 )
 
 // newRegistry returns a provider registry with the built-in providers registered.
@@ -32,6 +34,7 @@ func newRegistry() *calendar.Registry {
 	r.Register(defaultProvider, newGraphProvider)
 	r.Register(providerGoogle, newGoogleProvider)
 	r.Register(providerICloud, newICloudProvider)
+	r.Register(providerCalDAV, newCalDAVProvider)
 	return r
 }
 
@@ -136,6 +139,30 @@ func newICloudProvider(s calendar.Settings) (calendar.Provider, error) {
 		opts = append(opts, caldav.WithStatus(eventkit.Status))
 	}
 	return caldav.NewProvider("https://caldav.icloud.com", user, pass, opts...)
+}
+
+// newCalDAVProvider builds a generic CalDAV provider for any standard host, such as
+// Fastmail or Nextcloud, from environment settings. Unlike iCloud, a standard host
+// reports attendee accept and decline over CalDAV, so approval detection and the
+// daemon work without a local helper.
+func newCalDAVProvider(s calendar.Settings) (calendar.Provider, error) {
+	endpoint := os.Getenv("VAMOOSE_CALDAV_URL")
+	if endpoint == "" {
+		return nil, fmt.Errorf("VAMOOSE_CALDAV_URL not set: your CalDAV server URL, such as https://caldav.fastmail.com")
+	}
+	user := os.Getenv("VAMOOSE_CALDAV_USERNAME")
+	if user == "" {
+		return nil, fmt.Errorf("VAMOOSE_CALDAV_USERNAME not set: your CalDAV account username")
+	}
+	pass := os.Getenv("VAMOOSE_CALDAV_PASSWORD")
+	if pass == "" {
+		return nil, fmt.Errorf("VAMOOSE_CALDAV_PASSWORD not set: your CalDAV account password or app-specific password")
+	}
+	opts := []caldav.Option{caldav.WithTimeZone(s.TimeZone)}
+	if name := os.Getenv("VAMOOSE_CALDAV_CALENDAR"); name != "" {
+		opts = append(opts, caldav.WithCalendarName(name))
+	}
+	return caldav.NewProvider(endpoint, user, pass, opts...)
 }
 
 // resolveTimeZone returns the configured IANA zone, defaulting to UTC.
