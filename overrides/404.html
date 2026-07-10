@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="vamoose-404">
+  <img src="{{ 'assets/vamoose-mark.png' | url }}" alt="">
+  <h1>This trail went cold.</h1>
+  <p>The moose could not find that page.</p>
+  <p><a class="md-button md-button--primary" href="{{ 'index.html' | url }}">Back to the home range</a></p>
+</div>
+{% endblock %}

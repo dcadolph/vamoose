@@ -1,26 +1,77 @@
-<p align="center"><img src="assets/vamoose-banner.png" alt="vamoose" width="100%"></p>
+<div class="vamoose-hero" markdown>
 
-<p align="center">Calendar workflows, minus the tedium.</p>
+![vamoose](assets/vamoose-mark.png){ .hero-logo }
 
-The moose does the paperwork. You go to the beach. vamoose puts four calendar backends behind one workflow engine, driven from your terminal, Claude, or Slack.
+# vamoose
+
+<p class="tagline">Calendar workflows, minus the tedium.</p>
+
+<p class="subtitle">The moose does the paperwork. You go to the beach. Four calendar backends behind one workflow engine, driven from your terminal, Claude, or Slack.</p>
+
+[Get started](quickstart.md){ .md-button .md-button--primary }
+[View on GitHub](https://github.com/dcadolph/vamoose){ .md-button }
+
+</div>
+
+<div class="vamoose-terminal">
+<div class="vamoose-terminal-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="title">vamoose</span></div>
+<div class="vamoose-terminal-body"><span class="prompt">$</span> <span class="cmd">vamoose off next week --subject "Out: beach week"</span>
+<span class="out">Hold created and sent to boss@work.com for approval. Hold id: AAMk…</span>
+<span class="prompt">$</span> <span class="cmd">vamoose check</span>
+<span class="out">Approved by boss@work.com.</span>
+<span class="prompt">$</span> <span class="cmd">vamoose promote</span>
+<span class="out">Added 4 team members as optional from the directory. Everyone notified.</span></div>
+</div>
+
+<div class="vamoose-install" markdown>
 
 ```sh
 brew install dcadolph/tap/vamoose
 ```
 
-<p align="center"><img src="assets/vamoose-demo.gif" alt="vamoose demo" width="100%"></p>
+</div>
 
-## Guides
+## How it works
 
-| Guide                            | What                                                              &nbsp; |
-| -------------------------------- | ----------------------------------------------------------------------- |
-| [Quickstart](quickstart.md)      | Zero to your first approved time-off hold in a few minutes.             |
-| [Concepts](concepts.md)          | Holds, approval, workflows, and the three adapters.                     |
-| [Commands](commands.md)          | Every command, flag, and environment variable.                          |
-| [Workflows](workflows.md)        | Built-in workflows and authoring your own: branching, delays, guards.   |
-| [Providers](providers.md)        | Microsoft Graph, Google, iCloud, and CalDAV setup.                      |
-| [Slack](slack.md)                | Drive vamoose from Slack, with approval buttons.                        |
-| [Claude](claude-guide.md)        | The MCP server and the skill.                                           |
-| [Architecture](architecture.md)  | Surfaces, core, and adapters.                                           |
+<div class="vamoose-steps">
+<div class="step"><span class="num">1</span><strong>Request</strong>Block the dates shown free, so no calendar is touched, and invite your manager.</div>
+<div class="step"><span class="num">2</span><strong>Approve</strong>Your manager accepts the invite. That acceptance is the approval, no extra tool.</div>
+<div class="step"><span class="num">3</span><strong>Notify</strong>The team is added as optional attendees, so everyone sees you are out.</div>
+</div>
 
-New here? Start with the [Quickstart](quickstart.md), then [Concepts](concepts.md).
+## Why vamoose
+
+<div class="grid cards" markdown>
+
+-   :material-calendar-sync:{ .lg .middle } __Four backends, one engine__
+
+    ---
+
+    Microsoft Graph, Google, Apple iCloud, and any CalDAV host. Switch providers, change nothing.
+
+-   :material-source-branch:{ .lg .middle } __Real workflows__
+
+    ---
+
+    Approval chains, timeouts, day-of-week and attendee guards, delays, and branching, written as JSON you can read and share.
+
+-   :material-forum:{ .lg .middle } __Where you already work__
+
+    ---
+
+    Drive it from the CLI, Claude over MCP, or Slack with Approve and Decline buttons.
+
+-   :material-bullhorn:{ .lg .middle } __Tell the team__
+
+    ---
+
+    Fan out to the team as optional attendees, and announce the outcome to a Slack channel or email.
+
+</div>
+
+## Start here
+
+- [Quickstart](quickstart.md) — zero to your first approved hold in a few minutes.
+- [Concepts](concepts.md) — how holds, approval, and workflows fit together.
+- [Commands](commands.md) — every command, flag, and environment variable.
+- [Workflows](workflows.md) — design your own, with branching, delays, and guards.

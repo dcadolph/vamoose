@@ -1,0 +1,235 @@
+/* vamoose brand: cream moose on charcoal, warm amber accent. */
+
+:root {
+  --vamoose-amber: #d9a441;
+  --vamoose-amber-bright: #e8b85c;
+  --md-accent-fg-color: var(--vamoose-amber);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #191919;
+  --md-primary-fg-color: #191919;
+  --md-accent-fg-color: var(--vamoose-amber-bright);
+  --md-typeset-a-color: var(--vamoose-amber-bright);
+  --md-code-bg-color: #111111;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1c1c1c;
+  --md-typeset-a-color: #b9822a;
+}
+
+/* Header stays dark charcoal in both schemes. */
+.md-header,
+.md-tabs {
+  background-color: #191919;
+  color: #f2ede2;
+}
+
+/* Hero on the landing page. */
+.vamoose-hero {
+  text-align: center;
+  padding: 3rem 1rem 1.5rem;
+}
+
+.vamoose-hero img.hero-logo {
+  width: 132px;
+  height: auto;
+  margin-bottom: 0.4rem;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35));
+}
+
+.vamoose-hero h1 {
+  font-size: 3.1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0.2rem 0 0.1rem;
+}
+
+.vamoose-hero .tagline {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--vamoose-amber-bright);
+  margin: 0.2rem 0;
+}
+
+.vamoose-hero .subtitle {
+  font-size: 1.05rem;
+  opacity: 0.82;
+  max-width: 40rem;
+  margin: 0.4rem auto 1.2rem;
+}
+
+.vamoose-hero .md-button {
+  margin: 0.3rem 0.35rem 0;
+}
+
+/* Install snippet under the hero, centered and roomy. */
+.vamoose-install {
+  max-width: 34rem;
+  margin: 0 auto 2rem;
+}
+
+/* Feature cards lift on hover. */
+.md-typeset .grid.cards > ul > li,
+.md-typeset .grid > .card {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.7rem;
+  padding: 1.1rem 1.2rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  transform: translateY(-3px);
+}
+
+.md-typeset .grid.cards .twemoji,
+.md-typeset .grid.cards svg {
+  color: var(--vamoose-amber);
+  height: 1.6rem;
+}
+
+/* Primary button in brand amber. */
+.md-typeset .md-button--primary {
+  background-color: var(--vamoose-amber);
+  border-color: var(--vamoose-amber);
+  color: #1a1a1a;
+}
+
+.md-typeset .md-button--primary:hover {
+  background-color: var(--vamoose-amber-bright);
+  border-color: var(--vamoose-amber-bright);
+  color: #1a1a1a;
+}
+
+/* Rounder code blocks. */
+.md-typeset pre > code {
+  border-radius: 0.5rem;
+}
+
+/* Banner images breathe. */
+.md-typeset p > img[src*="banner"],
+.md-typeset p > img[src*="moosercycle"],
+.md-typeset p > img[src*="mapmoose"] {
+  border-radius: 0.6rem;
+}
+
+/* Warm glow behind the hero. */
+.vamoose-hero {
+  position: relative;
+}
+
+.vamoose-hero::before {
+  content: "";
+  position: absolute;
+  inset: -25% 0 auto 0;
+  height: 340px;
+  background: radial-gradient(55% 100% at 50% 0%, rgba(217, 164, 65, 0.16), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Fake terminal window that shows vamoose running. */
+.vamoose-terminal {
+  max-width: 44rem;
+  margin: 0 auto 2.6rem;
+  border-radius: 0.65rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 46px rgba(0, 0, 0, 0.4);
+}
+
+.vamoose-terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.85rem;
+  background: #2b2b2b;
+}
+
+.vamoose-terminal-bar .dot {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+}
+
+.vamoose-terminal-bar .red { background: #ff5f57; }
+.vamoose-terminal-bar .yellow { background: #febc2e; }
+.vamoose-terminal-bar .green { background: #28c840; }
+
+.vamoose-terminal-bar .title {
+  margin-left: 0.6rem;
+  font-family: var(--md-code-font, monospace);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  opacity: 0.55;
+}
+
+.vamoose-terminal-body {
+  margin: 0;
+  padding: 1.05rem 1.2rem;
+  background: #101010;
+  color: #e6e6e6;
+  font-family: var(--md-code-font, monospace);
+  font-size: 0.86rem;
+  line-height: 1.6;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.vamoose-terminal-body .prompt { color: var(--vamoose-amber); }
+.vamoose-terminal-body .cmd { color: #ffffff; }
+.vamoose-terminal-body .out { color: #9aa0a6; }
+
+/* How it works: a 1-2-3 strip. */
+.vamoose-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.1rem;
+  max-width: 54rem;
+  margin: 0 auto 2.6rem;
+}
+
+.vamoose-steps .step {
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.7rem;
+}
+
+.vamoose-steps .num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  margin-bottom: 0.5rem;
+  border-radius: 50%;
+  background: var(--vamoose-amber);
+  color: #1a1a1a;
+  font-weight: 800;
+}
+
+.vamoose-steps .step strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+@media (max-width: 700px) {
+  .vamoose-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Moose-themed 404. */
+.vamoose-404 {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.vamoose-404 img {
+  width: 96px;
+  opacity: 0.85;
+  margin-bottom: 1rem;
+}
