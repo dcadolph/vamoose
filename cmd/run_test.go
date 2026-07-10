@@ -307,6 +307,60 @@ func TestRunStepsMessageNoNotifier(t *testing.T) {
 	}
 }
 
+// TestRunWorkflowMultiApproverFirstGate confirms a chain invites only the first
+// approver, stops at the first gate, and records that approver for the daemon.
+func TestRunWorkflowMultiApproverFirstGate(t *testing.T) {
+	isolateConfig(t)
+	start, end := testWindow()
+	prov := &mockProvider{mgr: calendar.Person{Email: "boss@x.com"}}
+	wf := workflow.Workflow{Name: "two-level", Steps: []workflow.Step{
+		{ID: "hold", Verb: workflow.VerbHold},
+		{ID: "a1", Verb: workflow.VerbApprove, Manager: true},
+		{ID: "a2", Verb: workflow.VerbApprove, Approver: "dir@x.com"},
+		{ID: "notify", Verb: workflow.VerbNotify, Team: calendar.RoleOptional, Next: "end"},
+	}}
+	if err := runWorkflowOn(context.Background(), prov, "graph", wf, runOptions{
+		Subject: "Off", Start: start, End: end, AllDay: true, Watch: true,
+	}); err != nil {
+		t.Fatalf("runWorkflowOn: %v", err)
+	}
+	// Only the manager is invited; the director comes later, once the manager accepts.
+	if len(prov.created.Attendees) != 1 || prov.created.Attendees[0].Person.Email != "boss@x.com" {
+		t.Fatalf("attendees = %+v, want only boss@x.com", prov.created.Attendees)
+	}
+	if prov.updated != nil {
+		t.Error("notify ran before the chain completed")
+	}
+	watches, _ := loadWatches()
+	if len(watches) != 1 {
+		t.Fatalf("watches = %d, want 1", len(watches))
+	}
+	if w := watches[0]; w.Step != 1 || w.Approver != "boss@x.com" {
+		t.Errorf("watch = step %d approver %q, want step 1 boss@x.com", w.Step, w.Approver)
+	}
+}
+
+// TestRunWorkflowExplicitFirstApprover confirms an explicit approver on the first
+// approve is invited instead of the directory manager.
+func TestRunWorkflowExplicitFirstApprover(t *testing.T) {
+	isolateConfig(t)
+	start, end := testWindow()
+	prov := &mockProvider{mgr: calendar.Person{Email: "boss@x.com"}}
+	wf := workflow.Workflow{Name: "explicit", Steps: []workflow.Step{
+		{Verb: workflow.VerbHold},
+		{Verb: workflow.VerbApprove, Approver: "lead@x.com"},
+		{Verb: workflow.VerbNotify, Team: calendar.RoleOptional},
+	}}
+	if err := runWorkflowOn(context.Background(), prov, "graph", wf, runOptions{
+		Subject: "Off", Start: start, End: end, AllDay: true,
+	}); err != nil {
+		t.Fatalf("runWorkflowOn: %v", err)
+	}
+	if len(prov.created.Attendees) != 1 || prov.created.Attendees[0].Person.Email != "lead@x.com" {
+		t.Errorf("attendees = %+v, want lead@x.com (explicit approver)", prov.created.Attendees)
+	}
+}
+
 // TestWhenSummary confirms the dry-run guard summary renders each condition and stays
 // empty for an unset guard.
 func TestWhenSummary(t *testing.T) {

@@ -145,11 +145,11 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	switch create.Verb {
 	case workflow.VerbHold:
 		if wf.Has(workflow.VerbApprove) {
-			mgr, merr := resolveManager(ctx, prov, opt.Manager)
+			approver, merr := resolveApprover(ctx, prov, firstApproveStep(wf), opt.Manager)
 			if merr != nil {
 				return merr
 			}
-			hold.Attendees = []calendar.Attendee{{Person: mgr, Role: calendar.RoleRequired}}
+			hold.Attendees = []calendar.Attendee{{Person: approver, Role: calendar.RoleRequired}}
 		}
 	case workflow.VerbEvent:
 		if opt.Subject == "" {
@@ -260,8 +260,29 @@ func sendMessage(ctx context.Context, notifier comms.Notifier, step workflow.Ste
 	return nil
 }
 
+// firstApproveStep returns the workflow's first approve step, or a zero step when it
+// has none. It picks the approver invited when the hold is created.
+func firstApproveStep(wf workflow.Workflow) workflow.Step {
+	for _, s := range wf.Steps {
+		if s.Verb == workflow.VerbApprove {
+			return s
+		}
+	}
+	return workflow.Step{}
+}
+
+// resolveApprover returns the person an approve step waits on: the step's explicit
+// approver email, or the directory manager (or --manager) when the step names none.
+func resolveApprover(ctx context.Context, prov calendar.Provider, step workflow.Step, managerFlag string) (calendar.Person, error) {
+	if step.Approver != "" {
+		return calendar.Person{Email: step.Approver}, nil
+	}
+	return resolveManager(ctx, prov, managerFlag)
+}
+
 // gateOnApproval stops the workflow at its approval step. When watching, it records
-// the run at that step so the daemon advances it once the manager accepts.
+// the run at that step, with the approver it waits on, so the daemon advances it once
+// that approver accepts.
 func gateOnApproval(providerName string, wf workflow.Workflow, stepIdx int, hold calendar.Hold, watch bool) error {
 	if !watch {
 		fmt.Fprintln(os.Stdout, "Waiting on approval. Run 'vamoose check' to poll, or add --watch and run 'vamoose daemon' to advance on approval.")
@@ -272,6 +293,7 @@ func gateOnApproval(providerName string, wf workflow.Workflow, stepIdx int, hold
 		HoldID:    hold.ID,
 		Workflow:  wf.Name,
 		Step:      stepIdx,
+		Approver:  managerAttendee(hold).Person.Email,
 		Subject:   hold.Subject,
 		CreatedAt: time.Now(),
 	}); err != nil {

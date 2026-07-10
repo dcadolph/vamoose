@@ -18,6 +18,9 @@ type watchItem struct {
 	Workflow string `json:"workflow"`
 	// Step is the index of the pending step, the approval gate the daemon waits on.
 	Step int `json:"step"`
+	// Approver is the email the current gate waits on, so the daemon checks the right
+	// person in a multi-approver chain. Empty falls back to the first required attendee.
+	Approver string `json:"approver,omitempty"`
 	// Subject is the hold title, kept for readable logs.
 	Subject string `json:"subject,omitempty"`
 	// CreatedAt is when the watch was enqueued, used to time an approve step's
