@@ -49,6 +49,9 @@ const (
 	// VerbMessage posts a message to a comms channel, such as a Slack channel, to
 	// announce the workflow's outcome.
 	VerbMessage Verb = "message"
+	// VerbWait pauses the workflow for a duration, which the daemon advances past once
+	// the time elapses.
+	VerbWait Verb = "wait"
 )
 
 // Creates reports whether the verb creates the hold a workflow acts on. Exactly one
@@ -62,16 +65,16 @@ func (v Verb) Creates() bool {
 	}
 }
 
-// Waits reports whether the verb blocks on an external condition the daemon polls
-// rather than completing as soon as it runs.
+// Waits reports whether the verb blocks on a condition the daemon polls rather than
+// completing as soon as it runs: an approval, or a delay.
 func (v Verb) Waits() bool {
-	return v == VerbApprove
+	return v == VerbApprove || v == VerbWait
 }
 
 // known reports whether the verb is recognized.
 func (v Verb) known() bool {
 	switch v {
-	case VerbHold, VerbApprove, VerbNotify, VerbNote, VerbAway, VerbEvent, VerbCancel, VerbMessage:
+	case VerbHold, VerbApprove, VerbNotify, VerbNote, VerbAway, VerbEvent, VerbCancel, VerbMessage, VerbWait:
 		return true
 	default:
 		return false
@@ -114,6 +117,9 @@ type Step struct {
 	// Channel is the destination for a message step, such as a Slack channel id or
 	// name. Required on a message step, unused otherwise.
 	Channel string `json:"channel,omitempty"`
+	// For, on a wait step, is how long to pause as a Go duration such as "48h". The
+	// daemon advances past the step once it elapses. Required on a wait step.
+	For string `json:"for,omitempty"`
 }
 
 // ParsedTimeout returns the approve step's timeout as a duration, or zero when it is
@@ -124,6 +130,20 @@ func (s Step) ParsedTimeout() time.Duration {
 		return 0
 	}
 	d, err := time.ParseDuration(s.Timeout)
+	if err != nil {
+		return 0
+	}
+	return d
+}
+
+// ParsedFor returns a wait step's delay as a duration, or zero when it is unset or
+// unparseable. Validate rejects an unparseable or non-positive delay, so a nonzero
+// return means the daemon waits that long before advancing past the step.
+func (s Step) ParsedFor() time.Duration {
+	if s.For == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(s.For)
 	if err != nil {
 		return 0
 	}
@@ -288,6 +308,14 @@ func (w Workflow) Validate() error {
 		}
 		if s.Approver != "" && s.Verb != VerbApprove {
 			return fmt.Errorf("%w: step %d: only an approve step may set an approver", ErrInvalid, i)
+		}
+		if s.Verb == VerbWait {
+			if d, derr := time.ParseDuration(s.For); derr != nil || d <= 0 {
+				return fmt.Errorf("%w: step %d: a wait step needs a positive for duration such as \"48h\"", ErrInvalid, i)
+			}
+		}
+		if s.For != "" && s.Verb != VerbWait {
+			return fmt.Errorf("%w: step %d: only a wait step may set for", ErrInvalid, i)
 		}
 		if s.ID != "" {
 			if ids[s.ID] {

@@ -421,6 +421,36 @@ func TestValidateMultiApprove(t *testing.T) {
 	}
 }
 
+// TestValidateWait covers the wait-step duration rules.
+func TestValidateWait(t *testing.T) {
+	t.Parallel()
+	hold := Step{Verb: VerbHold}
+	notify := Step{Verb: VerbNotify, Team: calendar.RoleOptional}
+	tests := []struct {
+		Step    Step
+		WantErr bool
+	}{{ // Test 0: A wait with a positive duration is valid.
+		Step: Step{Verb: VerbWait, For: "48h"},
+	}, { // Test 1: A wait without a duration is invalid.
+		Step: Step{Verb: VerbWait}, WantErr: true,
+	}, { // Test 2: A wait with an unparseable duration is invalid.
+		Step: Step{Verb: VerbWait, For: "soon"}, WantErr: true,
+	}, { // Test 3: A wait of zero is invalid.
+		Step: Step{Verb: VerbWait, For: "0s"}, WantErr: true,
+	}, { // Test 4: A for on a non-wait step is invalid.
+		Step: Step{Verb: VerbNotify, Team: calendar.RoleOptional, For: "1h"}, WantErr: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			wf := Workflow{Name: "w", Steps: []Step{hold, test.Step, notify}}
+			if err := wf.Validate(); (err != nil) != test.WantErr {
+				t.Errorf("Validate err = %v, wantErr %v", err, test.WantErr)
+			}
+		})
+	}
+}
+
 // TestValidateMessage covers the message-step channel rules.
 func TestValidateMessage(t *testing.T) {
 	t.Parallel()
