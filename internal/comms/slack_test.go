@@ -31,6 +31,9 @@ func TestSlackNotify(t *testing.T) {
 		WantErr:     true, WantSubstr: "channel_not_found",
 	}, { // Test 2: An empty channel fails before any request.
 		Name: "empty channel", Channel: "", Text: "hi", WantErr: true, WantSubstr: "empty channel",
+	}, { // Test 3: A false ok with no error string still reports an error.
+		Name: "no error field", Channel: "#team", Text: "hi",
+		APIResponse: `{"ok":false}`, WantErr: true, WantSubstr: "unknown error",
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

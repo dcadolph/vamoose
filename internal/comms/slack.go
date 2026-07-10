@@ -73,7 +73,11 @@ func (s *SlackNotifier) Notify(ctx context.Context, channel, text string) error 
 		return fmt.Errorf("slack notify: decode response: %w", err)
 	}
 	if !out.OK {
-		return fmt.Errorf("slack notify: %s", out.Error)
+		msg := out.Error
+		if msg == "" {
+			msg = "unknown error"
+		}
+		return fmt.Errorf("slack notify: %s", msg)
 	}
 	return nil
 }
