@@ -2,7 +2,7 @@
 
 # Providers
 
-vamoose talks to a calendar backend through one `Provider` interface. Three ship today: Microsoft Graph, Google Calendar, and Apple iCloud. Select one with `--provider` or `VAMOOSE_PROVIDER` (default `graph`). They run the same commands.
+vamoose talks to a calendar backend through one `Provider` interface. Four ship today: Microsoft Graph, Google Calendar, Apple iCloud, and any standard CalDAV host. Select one with `--provider` or `VAMOOSE_PROVIDER` (default `graph`). They run the same commands.
 
 ## Microsoft Graph (Outlook, Microsoft 365, Teams)
 
@@ -52,6 +52,21 @@ Set a target calendar with `VAMOOSE_ICLOUD_CALENDAR="Home"`. The default is the 
 - **Slack.** Approve or decline with a button in Slack, which works regardless of backend. See [Slack](slack.md).
 
 Without either, promote by hand once you know the manager accepted.
+
+## Any CalDAV host (Fastmail, Nextcloud, and more)
+
+Use `--provider caldav` for any standard CalDAV server. Point it at the server URL and pass your account credentials, using an app-specific password where the host offers one:
+
+```sh
+export VAMOOSE_PROVIDER=caldav
+export VAMOOSE_CALDAV_URL=https://caldav.fastmail.com
+export VAMOOSE_CALDAV_USERNAME=you@fastmail.com
+export VAMOOSE_CALDAV_PASSWORD=xxxx-xxxx-xxxx-xxxx
+```
+
+Set a target calendar with `VAMOOSE_CALDAV_CALENDAR="Work"`; the default is the first calendar that accepts events. Like Google and iCloud, a CalDAV host has no directory, so pass your approver with `--manager` and set your team with `vamoose team set`.
+
+Unlike iCloud, a standard CalDAV host reports the manager's accept or decline over CalDAV, so `check` and the daemon detect approval with no extra setup.
 
 ## Tokens
 

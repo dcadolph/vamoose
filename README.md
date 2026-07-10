@@ -8,9 +8,9 @@
 
 The moose does the paperwork. You go to the beach.
 
-> **v0.7.0.** Three backends (Microsoft Graph, Google Calendar, Apple iCloud) behind a
-> conditional workflow engine with branching, timeouts, and day-of-week and attendee
-> guards, driven from the CLI, Claude, or Slack, with tokens in the OS keychain.
+> **v0.8.0.** Four backends (Microsoft Graph, Google Calendar, Apple iCloud, and any
+> CalDAV host) behind a conditional workflow engine with branching, timeouts, guards, and
+> channel messages, driven from the CLI, Claude, or Slack, with tokens in the OS keychain.
 > Install: `brew install dcadolph/tap/vamoose`.
 
 Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
@@ -33,12 +33,12 @@ These three steps are the built-in **pto** workflow, and `request`, `check`, and
 `promote` are fronts over its steps. vamoose runs other workflows too, and you can
 define your own. See [Workflows](#workflows).
 
-Three backends ship behind one provider interface: Microsoft Graph (Outlook,
-Microsoft 365, and Teams), Google Calendar, and Apple iCloud (via CalDAV). Pick one
-with `--provider` or the `VAMOOSE_PROVIDER` environment variable, and every command
-works the same across them. Approval detection is the one exception: iCloud sends
-invites but does not report accept/decline over CalDAV, so on iCloud you promote by
-hand. See [providers](docs/providers.md).
+Four backends ship behind one provider interface: Microsoft Graph (Outlook,
+Microsoft 365, and Teams), Google Calendar, Apple iCloud, and any standard CalDAV host.
+Pick one with `--provider` or the `VAMOOSE_PROVIDER` environment variable, and every
+command works the same across them. Approval detection is the one exception: iCloud
+sends invites but does not report accept/decline over CalDAV, so on iCloud you promote
+by hand. See [providers](docs/providers.md).
 
 ## Why not just calendar rules?
 
@@ -224,7 +224,7 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 - [Command reference](cmd/README.md): every command and its flags.
 - [Workflows](docs/workflows.md): built-in and custom workflows.
-- [Providers](docs/providers.md): Microsoft Graph, Google Calendar, and iCloud setup.
+- [Providers](docs/providers.md): Microsoft Graph, Google Calendar, iCloud, and CalDAV setup.
 - [Claude](docs/claude-guide.md): the MCP server and the skill.
 - [Slack](docs/slack.md): drive vamoose from Slack with approval buttons.
 - [Architecture](docs/architecture.md): surfaces, core, and adapters.
@@ -239,11 +239,11 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Status
 
-v0.7.0. Three backends (Graph, Google, iCloud), a conditional workflow engine with
-branching, timeouts, and step guards, CLI/Claude/Slack surfaces, and OS-keychain
-tokens. Google and iCloud are live-vetted end to end, including iCloud approval through
-EventKit. The Slack app and Microsoft Graph are covered by tests, with live validation
-the remaining step.
+v0.8.0. Four backends (Graph, Google, iCloud, CalDAV), a conditional workflow engine with
+branching, timeouts, step guards, and channel messages, CLI/Claude/Slack surfaces, and
+OS-keychain tokens. Google and iCloud are live-vetted end to end, including iCloud approval
+through EventKit. The Slack app, Microsoft Graph, and generic CalDAV are covered by tests,
+with live validation the remaining step.
 
 ## License
 
