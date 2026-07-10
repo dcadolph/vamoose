@@ -8,12 +8,10 @@
 
 The moose does the paperwork. You go to the beach.
 
-> **Status: v0.4.0, early.**
-> Three backends (Microsoft Graph, Google Calendar, Apple iCloud) behind a conditional
-> workflow engine, driven from the CLI, Claude, or Slack, with tokens in the OS keychain.
-> Live-vetted: Google end to end, and iCloud's core (sign-in, discovery, event create and
-> delete). Unit-tested but not yet fully live-vetted: conditional branching, the Slack app
-> and its install flow, iCloud approval via EventKit, and Graph against a real tenant.
+> **v0.7.0.** Three backends (Microsoft Graph, Google Calendar, Apple iCloud) behind a
+> conditional workflow engine with branching, timeouts, and day-of-week and attendee
+> guards, driven from the CLI, Claude, or Slack, with tokens in the OS keychain.
+> Install: `brew install dcadolph/tap/vamoose`.
 
 Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
 wait for a nod, then re-send the event to the team so nobody schedules over you.
@@ -233,20 +231,19 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Roadmap
 
-- Conditional and branching workflows: if-this-then-that and multi-step chains
-  beyond the built-in time-off flow.
+- A hosted, always-on server so per-user Slack and background advance run without a laptop.
+- Multi-level approval: a chain of approvers, not just a single manager.
+- Notify the team by Slack or email, not only as calendar attendees.
 - Auto-promote via Graph change-notification webhooks instead of polling.
-- Store tokens in the OS keychain rather than a config file.
 - Set the scheduled out-of-office auto-reply for the time-off window.
-- Harden the CLI and auth with cobra and MSAL.
 
 ## Status
 
-v0.4.0, early. Three backends (Graph, Google, iCloud), a conditional workflow engine,
-CLI/Claude/Slack surfaces, and OS-keychain tokens. Google runs live end to end and
-iCloud's core is live-vetted. Conditional branching, the Slack app and its install
-flow, iCloud approval via EventKit, and Graph against a real tenant are unit-tested
-but not yet live-vetted.
+v0.7.0. Three backends (Graph, Google, iCloud), a conditional workflow engine with
+branching, timeouts, and step guards, CLI/Claude/Slack surfaces, and OS-keychain
+tokens. Google and iCloud are live-vetted end to end, including iCloud approval through
+EventKit. The Slack app and Microsoft Graph are covered by tests, with live validation
+the remaining step.
 
 ## License
 
