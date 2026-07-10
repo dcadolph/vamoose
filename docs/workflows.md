@@ -197,6 +197,18 @@ export it:
 export VAMOOSE_SLACK_BOT_TOKEN=xoxb-...
 ```
 
+For email, set your SMTP server. A `channel` that is an email address is sent as an email:
+
+```sh
+export VAMOOSE_SMTP_HOST=smtp.example.com
+export VAMOOSE_SMTP_PORT=587
+export VAMOOSE_SMTP_USERNAME=you@example.com
+export VAMOOSE_SMTP_PASSWORD=...
+export VAMOOSE_SMTP_FROM=vamoose@example.com
+```
+
+When both are set, a message routes by its channel: an address containing `@` goes to email, anything else to Slack. So one workflow can post to a Slack channel and also email a list.
+
 The built-in `pto-announce` approves time off, announces it to a channel, then notifies the team:
 
 ```json
