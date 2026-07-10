@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
+	"github.com/dcadolph/vamoose/internal/comms"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
 
@@ -250,7 +251,7 @@ func TestRunStepsWhenGuard(t *testing.T) {
 	// One attendee: the guard denies, so notify is skipped.
 	small := &mockProvider{team: []calendar.Person{{Email: "peer@x.com"}}}
 	held := calendar.Hold{ID: "h1", Attendees: []calendar.Attendee{boss}}
-	if err := runSteps(context.Background(), small, "graph", wf, wf.Next(0, ""), held, false); err != nil {
+	if err := runSteps(context.Background(), small, nil, "graph", wf, wf.Next(0, ""), held, false); err != nil {
 		t.Fatalf("runSteps small: %v", err)
 	}
 	if small.updated != nil {
@@ -260,11 +261,49 @@ func TestRunStepsWhenGuard(t *testing.T) {
 	// Two attendees: the guard allows, so notify runs.
 	big := &mockProvider{team: []calendar.Person{{Email: "peer@x.com"}}}
 	full := calendar.Hold{ID: "h2", Attendees: []calendar.Attendee{boss, other}}
-	if err := runSteps(context.Background(), big, "graph", wf, wf.Next(0, ""), full, false); err != nil {
+	if err := runSteps(context.Background(), big, nil, "graph", wf, wf.Next(0, ""), full, false); err != nil {
 		t.Fatalf("runSteps big: %v", err)
 	}
 	if big.updated == nil {
 		t.Error("notify was skipped despite the guard allowing")
+	}
+}
+
+// TestRunStepsMessage confirms a message step posts the hold subject to its channel
+// through the notifier.
+func TestRunStepsMessage(t *testing.T) {
+	isolateConfig(t)
+	wf := workflow.Workflow{Name: "msg", Steps: []workflow.Step{
+		{Verb: workflow.VerbHold},
+		{Verb: workflow.VerbMessage, Channel: "#team", Next: "end"},
+	}}
+	var gotChannel, gotText string
+	notifier := comms.NotifierFunc(func(_ context.Context, channel, text string) error {
+		gotChannel, gotText = channel, text
+		return nil
+	})
+	prov := &mockProvider{}
+	held := calendar.Hold{ID: "h1", Subject: "Out: beach week"}
+	if err := runSteps(context.Background(), prov, notifier, "graph", wf, wf.Next(0, ""), held, false); err != nil {
+		t.Fatalf("runSteps: %v", err)
+	}
+	if gotChannel != "#team" || gotText != "Out: beach week" {
+		t.Errorf("message = %q to %q, want the hold subject to #team", gotText, gotChannel)
+	}
+}
+
+// TestRunStepsMessageNoNotifier confirms a message step errors when no comms backend
+// is configured, rather than silently dropping the message.
+func TestRunStepsMessageNoNotifier(t *testing.T) {
+	isolateConfig(t)
+	wf := workflow.Workflow{Name: "msg", Steps: []workflow.Step{
+		{Verb: workflow.VerbHold},
+		{Verb: workflow.VerbMessage, Channel: "#team", Next: "end"},
+	}}
+	prov := &mockProvider{}
+	err := runSteps(context.Background(), prov, nil, "graph", wf, wf.Next(0, ""), calendar.Hold{Subject: "x"}, false)
+	if err == nil {
+		t.Fatal("want an error when no notifier is configured")
 	}
 }
 

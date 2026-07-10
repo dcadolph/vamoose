@@ -148,16 +148,17 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 	if err != nil {
 		return pollFailed, err
 	}
+	notifier := resolveNotifier()
 	switch managerAttendee(hold).Response {
 	case calendar.ResponseAccepted:
-		if err := runSteps(ctx, prov, item.Provider, wf, wf.Next(item.Step, workflow.OutcomeAccepted), hold, false); err != nil {
+		if err := runSteps(ctx, prov, notifier, item.Provider, wf, wf.Next(item.Step, workflow.OutcomeAccepted), hold, false); err != nil {
 			return pollFailed, err
 		}
 		return pollApproved, nil
 	case calendar.ResponseDeclined:
 		if item.Step >= 0 && item.Step < len(wf.Steps) {
 			if target, ok := wf.Steps[item.Step].On[workflow.OutcomeDeclined]; ok && target != "end" {
-				if err := runSteps(ctx, prov, item.Provider, wf, wf.StepIndex(target), hold, false); err != nil {
+				if err := runSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold, false); err != nil {
 					return pollFailed, err
 				}
 			}
@@ -168,7 +169,7 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 			step := wf.Steps[item.Step]
 			if d := step.ParsedTimeout(); d > 0 && !item.CreatedAt.IsZero() && time.Since(item.CreatedAt) > d {
 				if target, ok := step.On[workflow.OutcomeExpired]; ok && target != "end" {
-					if err := runSteps(ctx, prov, item.Provider, wf, wf.StepIndex(target), hold, false); err != nil {
+					if err := runSteps(ctx, prov, notifier, item.Provider, wf, wf.StepIndex(target), hold, false); err != nil {
 						return pollFailed, err
 					}
 				}

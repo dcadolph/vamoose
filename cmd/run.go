@@ -11,8 +11,18 @@ import (
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
+	"github.com/dcadolph/vamoose/internal/comms"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
+
+// resolveNotifier returns the configured comms notifier, or nil when none is set. A
+// Slack bot token in VAMOOSE_SLACK_BOT_TOKEN enables the Slack notifier.
+func resolveNotifier() comms.Notifier {
+	if token := os.Getenv("VAMOOSE_SLACK_BOT_TOKEN"); token != "" {
+		return comms.NewSlackNotifier(token)
+	}
+	return nil
+}
 
 // workflowsDir returns the user workflow directory under the config directory.
 func workflowsDir() (string, error) {
@@ -162,7 +172,7 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	}
 	fmt.Fprintln(os.Stdout, startedMessage(wf, created))
 
-	return runSteps(ctx, prov, providerName, wf, wf.Next(0, ""), created, opt.Watch)
+	return runSteps(ctx, prov, resolveNotifier(), providerName, wf, wf.Next(0, ""), created, opt.Watch)
 }
 
 // runSteps walks the workflow from step `from` against an existing hold, following
@@ -171,7 +181,7 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 // execution, recording the run for the daemon when watching. A step whose when guard
 // denies at execution time is skipped. The run command calls it after creation; the
 // daemon calls it again from the branch once approval lands.
-func runSteps(ctx context.Context, prov calendar.Provider, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
+func runSteps(ctx context.Context, prov calendar.Provider, notifier comms.Notifier, providerName string, wf workflow.Workflow, from int, hold calendar.Hold, watch bool) error {
 	visited := make(map[int]bool)
 	for i := from; i >= 0 && i < len(wf.Steps); i = wf.Next(i, "") {
 		if visited[i] {
@@ -190,6 +200,10 @@ func runSteps(ctx context.Context, prov calendar.Provider, providerName string, 
 			}
 		case workflow.VerbNote:
 			if err := createNote(ctx, prov, wf.Steps[i], hold); err != nil {
+				return err
+			}
+		case workflow.VerbMessage:
+			if err := sendMessage(ctx, notifier, wf.Steps[i], hold); err != nil {
 				return err
 			}
 		case workflow.VerbCancel:
@@ -222,6 +236,27 @@ func createNote(ctx context.Context, prov calendar.Provider, step workflow.Step,
 		return fmt.Errorf("create note: %w", err)
 	}
 	fmt.Fprintf(os.Stdout, "Noted on your calendar: %q (id: %s)\n", subject, created.ID)
+	return nil
+}
+
+// sendMessage posts a message step's text to its channel through the notifier. The
+// text is the step subject, falling back to the hold subject, so the message carries
+// the run's context without the workflow hardcoding it.
+func sendMessage(ctx context.Context, notifier comms.Notifier, step workflow.Step, hold calendar.Hold) error {
+	if notifier == nil {
+		return fmt.Errorf("message step needs a comms backend: set VAMOOSE_SLACK_BOT_TOKEN")
+	}
+	text := step.Subject
+	if text == "" {
+		text = hold.Subject
+	}
+	if text == "" {
+		text = "Calendar update"
+	}
+	if err := notifier.Notify(ctx, step.Channel, text); err != nil {
+		return fmt.Errorf("message: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Messaged %s.\n", step.Channel)
 	return nil
 }
 
@@ -302,8 +337,16 @@ func previewWorkflow(w io.Writer, wf workflow.Workflow, hold calendar.Hold) {
 			fmt.Fprintf(w, "  approve, then %s%s\n", branchSummary(s), whenSummary(s.When))
 			continue
 		}
-		fmt.Fprintf(w, "  %s%s\n", stepLabel(s), whenSummary(s.When))
+		fmt.Fprintf(w, "  %s%s%s\n", stepLabel(s), messageTarget(s), whenSummary(s.When))
 	}
+}
+
+// messageTarget describes a message step's channel for the dry-run preview.
+func messageTarget(s workflow.Step) string {
+	if s.Verb == workflow.VerbMessage && s.Channel != "" {
+		return " -> " + s.Channel
+	}
+	return ""
 }
 
 // whenSummary describes a step's guard for the dry-run preview, returning the empty

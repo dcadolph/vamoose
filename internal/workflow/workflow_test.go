@@ -381,3 +381,28 @@ func daySet(days ...time.Weekday) map[time.Weekday]bool {
 	}
 	return m
 }
+
+// TestValidateMessage covers the message-step channel rules.
+func TestValidateMessage(t *testing.T) {
+	t.Parallel()
+	hold := Step{Verb: VerbHold}
+	tests := []struct {
+		Step    Step
+		WantErr bool
+	}{{ // Test 0: A message with a channel is valid.
+		Step: Step{Verb: VerbMessage, Channel: "#team"},
+	}, { // Test 1: A message without a channel fails.
+		Step: Step{Verb: VerbMessage}, WantErr: true,
+	}, { // Test 2: A channel on a non-message step fails.
+		Step: Step{Verb: VerbNotify, Channel: "#team"}, WantErr: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			wf := Workflow{Name: "t", Steps: []Step{hold, test.Step}}
+			if err := wf.Validate(); (err != nil) != test.WantErr {
+				t.Errorf("Validate err = %v, wantErr %v", err, test.WantErr)
+			}
+		})
+	}
+}

@@ -46,6 +46,9 @@ const (
 	VerbEvent Verb = "event"
 	// VerbCancel deletes the hold and notifies its attendees.
 	VerbCancel Verb = "cancel"
+	// VerbMessage posts a message to a comms channel, such as a Slack channel, to
+	// announce the workflow's outcome.
+	VerbMessage Verb = "message"
 )
 
 // Creates reports whether the verb creates the hold a workflow acts on. Exactly one
@@ -68,7 +71,7 @@ func (v Verb) Waits() bool {
 // known reports whether the verb is recognized.
 func (v Verb) known() bool {
 	switch v {
-	case VerbHold, VerbApprove, VerbNotify, VerbNote, VerbAway, VerbEvent, VerbCancel:
+	case VerbHold, VerbApprove, VerbNotify, VerbNote, VerbAway, VerbEvent, VerbCancel, VerbMessage:
 		return true
 	default:
 		return false
@@ -102,8 +105,12 @@ type Step struct {
 	Manager bool `json:"manager,omitempty"`
 	// Team sets the role used when a notify step adds the team. Empty means optional.
 	Team calendar.Role `json:"team,omitempty"`
-	// Subject overrides the event title for a note or event step.
+	// Subject overrides the event title for a note or event step, or the message text
+	// for a message step. Empty defaults per verb.
 	Subject string `json:"subject,omitempty"`
+	// Channel is the destination for a message step, such as a Slack channel id or
+	// name. Required on a message step, unused otherwise.
+	Channel string `json:"channel,omitempty"`
 }
 
 // ParsedTimeout returns the approve step's timeout as a duration, or zero when it is
@@ -269,6 +276,12 @@ func (w Workflow) Validate() error {
 		}
 		if s.Verb == VerbNotify && s.Team == calendar.RoleRequired {
 			return fmt.Errorf("%w: step %d: notify team must be optional so it never blocks teammates", ErrInvalid, i)
+		}
+		if s.Verb == VerbMessage && s.Channel == "" {
+			return fmt.Errorf("%w: step %d: a message step needs a channel", ErrInvalid, i)
+		}
+		if s.Channel != "" && s.Verb != VerbMessage {
+			return fmt.Errorf("%w: step %d: only a message step may set a channel", ErrInvalid, i)
 		}
 		if s.ID != "" {
 			if ids[s.ID] {
