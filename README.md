@@ -6,6 +6,14 @@
 
 <p align="center">Calendar workflows, minus the tedium.</p>
 
+<p align="center">
+  <a href="https://github.com/dcadolph/vamoose/releases"><img
+    src="https://img.shields.io/github/v/release/dcadolph/vamoose" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/go-mod/go-version/dcadolph/vamoose" alt="Go version">
+  <a href="LICENSE"><img
+    src="https://img.shields.io/badge/license-BUSL%201.1-blue" alt="License"></a>
+</p>
+
 The moose does the paperwork. You go to the beach.
 
 Four calendar backends behind one workflow engine, driven from your terminal, Claude, or Slack. Install with `brew install dcadolph/tap/vamoose`.
@@ -52,7 +60,25 @@ earns its keep the moment you have more than one account:
   dry-run, instead of a settings panel you rebuild by hand on every machine.
 - **Runs where you already are.** The CLI, Claude, and Slack, not one vendor's web UI.
 
+## Install
+
+```sh
+brew install dcadolph/tap/vamoose
+```
+
+Or with Go 1.26 or newer:
+
+```sh
+go install github.com/dcadolph/vamoose@latest
+```
+
+New to vamoose? The [Quickstart](docs/quickstart.md) takes you from zero to a first approved
+hold in a few minutes.
+
 ## Setup
+
+Set one calendar backend and export its credentials, then run `vamoose doctor` to check the
+setup. Every backend, including iCloud and any CalDAV host, is covered in [providers](docs/providers.md).
 
 ### Microsoft 365 / Outlook
 
@@ -91,6 +117,30 @@ export VAMOOSE_GOOGLE_CLIENT_SECRET=<oauth-desktop-client-secret>
 The first command opens your browser for consent on a local loopback address, then
 caches and refreshes tokens after that. Google Calendar has no directory, so pass
 your approver with `--manager` and set your team with `vamoose team set`.
+
+### Apple iCloud
+
+For `--provider icloud`, create an app-specific password at appleid.apple.com and export:
+
+```sh
+export VAMOOSE_PROVIDER=icloud
+export VAMOOSE_ICLOUD_USERNAME=you@icloud.com
+export VAMOOSE_ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+```
+
+iCloud sends invites but does not report approvals over CalDAV. Recover them with the macOS
+EventKit helper or a Slack Approve button, or promote by hand. See [providers](docs/providers.md).
+
+### Any CalDAV host
+
+For `--provider caldav`, point at any standard CalDAV server, such as Fastmail or Nextcloud:
+
+```sh
+export VAMOOSE_PROVIDER=caldav
+export VAMOOSE_CALDAV_URL=https://caldav.fastmail.com
+export VAMOOSE_CALDAV_USERNAME=you@fastmail.com
+export VAMOOSE_CALDAV_PASSWORD=xxxx-xxxx-xxxx-xxxx
+```
 
 ## Usage
 
@@ -219,12 +269,16 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Docs
 
-- [Command reference](cmd/README.md): every command and its flags.
-- [Workflows](docs/workflows.md): built-in and custom workflows.
-- [Providers](docs/providers.md): Microsoft Graph, Google Calendar, iCloud, and CalDAV setup.
-- [Claude](docs/claude-guide.md): the MCP server and the skill.
-- [Slack](docs/slack.md): drive vamoose from Slack with approval buttons.
-- [Architecture](docs/architecture.md): surfaces, core, and adapters.
+| Guide                                    | What                                                   &nbsp; |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| [Quickstart](docs/quickstart.md)         | Zero to a first approved hold in a few minutes.              |
+| [Concepts](docs/concepts.md)             | Holds, approval, workflows, and the three adapters.          |
+| [Commands](docs/commands.md)             | Every command, flag, and environment variable.               |
+| [Workflows](docs/workflows.md)           | Built-in and custom workflows: branching, delays, guards.    |
+| [Providers](docs/providers.md)           | Microsoft Graph, Google, iCloud, and CalDAV setup.           |
+| [Slack](docs/slack.md)                   | Drive vamoose from Slack, with approval buttons.             |
+| [Claude](docs/claude-guide.md)           | The MCP server and the skill.                                |
+| [Architecture](docs/architecture.md)     | Surfaces, core, and adapters.                                |
 
 ## Roadmap
 
