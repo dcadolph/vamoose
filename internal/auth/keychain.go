@@ -5,15 +5,23 @@ import (
 	"errors"
 
 	"github.com/zalando/go-keyring"
+
+	"github.com/dcadolph/vamoose/internal/secret"
 )
 
 // keychainService is the service name tokens are stored under in the OS keychain.
 const keychainService = "vamoose"
 
-// NewStore returns the best available token store for the provider: the OS keychain
-// when it is reachable, otherwise a file under the config directory. It never fails
-// over to leave tokens unstored, so auth keeps working everywhere.
+// NewStore returns the best available token store for the provider: an encrypted file
+// when VAMOOSE_SECRET_KEY is set (for a headless host), otherwise the OS keychain when
+// it is reachable, otherwise a plaintext file under the config directory. It never
+// fails over to leave tokens unstored, so auth keeps working everywhere.
 func NewStore(name string) (TokenStore, error) {
+	if enc, err := NewEncryptedStore(name); err == nil {
+		return enc, nil
+	} else if !errors.Is(err, secret.ErrNoKey) {
+		return nil, err
+	}
 	fs, err := NewFileStore(name)
 	if err != nil {
 		return nil, err
