@@ -96,6 +96,16 @@ Create a quick event, optionally inviting attendees. Shown busy unless `--free`.
 
 Poll watched holds and advance their workflows when the manager responds or a delay passes. `--once` does a single pass and exits. `--prune` drops watched holds whose provider is no longer configured.
 
+### schedule
+
+`vamoose schedule [add <workflow> --every <dur> --phrase <window> | list | remove <index>]`
+
+Rerun a workflow on an interval. `add` schedules it, `list` shows the schedules with their index, and `remove` drops one. The daemon fires due schedules, so run `vamoose daemon`. Add flags: `--subject`, `--manager`, `--provider`.
+
+```sh
+vamoose schedule add pto --every 168h --phrase "next week" --manager boss@work.com
+```
+
 ### service
 
 `vamoose service [--interval 1m] [--label <name>]`
@@ -206,3 +216,4 @@ The Slack server also reads `VAMOOSE_SLACK_SIGNING_SECRET` and, for install and 
 - **Tokens** are stored in the OS keychain when it is reachable, otherwise a `0600` file under your config directory. They refresh automatically. No setup needed.
 - **Config directory** is the OS user config directory, `vamoose/` within it: `~/.config/vamoose` on Linux, `~/Library/Application Support/vamoose` on macOS.
 - **Watch state** for `--watch` holds is `watches.json` in the config directory, or the path in `VAMOOSE_WATCH_FILE` when set (the Slack server uses this to give each linked user their own file).
+- **Schedules** from `vamoose schedule` are `schedules.json` in the config directory, which the daemon reads to fire recurring runs.

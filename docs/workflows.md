@@ -127,7 +127,19 @@ The built-in `notify-later` books the time now and tells the team a day later, r
 }
 ```
 
-A wait can sit before or after an approval, so a workflow can pause and then ask for sign-off, or hold after approval before fanning out. Workflows that repeat on a schedule are a separate, later feature.
+A wait can sit before or after an approval, so a workflow can pause and then ask for sign-off, or hold after approval before fanning out. To repeat a whole workflow on a schedule, see Recurring below.
+
+## Recurring
+
+`vamoose schedule` reruns a workflow on an interval, so a routine happens on its own. This differs from a `wait` step, which pauses a single run; a schedule starts a fresh run each interval. Give it a duration and a relative window that is resolved at each run:
+
+```sh
+vamoose schedule add pto --every 168h --phrase "next week" --manager boss@work.com
+```
+
+`vamoose daemon` fires each schedule once its interval passes, running the workflow for whatever the phrase resolves to at that moment, so `next week` always means the week ahead of the run. List them with `vamoose schedule list` and drop one with `vamoose schedule remove <index>`.
+
+Intervals are Go durations, so weekly is `168h`. Day-of-week and time-of-day schedules come in a later version.
 
 ## Multiple approvers
 
