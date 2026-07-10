@@ -32,9 +32,16 @@ See [workflows](workflows.md) to write your own.
 
 ### workflows
 
-`vamoose workflows`
+`vamoose workflows [list | add [--file <path>] | remove <name>]`
 
-List the available workflows, built-in and user-defined. User workflows are marked and override built-ins of the same name.
+Manage workflows. `list` (the default) shows the available workflows, built-in and user-defined, with user workflows marked and overriding built-ins of the same name. `add` saves a user workflow from a JSON definition read from `--file` or stdin, validating it and taking its name from the definition. `remove` deletes a user workflow.
+
+```sh
+cat team-heads-up.json | vamoose workflows add
+vamoose workflows remove team-heads-up
+```
+
+See [workflows](workflows.md) for the definition format.
 
 ## Time off
 

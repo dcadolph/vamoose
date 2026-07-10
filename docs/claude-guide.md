@@ -38,6 +38,8 @@ Set the provider and any credentials the backend needs in `env`, the same variab
 
 ### Tools
 
+The fixed time-off tools:
+
 | Tool                | Does                                                        &nbsp; |
 | ------------------- | ----------------------------------------------------------------- |
 | `whoami`            | Show the signed-in user, manager, and team.                       |
@@ -48,14 +50,29 @@ Set the provider and any credentials the backend needs in `env`, the same variab
 | `set_away`          | Mark yourself out of office over a range, no approval.            |
 | `create_event`      | Create a quick event, optionally inviting attendees.              |
 
+The workflow engine, so an agent can drive any workflow, not just time off:
+
+| Tool                | Does                                                          &nbsp; |
+| ------------------- | ------------------------------------------------------------------- |
+| `list_workflows`    | List the workflows available to run, with descriptions.             |
+| `preview_workflow`  | Show a workflow's plan for a date window, without changing anything. |
+| `run_workflow`      | Run any workflow, optionally watching for approval.                 |
+| `create_workflow`   | Author or replace a reusable workflow from a JSON definition.        |
+| `list_schedules`    | List the recurring workflow schedules.                              |
+| `schedule_workflow` | Schedule a workflow to rerun on an interval.                        |
+
+An agent can discover, preview, run, schedule, and even author workflows, so vamoose is a calendar-workflow layer it drives and extends, not a fixed set of commands.
+
 ### What you can say
 
 With the server connected, ask Claude in plain language, for example:
 
 - "Request time off next week and send it to my manager for approval."
-- "Has my manager approved my time off yet?"
-- "Approved? Then let my team know I'm out."
-- "Mark me out of office Thursday and Friday."
+- "Has my manager approved my time off yet? If so, let my team know I'm out."
+- "What workflows can I run?"
+- "Preview the pto workflow for the week of the 20th before running it."
+- "Make a workflow that holds the time, waits two days, then notifies the team, and run it for next week."
+- "Schedule the notify-only workflow to run every week for the week ahead."
 
 ## Skill
 

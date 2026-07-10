@@ -16,7 +16,7 @@ A workflow is an ordered list of steps vamoose runs and the daemon advances. Run
 
 ## Custom workflows
 
-Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`. A file there overrides a built-in of the same name. Then run `vamoose run <name>`.
+Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`, or pipe it to `vamoose workflows add` (which validates it first). A user file overrides a built-in of the same name. Then run `vamoose run <name>`.
 
 ```json
 {
