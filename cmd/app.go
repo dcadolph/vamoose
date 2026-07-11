@@ -276,7 +276,8 @@ func appWorkflowSave(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Definition string `json:"definition"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Definition) == "" {
+	// A workflow definition is small; cap the body so a runaway request cannot balloon.
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil || strings.TrimSpace(req.Definition) == "" {
 		http.Error(w, "a definition is required", http.StatusBadRequest)
 		return
 	}
