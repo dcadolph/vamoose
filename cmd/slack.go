@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dcadolph/vamoose/internal/boltstore"
 	"github.com/dcadolph/vamoose/internal/secret"
 	"github.com/dcadolph/vamoose/internal/slack"
 )
@@ -42,9 +43,23 @@ func runSlack(ctx context.Context, args []string) error {
 	}
 	logger := log.New(os.Stderr, "vamoose slack: ", log.LstdFlags)
 
+	// A hosted multi-tenant server backs its per-workspace tokens and per-user links with
+	// a single embedded database when VAMOOSE_DB_PATH is set; otherwise they are files.
+	// The server owns this database; the shelled-out per-user commands do not touch it.
+	var db *boltstore.DB
+	if path := os.Getenv("VAMOOSE_DB_PATH"); path != "" {
+		opened, derr := boltstore.Open(path)
+		if derr != nil {
+			return fmt.Errorf("open database: %w", derr)
+		}
+		defer opened.Close()
+		db = opened
+		logger.Printf("store: embedded database at %s", path)
+	}
+
 	var opts []slack.Option
 	if id, sec, pub := os.Getenv("VAMOOSE_SLACK_CLIENT_ID"), os.Getenv("VAMOOSE_SLACK_CLIENT_SECRET"), os.Getenv("VAMOOSE_SLACK_PUBLIC_URL"); id != "" && sec != "" && pub != "" {
-		store, serr := slackTokenStore()
+		store, serr := slackTokenStore(db)
 		if serr != nil {
 			return fmt.Errorf("slack token store: %w", serr)
 		}
@@ -57,7 +72,7 @@ func runSlack(ctx context.Context, args []string) error {
 		if pub == "" {
 			return fmt.Errorf("per-user mode requires VAMOOSE_SLACK_PUBLIC_URL for the OAuth callback")
 		}
-		links, lerr := slackUserLinkStore()
+		links, lerr := slackUserLinkStore(db)
 		if lerr != nil {
 			return fmt.Errorf("slack user link store: %w", lerr)
 		}
@@ -126,10 +141,13 @@ func runSlack(ctx context.Context, args []string) error {
 	return nil
 }
 
-// slackTokenStore returns a file-backed store for per-workspace bot tokens under the
-// user config directory, encrypted at rest when VAMOOSE_SECRET_KEY is set for a hosted
-// server, otherwise a plaintext file.
-func slackTokenStore() (*slack.FileStore, error) {
+// slackTokenStore returns the store for per-workspace bot tokens: the shared embedded
+// database when one is given, otherwise a file under the config directory, encrypted at
+// rest when VAMOOSE_SECRET_KEY is set.
+func slackTokenStore(db *boltstore.DB) (slack.TokenStore, error) {
+	if db != nil {
+		return slack.NewBoltTokenStore(db), nil
+	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
@@ -141,9 +159,13 @@ func slackTokenStore() (*slack.FileStore, error) {
 	return slack.NewTokenStore(filepath.Join(dir, "vamoose", name))
 }
 
-// slackUserLinkStore returns a store for per-user calendar links, encrypted at rest
-// when VAMOOSE_SECRET_KEY is set (for a hosted server), otherwise a plaintext file.
-func slackUserLinkStore() (*slack.UserLinkFileStore, error) {
+// slackUserLinkStore returns the store for per-user calendar links: the shared embedded
+// database when one is given, otherwise a file under the config directory, encrypted at
+// rest when VAMOOSE_SECRET_KEY is set.
+func slackUserLinkStore(db *boltstore.DB) (slack.UserLinkStore, error) {
+	if db != nil {
+		return slack.NewBoltUserLinkStore(db), nil
+	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err

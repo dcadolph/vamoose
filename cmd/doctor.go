@@ -117,5 +117,8 @@ func doctorChecks(getenv func(string) string) []doctorCheck {
 		doctorCheck{Label: "Secrets: " + secrets, OK: true, Optional: true},
 		doctorCheck{Label: "Run history: recorded to the audit log (see 'vamoose history')", OK: true, Optional: true},
 	)
+	if db := getenv("VAMOOSE_DB_PATH"); db != "" {
+		checks = append(checks, doctorCheck{Label: "Multi-tenant store: embedded database at " + db, OK: true, Optional: true})
+	}
 	return checks
 }

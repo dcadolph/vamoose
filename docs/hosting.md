@@ -47,4 +47,6 @@ Slack needs a public HTTPS URL for its slash command, interactivity, and OAuth c
 
 ## Storage and scale
 
-Tokens, per-user links, and watch state are files under the config directory, encrypted when a key is set. This is the seam for a database: the `TokenStore` and `UserLinkStore` interfaces can be swapped for a database-backed implementation for larger multi-tenant scale, without touching the rest of the code.
+By default, tokens, per-user links, and watch state are files under the config directory, encrypted when a key is set. Set `VAMOOSE_DB_PATH` to back the server's per-workspace tokens and per-user links with a single embedded database (bbolt) instead, for atomic transactional writes and multi-tenant scale past what a rewritten JSON file handles well. The server owns this database; keep `VAMOOSE_DB_PATH` set only on the long-running server, not on ad-hoc CLI commands, since the database takes an exclusive file lock. Values in it are encrypted at rest with the same `VAMOOSE_SECRET_KEY`.
+
+Run history and watch state stay in files even with `VAMOOSE_DB_PATH` set, because the shelled-out per-user commands write them concurrently. The daemon writes watch progress after each step, so a crash resumes mid-workflow rather than replaying it.
