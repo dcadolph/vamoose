@@ -207,12 +207,12 @@ func registerWorkflowTools(srv *mcp.Server) {
 			if err != nil {
 				return "", err
 			}
-			defer os.Remove(f.Name())
+			defer func() { _ = os.Remove(f.Name()) }()
 			if _, err := f.WriteString(def); err != nil {
-				f.Close()
+				_ = f.Close()
 				return "", err
 			}
-			f.Close()
+			_ = f.Close()
 			return execSelf(ctx, "workflows", "add", "--file", f.Name())
 		},
 	})

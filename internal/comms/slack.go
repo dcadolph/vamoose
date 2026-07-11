@@ -64,7 +64,7 @@ func (s *SlackNotifier) Notify(ctx context.Context, channel, text string) error 
 	if err != nil {
 		return fmt.Errorf("slack notify: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var out struct {
 		OK    bool   `json:"ok"`
 		Error string `json:"error"`

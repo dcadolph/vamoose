@@ -75,7 +75,7 @@ func TestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var body bytes.Buffer
 	_, _ = body.ReadFrom(resp.Body)
 	if !strings.Contains(body.String(), "vamoose_hits_total 1") {

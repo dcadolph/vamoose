@@ -90,7 +90,7 @@ func (s *Server) exchangeCode(ctx context.Context, code string) (teamID, token s
 	if err != nil {
 		return "", "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var out struct {
 		OK          bool   `json:"ok"`
 		Error       string `json:"error"`

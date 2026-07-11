@@ -84,7 +84,7 @@ func (f *BambooHRFiler) FileLeave(ctx context.Context, leave Leave) (string, err
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxRespBody))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("bamboohr: file leave: status %d: %s", resp.StatusCode, string(respBody))

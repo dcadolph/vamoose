@@ -147,7 +147,7 @@ func appDoctor() (any, error) {
 	checks := doctorChecks(os.Getenv)
 	out := make([]appCheck, 0, len(checks))
 	for _, c := range checks {
-		out = append(out, appCheck{Label: c.Label, OK: c.OK, Hint: c.Hint, Optional: c.Optional})
+		out = append(out, appCheck(c))
 	}
 	return out, nil
 }

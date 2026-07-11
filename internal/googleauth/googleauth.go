@@ -302,7 +302,7 @@ func (a *Authenticator) postToken(ctx context.Context, form url.Values) (auth.To
 	if err != nil {
 		return auth.Token{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return auth.Token{}, err

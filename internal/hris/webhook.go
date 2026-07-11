@@ -72,7 +72,7 @@ func (f *WebhookFiler) FileLeave(ctx context.Context, leave Leave) (string, erro
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxRespBody))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("leave webhook: status %d: %s", resp.StatusCode, string(respBody))

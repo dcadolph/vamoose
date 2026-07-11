@@ -528,7 +528,7 @@ func (p *Provider) CreateCalendar(ctx context.Context, displayName string) (stri
 	if err != nil {
 		return "", fmt.Errorf("%w: mkcalendar: %v", ErrCalDAV, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		return "", fmt.Errorf("%w: mkcalendar failed: %s: %s", ErrCalDAV, resp.Status, strings.TrimSpace(string(b)))

@@ -70,7 +70,7 @@ func TestBoltPersists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db2.Close()
+	defer func() { _ = db2.Close() }()
 	if v, ok, _ := db2.Get("b", "k"); !ok || string(v) != "v" {
 		t.Errorf("reopen get = %q, %v; want v", v, ok)
 	}
@@ -123,7 +123,7 @@ func TestBoltEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db3.Close()
+	defer func() { _ = db3.Close() }()
 	if _, _, err := db3.Get("secrets", "tok"); err == nil {
 		t.Error("the wrong key should fail to decrypt the value")
 	}

@@ -51,7 +51,7 @@ func runSlack(ctx context.Context, args []string) error {
 		if derr != nil {
 			return fmt.Errorf("open database: %w", derr)
 		}
-		defer opened.Close()
+		defer func() { _ = opened.Close() }()
 		db = opened
 		logger.Info("store: embedded database", "path", path)
 	}

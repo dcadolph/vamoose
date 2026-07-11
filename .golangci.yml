@@ -1,0 +1,15 @@
+version: "2"
+
+linters:
+  enable:
+    - misspell
+  settings:
+    errcheck:
+      # CLI output to stdout or a response writer has no actionable error path, so the
+      # bare fmt.Fprint family is the repo idiom. Everything else stays checked.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    misspell:
+      locale: US

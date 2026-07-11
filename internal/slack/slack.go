@@ -422,7 +422,7 @@ func (s *Server) lookupUserByEmail(ctx context.Context, botToken, email string) 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var out struct {
 		OK    bool   `json:"ok"`
 		Error string `json:"error"`
@@ -894,7 +894,7 @@ func (s *Server) openCredentialModal(teamID, triggerID, provider string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var out struct {
 		OK    bool   `json:"ok"`
 		Error string `json:"error"`
