@@ -19,9 +19,9 @@ import (
 	"time"
 )
 
-// appUI holds the embedded local dashboard.
+// appUI holds the embedded local dashboard and its logo.
 //
-//go:embed appui/index.html
+//go:embed appui/index.html appui/mark.png
 var appUI embed.FS
 
 // runApp serves a local web dashboard for vamoose and opens it in the browser. It binds to
@@ -56,6 +56,19 @@ func runApp(ctx context.Context, args []string) error {
 			return
 		}
 		_, _ = io.WriteString(w, versionString())
+	})
+	mux.HandleFunc("GET /mark.png", func(w http.ResponseWriter, r *http.Request) {
+		if !localOnly(w, r) {
+			return
+		}
+		b, rerr := appUI.ReadFile("appui/mark.png")
+		if rerr != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "max-age=86400")
+		_, _ = w.Write(b)
 	})
 	mux.HandleFunc("GET /api/workflows", appJSON(appWorkflows))
 	mux.HandleFunc("GET /api/watches", appJSON(func() (any, error) { return loadWatches() }))
