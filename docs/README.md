@@ -39,9 +39,9 @@ brew install dcadolph/tap/vamoose
 ## How it works { .section-head }
 
 <div class="flow">
-<div class="flow-step"><span class="num">1</span><div class="flow-text"><strong>Request</strong><span>Block the dates shown free, so no calendar is touched, and invite your manager.</span></div></div>
-<div class="flow-step"><span class="num">2</span><div class="flow-text"><strong>Approve</strong><span>Your manager accepts the invite. That acceptance is the approval, no extra tool.</span></div></div>
-<div class="flow-step"><span class="num">3</span><div class="flow-text"><strong>Notify</strong><span>The team is added as optional attendees, so everyone sees you are out.</span></div></div>
+<div class="flow-step"><span class="num">1</span><div class="flow-text"><strong>Declare</strong><span>A workflow is ordered steps: create a hold, branch on the outcome, wait, and gate on approval. Time off is built in, or author your own in JSON or with an AI agent.</span></div></div>
+<div class="flow-step"><span class="num">2</span><div class="flow-text"><strong>Run</strong><span>Drive it from your terminal, Claude, or Slack, on Microsoft Graph, Google, iCloud, or any CalDAV host. Swappable doors, swappable backends.</span></div></div>
+<div class="flow-step"><span class="num">3</span><div class="flow-text"><strong>Advance</strong><span>The daemon moves it along on its own: approvals, timeouts, waits, recurring schedules, and the notify, note, and message steps.</span></div></div>
 </div>
 
 ## Why vamoose { .section-head }
