@@ -32,3 +32,5 @@ Thumbs.db
 
 # mkdocs build output
 site/
+/Vamoose.app/
+/vamoose.iconset/
