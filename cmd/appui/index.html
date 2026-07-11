@@ -275,7 +275,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const esc = (s) => (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtTime = (t) => (t || "").replace("T", " ").slice(0, 19);
 const HIST_CAP = 20;
 const dotColor = { approved:"var(--green)", declined:"var(--red)", canceled:"var(--red)", expired:"var(--red)",
@@ -292,9 +292,9 @@ async function loadWorkflows() {
       return `<div class="card"><div class="wf-top"><span class="wf-name">${n}</span><span class="pill">${esc(w.source)}</span></div>
         <div class="wf-desc">${esc(w.description) || "&nbsp;"}</div>
         <div class="wf-acts">
-          <button class="btn-ghost btn-sm" onclick="openModal('${n}')">Run ▸</button>
-          <button class="btn-quiet btn-sm" onclick="openEditor('${n}')">${user ? "Edit" : "View"}</button>
-          ${user ? `<button class="btn-danger btn-sm" onclick="deleteWorkflow('${n}')">Delete</button>` : ""}
+          <button class="btn-ghost btn-sm" data-wf="run" data-name="${n}">Run ▸</button>
+          <button class="btn-quiet btn-sm" data-wf="edit" data-name="${n}">${user ? "Edit" : "View"}</button>
+          ${user ? `<button class="btn-danger btn-sm" data-wf="delete" data-name="${n}">Delete</button>` : ""}
         </div></div>`;
     }).join("") || `<div class="empty">No workflows.</div>`;
   } catch (e) { $("workflows-grid").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
@@ -442,6 +442,14 @@ async function action(a, id, provider) {
   loadWatches(); loadHistory();
 }
 $("watches").addEventListener("click", (e) => { const b = e.target.closest("button[data-a]"); if (b) action(b.dataset.a, b.dataset.id, b.dataset.p); });
+$("workflows-grid").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-wf]");
+  if (!b) return;
+  const name = b.dataset.name;
+  if (b.dataset.wf === "run") openModal(name);
+  else if (b.dataset.wf === "edit") openEditor(name);
+  else if (b.dataset.wf === "delete") deleteWorkflow(name);
+});
 
 // Mobile sidebar toggle.
 function setNav(open) { $("sidebar").classList.toggle("open", open); $("scrim").classList.toggle("open", open); }
