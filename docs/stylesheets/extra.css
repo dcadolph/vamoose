@@ -253,14 +253,28 @@
   }
 }
 
-/* ---------- Why vamoose: full-width feature rows, not a card grid. ---------- */
+/* ---------- Why vamoose: an even three-per-row feature grid. The selector carries the
+   .grid.cards classes so it outweighs Material's card-grid default and holds three
+   columns, dropping to two then one as the screen narrows. ---------- */
 
-.md-typeset .vamoose-features > ul {
+.md-typeset .grid.cards.vamoose-features > ul {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.85rem;
   margin: 1.1rem 0;
   padding: 0;
+}
+
+@media screen and (max-width: 76.1875em) {
+  .md-typeset .grid.cards.vamoose-features > ul {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 44.9375em) {
+  .md-typeset .grid.cards.vamoose-features > ul {
+    grid-template-columns: 1fr;
+  }
 }
 
 .md-typeset .vamoose-features > ul > li {
