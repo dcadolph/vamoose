@@ -52,6 +52,9 @@ const (
 	// VerbWait pauses the workflow for a duration, which the daemon advances past once
 	// the time elapses.
 	VerbWait Verb = "wait"
+	// VerbLeave files the time off as real leave with the configured HR system, so an
+	// approved hold becomes an HR record, not just a calendar block.
+	VerbLeave Verb = "leave"
 )
 
 // Creates reports whether the verb creates the hold a workflow acts on. Exactly one
@@ -74,7 +77,7 @@ func (v Verb) Waits() bool {
 // known reports whether the verb is recognized.
 func (v Verb) known() bool {
 	switch v {
-	case VerbHold, VerbApprove, VerbNotify, VerbNote, VerbAway, VerbEvent, VerbCancel, VerbMessage, VerbWait:
+	case VerbHold, VerbApprove, VerbNotify, VerbNote, VerbAway, VerbEvent, VerbCancel, VerbMessage, VerbWait, VerbLeave:
 		return true
 	default:
 		return false

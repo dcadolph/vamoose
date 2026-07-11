@@ -31,6 +31,8 @@ const (
 	ActionMessaged Action = "messaged"
 	// ActionCanceled is the hold being deleted.
 	ActionCanceled Action = "canceled"
+	// ActionFiled is the leave being filed with the HR system.
+	ActionFiled Action = "filed"
 )
 
 // Event is one recorded moment in a workflow run. The caller stamps Time so the record

@@ -43,7 +43,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`, or pipe it to `va
 | `timeout`| approve           | Duration to wait (e.g. `72h`) before the `expired` branch runs.      |
 | `when`   | any but the first | Guard that skips the step unless its conditions hold. See Guards.    |
 | `next`   | any               | The step id to run next, or `end`. Defaults to the following step.   |
-| `subject`| note, event, message | Event title, or the text for a message step.                     |
+| `subject`| note, event, message, leave | Event title, message text, or the note on a filed leave.  |
 | `channel`| message           | Where a message step posts, such as a Slack channel. Required.       |
 | `for`    | wait              | How long a wait step pauses, as a duration like `48h`. Required.     |
 
@@ -58,6 +58,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`, or pipe it to `va
 - `cancel` deletes the hold.
 - `message` posts to a comms channel, such as a Slack channel, to announce the outcome.
 - `wait` pauses the workflow for a duration. The daemon advances past it once the time passes.
+- `leave` files the time off as real leave with the configured HR system, so an approved hold becomes an HR record. See [hosting](hosting.md) for setup.
 
 ## Rules
 

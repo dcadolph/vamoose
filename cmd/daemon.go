@@ -175,7 +175,7 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 	if item.Step < 0 || item.Step >= len(wf.Steps) {
 		return pollPending, item, nil
 	}
-	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder(), checkpoint: checkpointFor(item)}
+	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder(), checkpoint: checkpointFor(item), filer: resolveFiler()}
 
 	// A prior poll ran this branch partway. Earlier steps already took effect, so the
 	// branch is committed: resume at the checkpoint and run it to completion, without

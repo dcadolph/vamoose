@@ -56,3 +56,17 @@ Run history and watch state stay in files even with `VAMOOSE_DB_PATH` set, becau
 The server serves Prometheus metrics at `/metrics` (dispatched commands, approval actions, rejected actions, command errors, and installs) and a liveness check at `/health`. Point a scraper at `/metrics`.
 
 Set `VAMOOSE_LOG_FORMAT=json` for machine-parseable structured logs, and `VAMOOSE_LOG_LEVEL` (`debug`, `info`, `warn`, `error`, default `info`) to set verbosity. Events carry the workspace, user, command, and outcome as fields, so a command run, an approval, or a rejected click is one queryable line.
+
+## Filing real leave (BambooHR)
+
+A `leave` step files the time off as a real leave request in your HR system, so the system of record matches the calendar rather than only a calendar hold. BambooHR is the first system:
+
+```sh
+export VAMOOSE_BAMBOOHR_SUBDOMAIN=<company>      # from your BambooHR URL
+export VAMOOSE_BAMBOOHR_API_KEY=<api-key>        # a BambooHR API key
+export VAMOOSE_BAMBOOHR_EMPLOYEE_ID=<id>         # the employee taking leave
+export VAMOOSE_BAMBOOHR_TYPE_ID=<time-off-type>  # the BambooHR time-off type id
+export VAMOOSE_BAMBOOHR_STATUS=requested         # or approved, default requested
+```
+
+The built-in `pto-file-leave` workflow files leave once the manager approves, then notifies the team. Without these variables, a `leave` step reports that no HR system is configured, so add the step only when the HR system is set up.

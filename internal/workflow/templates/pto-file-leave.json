@@ -1,0 +1,10 @@
+{
+  "name": "pto-file-leave",
+  "description": "Time off a manager approves, then filed as real leave in the HR system and the team notified.",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "approval", "verb": "approve", "manager": true, "on": { "accepted": "file" } },
+    { "id": "file", "verb": "leave", "subject": "Time off", "next": "notify" },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}

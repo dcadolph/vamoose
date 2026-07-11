@@ -13,6 +13,7 @@ import (
 	"github.com/dcadolph/vamoose/internal/audit"
 	"github.com/dcadolph/vamoose/internal/calendar"
 	"github.com/dcadolph/vamoose/internal/comms"
+	"github.com/dcadolph/vamoose/internal/hris"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
 
@@ -28,6 +29,9 @@ type stepDeps struct {
 	// run, or negative when the branch has completed. The daemon sets it so a crash
 	// resumes rather than replaying; the run command leaves it nil.
 	checkpoint func(resume int)
+	// filer files approved leave with an HR system for a leave step; nil when no HR
+	// system is configured.
+	filer hris.Filer
 }
 
 // checkpointAt persists the branch's progress when a checkpoint is set, so a daemon crash
@@ -60,6 +64,16 @@ func resolveNotifier() comms.Notifier {
 		return nil
 	}
 	return comms.Route(slack, email)
+}
+
+// resolveFiler returns the configured HR leave filer, or nil when none is set. BambooHR
+// is enabled by VAMOOSE_BAMBOOHR_SUBDOMAIN and VAMOOSE_BAMBOOHR_API_KEY.
+func resolveFiler() hris.Filer {
+	sub, key := os.Getenv("VAMOOSE_BAMBOOHR_SUBDOMAIN"), os.Getenv("VAMOOSE_BAMBOOHR_API_KEY")
+	if sub == "" || key == "" {
+		return nil
+	}
+	return hris.NewBambooHRFiler(sub, key, os.Getenv("VAMOOSE_BAMBOOHR_STATUS"))
 }
 
 // workflowsDir returns the user workflow directory under the config directory.
@@ -210,7 +224,7 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	}
 	fmt.Fprintln(os.Stdout, startedMessage(wf, created))
 
-	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder()}
+	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder(), filer: resolveFiler()}
 	recordAudit(ctx, deps.recorder, audit.Event{
 		Workflow: wf.Name, Provider: providerName, HoldID: created.ID, Action: audit.ActionCreated,
 	})
@@ -271,6 +285,12 @@ func walkSteps(ctx context.Context, prov calendar.Provider, deps stepDeps, provi
 				return i, err
 			}
 			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionMessaged, wf.Steps[i].Channel))
+			deps.checkpointAt(wf.Next(i, ""))
+		case workflow.VerbLeave:
+			if err := fileLeave(ctx, deps.filer, wf.Steps[i], hold); err != nil {
+				return i, err
+			}
+			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionFiled, wf.Steps[i].Subject))
 			deps.checkpointAt(wf.Next(i, ""))
 		case workflow.VerbCancel:
 			if err := prov.DeleteHold(ctx, hold.ID); err != nil {
@@ -336,6 +356,31 @@ func sendMessage(ctx context.Context, notifier comms.Notifier, step workflow.Ste
 		return fmt.Errorf("message: %w", err)
 	}
 	fmt.Fprintf(os.Stdout, "Messaged %s.\n", step.Channel)
+	return nil
+}
+
+// fileLeave files the hold's dates as leave with the configured HR system. The employee
+// and time-off type come from the environment; the note is the step subject, falling back
+// to the hold subject.
+func fileLeave(ctx context.Context, filer hris.Filer, step workflow.Step, hold calendar.Hold) error {
+	if filer == nil {
+		return fmt.Errorf("leave step needs an HR system: set VAMOOSE_BAMBOOHR_SUBDOMAIN and VAMOOSE_BAMBOOHR_API_KEY")
+	}
+	note := step.Subject
+	if note == "" {
+		note = hold.Subject
+	}
+	id, err := filer.FileLeave(ctx, hris.Leave{
+		EmployeeID: os.Getenv("VAMOOSE_BAMBOOHR_EMPLOYEE_ID"),
+		TypeID:     os.Getenv("VAMOOSE_BAMBOOHR_TYPE_ID"),
+		Start:      hold.Start,
+		End:        hold.End,
+		Note:       note,
+	})
+	if err != nil {
+		return fmt.Errorf("file leave: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Filed leave with the HR system (request %s).\n", id)
 	return nil
 }
 
