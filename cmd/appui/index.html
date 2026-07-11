@@ -16,49 +16,44 @@
     --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   * { box-sizing:border-box; }
-  html,body { margin:0; scroll-behavior:smooth; }
+  html,body { margin:0; }
   body { background:var(--bg); color:var(--fg); font:15px/1.55 var(--font); -webkit-font-smoothing:antialiased; }
   a { color:inherit; text-decoration:none; }
+  code { font-family:var(--mono); font-size:.86em; background:rgba(255,255,255,.06); padding:.1rem .35rem; border-radius:5px; color:#e6d3ac; }
 
-  /* Sidebar */
   .sidebar { position:fixed; top:0; left:0; bottom:0; width:var(--side-w); z-index:30;
     background:var(--side); border-right:1px solid var(--line); display:flex; flex-direction:column;
     padding:1.15rem 1rem 1rem; transition:transform .22s ease; }
   .logo { display:flex; align-items:center; gap:.55rem; padding:.1rem .35rem 1.15rem; }
   .logo img { width:34px; height:34px; object-fit:contain; }
-  .logo span { font-size:1.24rem; font-weight:760; letter-spacing:.005em; }
+  .logo span { font-size:1.24rem; font-weight:760; }
   .logo b { color:var(--amber); font-weight:760; }
   .nav { display:flex; flex-direction:column; gap:.18rem; }
-  .nav-link { display:flex; align-items:center; gap:.55rem; padding:.5rem .6rem; border-radius:9px;
-    color:var(--dim); font-weight:560; font-size:.94rem; transition:.14s ease; }
+  .nav-link { display:flex; align-items:center; gap:.6rem; padding:.5rem .65rem; border-radius:9px;
+    color:var(--dim); font-weight:560; font-size:.94rem; transition:.14s ease; cursor:pointer; }
   .nav-link:hover { background:rgba(255,255,255,.04); color:var(--fg); }
   .nav-link.active { background:var(--amber-soft); color:var(--amber); }
-  .nav-link .ni { width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.55; }
+  .nav-link svg { width:16px; height:16px; opacity:.9; flex:none; }
   .nav-badge { margin-left:auto; font-size:.72rem; color:var(--faint); font-family:var(--mono); }
-  .side-foot { margin-top:auto; padding-top:1rem; border-top:1px solid var(--line); display:flex;
-    flex-direction:column; gap:.5rem; }
-  .gh-link { display:flex; align-items:center; gap:.5rem; color:var(--dim); font-size:.9rem;
-    padding:.3rem .35rem; border-radius:8px; }
+  .side-foot { margin-top:auto; padding-top:1rem; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:.5rem; }
+  .gh-link { display:flex; align-items:center; gap:.5rem; color:var(--dim); font-size:.9rem; padding:.3rem .35rem; border-radius:8px; }
   .gh-link:hover { color:var(--fg); }
   .ver { color:var(--faint); font-size:.78rem; font-family:var(--mono); padding:0 .35rem; }
 
-  /* Content */
   .content { margin-left:var(--side-w); min-height:100vh; }
-  .topbar { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.7rem;
-    height:56px; padding:0 1.6rem; background:rgba(20,21,23,.8); backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--line); }
-  .topbar-title { font-weight:640; color:var(--dim); }
+  .topbar { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.7rem; height:56px;
+    padding:0 1.6rem; background:rgba(20,21,23,.8); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
+  .topbar-title { font-weight:660; }
   .spacer { flex:1; }
   .gh-icon { color:var(--dim); display:flex; padding:.35rem; border-radius:8px; transition:.14s; }
   .gh-icon:hover { color:var(--fg); background:rgba(255,255,255,.05); }
   .hamburger { display:none; }
 
   main { max-width:1120px; padding:1.7rem 1.6rem 4rem; }
-  .sec { margin-bottom:2.3rem; scroll-margin-top:74px; }
-  .sec-head { display:flex; align-items:baseline; gap:.7rem; margin:0 0 1rem; }
-  .sec-head h2 { font-size:1.1rem; font-weight:700; margin:0; }
-  .sec-head .count { color:var(--faint); font-size:.85rem; }
-  .sec-head::before { content:""; width:3px; height:1.08rem; background:var(--amber); border-radius:2px; }
+  .page { display:none; }
+  .page.active { display:block; animation:fade .2s ease; }
+  @keyframes fade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+  .page-intro { color:var(--dim); margin:-.3rem 0 1.4rem; max-width:70ch; }
 
   .grid { display:grid; gap:.9rem; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:1rem 1.1rem;
@@ -71,8 +66,7 @@
   .wf-desc { color:var(--dim); font-size:.88rem; flex:1; }
   .wf-run { align-self:flex-start; margin-top:.85rem; }
 
-  button { font:inherit; cursor:pointer; border-radius:9px; border:1px solid transparent;
-    padding:.42rem .9rem; font-weight:620; transition:.15s ease; }
+  button { font:inherit; cursor:pointer; border-radius:9px; border:1px solid transparent; padding:.42rem .9rem; font-weight:620; transition:.15s ease; }
   .btn-primary { background:var(--amber); color:#1a1206; }
   .btn-primary:hover { filter:brightness(1.07); }
   .btn-ghost { background:transparent; color:var(--amber); border-color:var(--amber-line); }
@@ -100,33 +94,45 @@
   .hmeta { color:var(--faint); font-family:var(--mono); font-size:.8rem; margin-left:auto; white-space:nowrap; }
   .showall { margin-top:.8rem; }
 
-  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(3px);
-    display:none; align-items:center; justify-content:center; z-index:50; padding:1rem; }
+  .chk { display:flex; gap:.7rem; align-items:flex-start; padding:.6rem .9rem; border:1px solid var(--line);
+    border-radius:10px; margin-bottom:.5rem; background:var(--card); }
+  .chk-badge { width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:.8rem; font-weight:700; flex:none; margin-top:1px; }
+  .chk-ok .chk-badge { background:rgba(91,189,122,.16); color:var(--green); }
+  .chk-miss .chk-badge { background:rgba(224,103,76,.16); color:var(--red); }
+  .chk-opt .chk-badge { background:rgba(255,255,255,.06); color:var(--dim); }
+  .chk-label { font-weight:560; }
+  .chk-hint { color:var(--dim); font-size:.85rem; margin-top:.12rem; }
+
+  .prose { max-width:74ch; }
+  .prose h3 { font-size:1.02rem; margin:1.7rem 0 .6rem; color:var(--amber); }
+  .prose h3:first-child { margin-top:0; }
+  .prose p { color:var(--dim); }
+  .prose ul { padding-left:1.1rem; color:var(--dim); }
+  .prose li { margin:.25rem 0; }
+  .prose .cmd { color:var(--fg); }
+  .linkrow { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:.4rem; }
+  .linkrow a { display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--line-hi);
+    border-radius:9px; padding:.4rem .8rem; color:var(--fg); font-weight:560; font-size:.9rem; }
+  .linkrow a:hover { border-color:var(--amber-line); background:var(--amber-soft); }
+
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:50; padding:1rem; }
   .overlay.open { display:flex; }
-  .modal { width:min(520px,100%); background:var(--panel); border:1px solid var(--line-hi);
-    border-radius:16px; box-shadow:var(--shadow); padding:1.35rem 1.5rem 1.5rem; }
+  .modal { width:min(520px,100%); background:var(--panel); border:1px solid var(--line-hi); border-radius:16px; box-shadow:var(--shadow); padding:1.35rem 1.5rem 1.5rem; }
   .modal h3 { margin:0 0 1rem; font-size:1.1rem; }
   .modal h3 b { color:var(--amber); }
   label { display:block; color:var(--dim); font-size:.8rem; margin:.75rem 0 .28rem; }
-  input, select { width:100%; background:#141518; color:var(--fg); border:1px solid var(--line-hi);
-    border-radius:9px; padding:.5rem .7rem; font:inherit; }
+  input { width:100%; background:#141518; color:var(--fg); border:1px solid var(--line-hi); border-radius:9px; padding:.5rem .7rem; font:inherit; }
   input:focus { outline:none; border-color:var(--amber-line); }
   .modal-acts { display:flex; gap:.6rem; margin-top:1.2rem; align-items:center; }
-  pre { background:#111214; border:1px solid var(--line); border-radius:10px; padding:.8rem;
-    white-space:pre-wrap; word-break:break-word; color:var(--dim); max-height:240px; overflow:auto;
-    font-family:var(--mono); font-size:.82rem; margin:1rem 0 0; }
-  .toast { position:fixed; bottom:1.2rem; left:calc(50% + var(--side-w)/2); transform:translateX(-50%);
-    background:var(--card-hi); border:1px solid var(--line-hi); border-radius:10px; padding:.6rem 1rem;
-    box-shadow:var(--shadow); font-size:.9rem; display:none; z-index:60; }
+  pre { background:#111214; border:1px solid var(--line); border-radius:10px; padding:.8rem; white-space:pre-wrap; word-break:break-word; color:var(--dim); max-height:240px; overflow:auto; font-family:var(--mono); font-size:.82rem; margin:1rem 0 0; }
+  .toast { position:fixed; bottom:1.2rem; left:calc(50% + var(--side-w)/2); transform:translateX(-50%); background:var(--card-hi); border:1px solid var(--line-hi); border-radius:10px; padding:.6rem 1rem; box-shadow:var(--shadow); font-size:.9rem; display:none; z-index:60; }
   .toast.show { display:block; }
   .scrim { display:none; }
-
   @media (max-width:880px) {
     .sidebar { transform:translateX(-100%); box-shadow:var(--shadow); }
     .sidebar.open { transform:translateX(0); }
     .content { margin-left:0; }
-    .hamburger { display:inline-flex; background:transparent; border:1px solid var(--line-hi); color:var(--fg);
-      border-radius:8px; padding:.3rem .55rem; font-size:1.05rem; }
+    .hamburger { display:inline-flex; background:transparent; border:1px solid var(--line-hi); color:var(--fg); border-radius:8px; padding:.3rem .55rem; font-size:1.05rem; }
     .toast { left:50%; }
     .scrim.open { display:block; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:29; }
   }
@@ -134,26 +140,27 @@
 </head>
 <body>
 <aside class="sidebar" id="sidebar">
-  <a class="logo" href="#top"><img src="mark.png" alt=""><span>va<b>moose</b></span></a>
+  <a class="logo" href="#workflows"><img src="mark.png" alt=""><span>va<b>moose</b></span></a>
   <nav class="nav" id="nav">
-    <a href="#workflows" class="nav-link" data-s="workflows"><span class="ni"></span>Workflows</a>
-    <a href="#watching" class="nav-link" data-s="watching"><span class="ni"></span>Watching<span class="nav-badge" id="nav-w"></span></a>
-    <a href="#history" class="nav-link" data-s="history"><span class="ni"></span>Run history</a>
+    <a href="#workflows" class="nav-link" data-page="workflows"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5v9A1.5 1.5 0 0112.5 14h-9A1.5 1.5 0 012 12.5v-9zM3.5 3a.5.5 0 00-.5.5V6h10V3.5a.5.5 0 00-.5-.5h-9zM13 7H3v5.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V7z"/></svg>Workflows</a>
+    <a href="#watching" class="nav-link" data-page="watching"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 3C4.5 3 1.7 5.1.5 8 1.7 10.9 4.5 13 8 13s6.3-2.1 7.5-5C14.3 5.1 11.5 3 8 3zm0 8a3 3 0 110-6 3 3 0 010 6zm0-1.5A1.5 1.5 0 108 6.5a1.5 1.5 0 000 3z"/></svg>Watching<span class="nav-badge" id="nav-w"></span></a>
+    <a href="#runs" class="nav-link" data-page="runs"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 107 7 .75.75 0 00-1.5 0A5.5 5.5 0 118 2.5V5l3.5-2.5L8 0v1z"/><path d="M7.25 4.5v4l3 1.8.75-1.25-2.25-1.35V4.5z"/></svg>Runs</a>
+    <a href="#setup" class="nav-link" data-page="setup"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 5a3 3 0 100 6 3 3 0 000-6zm0 1.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/><path d="M6.9.8a1 1 0 011.02-.8h.16A1 1 0 019.1.8l.2 1.2c.3.1.6.24.87.4l1.1-.5a1 1 0 011.24.4l.4.7a1 1 0 01-.22 1.28l-1 .8c.02.16.03.33.03.5s-.01.34-.03.5l1 .8a1 1 0 01.22 1.28l-.4.7a1 1 0 01-1.24.4l-1.1-.5c-.27.16-.56.3-.87.4l-.2 1.2a1 1 0 01-1.02.8h-.16A1 1 0 016.9 15.2l-.2-1.2a4.9 4.9 0 01-.87-.4l-1.1.5a1 1 0 01-1.24-.4l-.4-.7a1 1 0 01.22-1.28l1-.8a5 5 0 010-1l-1-.8a1 1 0 01-.22-1.28l.4-.7a1 1 0 011.24-.4l1.1.5c.27-.16.56-.3.87-.4l.2-1.2z"/></svg>Setup</a>
+    <a href="#help" class="nav-link" data-page="help"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zM7 11h2v2H7v-2zm2.9-3.3c-.5.4-.9.8-.9 1.6H7c0-1.3.6-2 1.3-2.5.5-.4.7-.7.7-1.1 0-.6-.5-1-1.1-1-.7 0-1.1.4-1.3 1L4.9 5C5.2 3.9 6.1 3 7.9 3 9.5 3 11 3.9 11 5.6c0 1-.5 1.6-1.1 2.1z"/></svg>Help</a>
   </nav>
   <div class="side-foot">
     <a class="gh-link" href="https://github.com/dcadolph/vamoose" target="_blank" rel="noopener">
-      <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-      GitHub
+      <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
     </a>
     <div class="ver" id="ver"></div>
   </div>
 </aside>
 <div class="scrim" id="scrim"></div>
 
-<div class="content" id="top">
+<div class="content">
   <div class="topbar">
     <button class="hamburger" id="hamb" aria-label="Menu">☰</button>
-    <span class="topbar-title">Dashboard</span>
+    <span class="topbar-title" id="pagetitle">Workflows</span>
     <span class="spacer"></span>
     <a class="gh-icon" href="https://github.com/dcadolph/vamoose" target="_blank" rel="noopener" title="View on GitHub">
       <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
@@ -161,18 +168,51 @@
   </div>
 
   <main>
-    <section id="workflows" class="sec">
-      <div class="sec-head"><h2>Workflows</h2><span class="count" id="wfcount"></span></div>
+    <div class="page" id="page-workflows">
+      <p class="page-intro">Every workflow available to run, built in or authored by you. Time off is the flagship; each is a small state machine of steps.</p>
       <div class="grid" id="workflows-grid"><div class="empty">Loading…</div></div>
-    </section>
-    <section id="watching" class="sec">
-      <div class="sec-head"><h2>Watching</h2><span class="count" id="wcount"></span></div>
+    </div>
+
+    <div class="page" id="page-watching">
+      <p class="page-intro">Holds the daemon is advancing. Check the approval, promote to the team, or cancel.</p>
       <div id="watches"><div class="empty">Loading…</div></div>
-    </section>
-    <section id="history" class="sec">
-      <div class="sec-head"><h2>Run history</h2><span class="count" id="hcount"></span></div>
+    </div>
+
+    <div class="page" id="page-runs">
+      <p class="page-intro">What every hold did and who approved it, newest first.</p>
       <div id="history-list"><div class="empty">Loading…</div></div>
-    </section>
+    </div>
+
+    <div class="page" id="page-setup">
+      <p class="page-intro">What is configured on this machine. A green check is ready; red is required and missing; a dash is optional. Run <code>vamoose doctor</code> for the same report.</p>
+      <div id="setup-list"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="page" id="page-help">
+      <div class="prose">
+        <h3>What is vamoose</h3>
+        <p>A smart calendar-workflow engine. Declare ordered steps that branch, wait, and gate on approval, and vamoose runs them across any calendar backend from your terminal, Claude, or Slack. Time off is the flagship workflow, not the whole scope.</p>
+        <h3>Quick commands</h3>
+        <ul>
+          <li><code class="cmd">vamoose off next week</code> request time off from a phrase</li>
+          <li><code class="cmd">vamoose run &lt;workflow&gt; next week --watch</code> run any workflow and let the daemon advance it</li>
+          <li><code class="cmd">vamoose check</code> see whether the manager approved</li>
+          <li><code class="cmd">vamoose daemon</code> advance watched holds in the background</li>
+          <li><code class="cmd">vamoose history</code> the run log, also on the Runs page here</li>
+          <li><code class="cmd">vamoose app</code> this dashboard</li>
+        </ul>
+        <h3>Workflow verbs</h3>
+        <p><code>hold</code>, <code>approve</code>, <code>notify</code>, <code>note</code>, <code>away</code>, <code>event</code>, <code>cancel</code>, <code>message</code>, <code>wait</code>, <code>leave</code>. An <code>approve</code> step can branch on the outcome, gate on a timeout, and chain several approvers.</p>
+        <h3>Backends</h3>
+        <p>Microsoft Graph, Google Calendar, Apple iCloud, and any CalDAV host, behind one interface. Pick with <code>--provider</code> or <code>VAMOOSE_PROVIDER</code>. See the Setup page for what is configured.</p>
+        <h3>More</h3>
+        <div class="linkrow">
+          <a href="https://vamoose.dev" target="_blank" rel="noopener">Documentation ↗</a>
+          <a href="https://github.com/dcadolph/vamoose" target="_blank" rel="noopener">GitHub ↗</a>
+          <a href="https://vamoose.dev/hosting.html" target="_blank" rel="noopener">Hosting ↗</a>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -202,17 +242,14 @@ const esc = (s) => (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<
 const fmtTime = (t) => (t || "").replace("T", " ").slice(0, 19);
 const HIST_CAP = 20;
 const dotColor = { approved:"var(--green)", declined:"var(--red)", canceled:"var(--red)", expired:"var(--red)",
-  created:"var(--amber)", advanced:"var(--amber)", notified:"var(--blue)", messaged:"var(--blue)",
-  noted:"var(--blue)", filed:"var(--blue)" };
+  created:"var(--amber)", advanced:"var(--amber)", notified:"var(--blue)", messaged:"var(--blue)", noted:"var(--blue)", filed:"var(--blue)" };
 
 async function getJSON(p) { const r = await fetch(p); if (!r.ok) throw new Error(await r.text()); return r.json(); }
-function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show");
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 
 async function loadWorkflows() {
   try {
     const wfs = await getJSON("/api/workflows");
-    $("wfcount").textContent = wfs.length + (wfs.length === 1 ? " workflow" : " workflows");
     $("workflows-grid").innerHTML = wfs.map(w =>
       `<div class="card"><div class="wf-top"><span class="wf-name">${esc(w.name)}</span><span class="pill">${esc(w.source)}</span></div>
         <div class="wf-desc">${esc(w.description) || "&nbsp;"}</div>
@@ -224,7 +261,6 @@ async function loadWorkflows() {
 async function loadWatches() {
   try {
     const items = await getJSON("/api/watches");
-    $("wcount").textContent = items.length ? items.length + " held" : "";
     $("nav-w").textContent = items.length || "";
     $("watches").innerHTML = items.length ? items.map(w => {
       const id = esc(w.hold_id), p = esc(w.provider);
@@ -242,7 +278,6 @@ async function loadWatches() {
 let allHist = [], histExpanded = false;
 function renderHistory() {
   const evs = allHist.slice().reverse();
-  $("hcount").textContent = evs.length ? evs.length + " events" : "";
   if (!evs.length) { $("history-list").innerHTML = `<div class="empty">No run history yet.</div>`; return; }
   const shown = histExpanded ? evs : evs.slice(0, HIST_CAP);
   const rows = shown.map(e =>
@@ -250,14 +285,25 @@ function renderHistory() {
       <span class="act">${esc(e.action)}</span><span>${esc(e.workflow || "")}</span>
       ${e.actor ? `<span class="hactor">· ${esc(e.actor)}</span>` : ""}
       <span class="hmeta">${esc(fmtTime(e.time))}${e.hold_id ? " · " + esc(e.hold_id) : ""}</span></div>`).join("");
-  const more = evs.length > HIST_CAP
-    ? `<button class="btn-quiet btn-sm showall" onclick="toggleHist()">${histExpanded ? "Show fewer" : "Show all " + evs.length}</button>` : "";
+  const more = evs.length > HIST_CAP ? `<button class="btn-quiet btn-sm showall" onclick="toggleHist()">${histExpanded ? "Show fewer" : "Show all " + evs.length}</button>` : "";
   $("history-list").innerHTML = `<div class="hist">${rows}</div>${more}`;
 }
 function toggleHist() { histExpanded = !histExpanded; renderHistory(); }
 async function loadHistory() {
   try { allHist = await getJSON("/api/history"); renderHistory(); }
   catch (e) { $("history-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function loadDoctor() {
+  try {
+    const checks = await getJSON("/api/doctor");
+    $("setup-list").innerHTML = checks.map(c => {
+      const cls = c.ok ? "chk-ok" : (c.optional ? "chk-opt" : "chk-miss");
+      const badge = c.ok ? "✓" : (c.optional ? "–" : "!");
+      return `<div class="chk ${cls}"><span class="chk-badge">${badge}</span>
+        <div><div class="chk-label">${esc(c.label)}</div>${(c.hint && !c.ok) ? `<div class="chk-hint">${esc(c.hint)}</div>` : ""}</div></div>`;
+    }).join("");
+  } catch (e) { $("setup-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
 let currentWf = "";
@@ -293,23 +339,33 @@ async function action(a, id, provider) {
 }
 $("watches").addEventListener("click", (e) => { const b = e.target.closest("button[data-a]"); if (b) action(b.dataset.a, b.dataset.id, b.dataset.p); });
 
-// Sidebar (mobile) toggle.
+// Mobile sidebar toggle.
 function setNav(open) { $("sidebar").classList.toggle("open", open); $("scrim").classList.toggle("open", open); }
 $("hamb").addEventListener("click", () => setNav(!$("sidebar").classList.contains("open")));
 $("scrim").addEventListener("click", () => setNav(false));
-document.querySelectorAll(".nav-link").forEach(l => l.addEventListener("click", () => setNav(false)));
 
-// Scrollspy: highlight the nav link for the section in view.
-const links = {}; document.querySelectorAll(".nav-link").forEach(l => links[l.dataset.s] = l);
-["workflows","watching","history"].forEach(id => {
-  new IntersectionObserver((ents) => { ents.forEach(en => { if (en.isIntersecting) {
-    Object.values(links).forEach(l => l.classList.remove("active")); links[id].classList.add("active"); } }); },
-    { rootMargin:"-45% 0px -50% 0px" }).observe($(id));
-});
+// Page router: the sidebar switches whole pages, no scrolling between them.
+const pages = ["workflows","watching","runs","setup","help"];
+const titles = { workflows:"Workflows", watching:"Watching", runs:"Run history", setup:"Setup", help:"Help" };
+const loaders = { workflows:loadWorkflows, watching:loadWatches, runs:loadHistory, setup:loadDoctor };
+let activePage = "workflows";
+function showPage(p) {
+  if (!pages.includes(p)) p = "workflows";
+  activePage = p;
+  pages.forEach(x => $("page-" + x).classList.toggle("active", x === p));
+  document.querySelectorAll(".nav-link").forEach(l => l.classList.toggle("active", l.dataset.page === p));
+  $("pagetitle").textContent = titles[p];
+  window.scrollTo(0, 0);
+  setNav(false);
+  if (loaders[p]) loaders[p]();
+}
+function route() { showPage((location.hash || "#workflows").slice(1)); }
+window.addEventListener("hashchange", route);
 
 (async () => { try { $("ver").textContent = await (await fetch("/api/version")).text(); } catch {} })();
-loadWorkflows(); loadWatches(); loadHistory();
-setInterval(() => { loadWatches(); loadHistory(); }, 15000);
+loadWatches(); // keep the sidebar badge fresh regardless of page
+route();
+setInterval(() => { if (activePage === "watching") loadWatches(); if (activePage === "runs") loadHistory(); loadWatches(); }, 15000);
 </script>
 </body>
 </html>

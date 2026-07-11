@@ -71,6 +71,7 @@ func runApp(ctx context.Context, args []string) error {
 		_, _ = w.Write(b)
 	})
 	mux.HandleFunc("GET /api/workflows", appJSON(appWorkflows))
+	mux.HandleFunc("GET /api/doctor", appJSON(appDoctor))
 	mux.HandleFunc("GET /api/watches", appJSON(func() (any, error) { return loadWatches() }))
 	mux.HandleFunc("GET /api/history", appJSON(func() (any, error) {
 		store, serr := auditStore()
@@ -122,6 +123,28 @@ func appWorkflows() (any, error) {
 	out := make([]appWorkflow, 0, len(infos))
 	for _, in := range infos {
 		out = append(out, appWorkflow{Name: in.Name, Description: in.Description, Source: string(in.Source)})
+	}
+	return out, nil
+}
+
+// appCheck is one setup check with browser-friendly JSON keys.
+type appCheck struct {
+	// Label describes what was checked.
+	Label string `json:"label"`
+	// OK reports whether the check passed.
+	OK bool `json:"ok"`
+	// Hint is a remedy shown when the check is missing.
+	Hint string `json:"hint,omitempty"`
+	// Optional marks an informational check.
+	Optional bool `json:"optional"`
+}
+
+// appDoctor reports the configuration checks for the Setup page.
+func appDoctor() (any, error) {
+	checks := doctorChecks(os.Getenv)
+	out := make([]appCheck, 0, len(checks))
+	for _, c := range checks {
+		out = append(out, appCheck{Label: c.Label, OK: c.OK, Hint: c.Hint, Optional: c.Optional})
 	}
 	return out, nil
 }
