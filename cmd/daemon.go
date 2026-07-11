@@ -132,6 +132,12 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 			remaining = append(remaining, updated)
 		}
 	}
+	// The watch list is persisted once, after the pass runs each hold's side effects. A
+	// crash between a hold's side effects and this save replays that hold's branch on the
+	// next start, because the gate still reads resolved and the drop was never recorded.
+	// A non-idempotent side effect (a message or a note) can then repeat, and the audit
+	// log can show the outcome twice. Within a single process this does not happen; the
+	// durable fix is a transactional store, which is the seam the DB-backed store fills.
 	if err := saveWatches(remaining); err != nil {
 		logger.Printf("save watches: %v", err)
 	}
