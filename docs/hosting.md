@@ -70,3 +70,12 @@ export VAMOOSE_BAMBOOHR_STATUS=requested         # or approved, default requeste
 ```
 
 The built-in `pto-file-leave` workflow files leave once the manager approves, then notifies the team. Without these variables, a `leave` step reports that no HR system is configured, so add the step only when the HR system is set up.
+
+For any other system, point a `leave` step at a webhook instead of BambooHR and receive the leave with your own glue, such as Zapier, n8n, or a small endpoint:
+
+```sh
+export VAMOOSE_LEAVE_WEBHOOK_URL=https://hooks.example.com/leave
+export VAMOOSE_LEAVE_WEBHOOK_AUTH="Bearer <token>"   # optional, sent as Authorization
+```
+
+vamoose posts a JSON body with `employee_id`, `type_id`, `start`, `end`, and `note`. BambooHR is used when its variables are set; otherwise the webhook is used.

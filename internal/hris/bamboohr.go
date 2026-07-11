@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -91,14 +92,17 @@ func (f *BambooHRFiler) FileLeave(ctx context.Context, leave Leave) (string, err
 	return requestID(respBody, resp.Header.Get("Location")), nil
 }
 
-// requestID pulls the created request id from the JSON body's id field, falling back to
-// the last path segment of the Location header.
+// requestID pulls the created request id from the JSON body's id field, which HR systems
+// return as a number or a string, falling back to the last path segment of the Location
+// header.
 func requestID(body []byte, location string) string {
 	var out struct {
-		ID json.Number `json:"id"`
+		ID json.RawMessage `json:"id"`
 	}
-	if json.Unmarshal(body, &out) == nil && out.ID != "" {
-		return out.ID.String()
+	if json.Unmarshal(body, &out) == nil {
+		if id := strings.Trim(string(out.ID), `"`); id != "" && id != "null" {
+			return id
+		}
 	}
 	if location != "" {
 		seg := location

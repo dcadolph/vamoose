@@ -67,13 +67,17 @@ func resolveNotifier() comms.Notifier {
 }
 
 // resolveFiler returns the configured HR leave filer, or nil when none is set. BambooHR
-// is enabled by VAMOOSE_BAMBOOHR_SUBDOMAIN and VAMOOSE_BAMBOOHR_API_KEY.
+// (VAMOOSE_BAMBOOHR_SUBDOMAIN and VAMOOSE_BAMBOOHR_API_KEY) is preferred; otherwise a
+// generic webhook (VAMOOSE_LEAVE_WEBHOOK_URL) posts the leave anywhere, so any HR system
+// or automation platform can receive it.
 func resolveFiler() hris.Filer {
-	sub, key := os.Getenv("VAMOOSE_BAMBOOHR_SUBDOMAIN"), os.Getenv("VAMOOSE_BAMBOOHR_API_KEY")
-	if sub == "" || key == "" {
-		return nil
+	if sub, key := os.Getenv("VAMOOSE_BAMBOOHR_SUBDOMAIN"), os.Getenv("VAMOOSE_BAMBOOHR_API_KEY"); sub != "" && key != "" {
+		return hris.NewBambooHRFiler(sub, key, os.Getenv("VAMOOSE_BAMBOOHR_STATUS"))
 	}
-	return hris.NewBambooHRFiler(sub, key, os.Getenv("VAMOOSE_BAMBOOHR_STATUS"))
+	if url := os.Getenv("VAMOOSE_LEAVE_WEBHOOK_URL"); url != "" {
+		return hris.NewWebhookFiler(url, os.Getenv("VAMOOSE_LEAVE_WEBHOOK_AUTH"))
+	}
+	return nil
 }
 
 // workflowsDir returns the user workflow directory under the config directory.
@@ -364,7 +368,7 @@ func sendMessage(ctx context.Context, notifier comms.Notifier, step workflow.Ste
 // to the hold subject.
 func fileLeave(ctx context.Context, filer hris.Filer, step workflow.Step, hold calendar.Hold) error {
 	if filer == nil {
-		return fmt.Errorf("leave step needs an HR system: set VAMOOSE_BAMBOOHR_SUBDOMAIN and VAMOOSE_BAMBOOHR_API_KEY")
+		return fmt.Errorf("leave step needs an HR system: set VAMOOSE_BAMBOOHR_* or VAMOOSE_LEAVE_WEBHOOK_URL")
 	}
 	note := step.Subject
 	if note == "" {
