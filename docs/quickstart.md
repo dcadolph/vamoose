@@ -77,7 +77,10 @@ vamoose daemon
 
 ## Where next
 
-- [Concepts](concepts.md): how holds, approval, and workflows fit together.
-- [Workflows](workflows.md): design your own, with branching, delays, guards, and multi-level approval.
-- [Commands](commands.md): every command, flag, and environment variable.
-- [Slack](slack.md) and [Claude](claude-guide.md): drive vamoose from where you already work.
+| Guide                            | What's in it                                             &nbsp; |
+| -------------------------------- | ---------------------------------------------------------------- |
+| [Concepts](concepts.md)          | How holds, approval, and workflows fit together.                 |
+| [Workflows](workflows.md)        | Design your own, with branching, delays, guards, and approvers.  |
+| [Commands](commands.md)          | Every command, flag, and environment variable.                   |
+| [Slack](slack.md)                | Run vamoose from slash commands, with approval buttons.          |
+| [Claude](claude-guide.md)        | Drive and author workflows from Claude over MCP.                 |
