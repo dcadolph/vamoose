@@ -7,7 +7,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -110,19 +112,39 @@ func appWorkflows() (any, error) {
 	return out, nil
 }
 
-// localOnly rejects a request whose Host is not loopback, so a page in the user's browser
-// cannot reach this local server by rebinding a hostname to 127.0.0.1.
+// localOnly rejects a request that is not from this machine: its Host must be loopback,
+// which blunts DNS rebinding, and any Origin header must be a loopback origin, which stops
+// a cross-origin page in the user's browser from driving the server.
 func localOnly(w http.ResponseWriter, r *http.Request) bool {
-	host := r.Host
-	if i := strings.LastIndex(host, ":"); i >= 0 {
-		host = host[:i]
+	if !isLoopbackHost(hostname(r.Host)) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return false
 	}
+	if origin := r.Header.Get("Origin"); origin != "" {
+		if u, err := url.Parse(origin); err != nil || !isLoopbackHost(u.Hostname()) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return false
+		}
+	}
+	return true
+}
+
+// hostname returns the host without its port, unwrapping an IPv6 address's brackets.
+func hostname(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	return host
+}
+
+// isLoopbackHost reports whether host is a loopback name or address.
+func isLoopbackHost(host string) bool {
 	switch host {
-	case "127.0.0.1", "localhost", "::1", "[::1]":
+	case "127.0.0.1", "localhost", "::1":
 		return true
+	default:
+		return false
 	}
-	http.Error(w, "forbidden", http.StatusForbidden)
-	return false
 }
 
 // appJSON serves fn's result as JSON, guarded to loopback.

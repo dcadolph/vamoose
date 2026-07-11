@@ -34,6 +34,28 @@ func TestLocalOnly(t *testing.T) {
 	}
 }
 
+// TestLocalOnlyOrigin confirms a loopback request from a cross-origin page is refused, so
+// a page on another site cannot drive the local server.
+func TestLocalOnlyOrigin(t *testing.T) {
+	t.Parallel()
+	// Loopback host but a cross-origin Origin is forbidden.
+	r := httptest.NewRequest("POST", "/api/run", nil)
+	r.Host = "127.0.0.1:8787"
+	r.Header.Set("Origin", "http://evil.com")
+	w := httptest.NewRecorder()
+	if localOnly(w, r) || w.Code != http.StatusForbidden {
+		t.Errorf("cross-origin request should be forbidden, got code %d", w.Code)
+	}
+
+	// A loopback Origin is allowed.
+	r2 := httptest.NewRequest("POST", "/api/run", nil)
+	r2.Host = "127.0.0.1:8787"
+	r2.Header.Set("Origin", "http://127.0.0.1:8787")
+	if !localOnly(httptest.NewRecorder(), r2) {
+		t.Error("same-origin loopback request should be allowed")
+	}
+}
+
 // TestAppJSON confirms the JSON handler serves results, surfaces errors, and blocks
 // non-loopback callers.
 func TestAppJSON(t *testing.T) {
