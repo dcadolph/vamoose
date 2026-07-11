@@ -72,36 +72,55 @@ func workflowAdd(args []string) error {
 	if err != nil {
 		return fmt.Errorf("workflows add: read definition: %w", err)
 	}
-	wf, err := workflow.Parse(data)
+	wf, err := saveUserWorkflow(data)
 	if err != nil {
 		return fmt.Errorf("workflows add: %w", err)
 	}
-	if !safeWorkflowName(wf.Name) {
-		return fmt.Errorf("workflows add: invalid workflow name %q", wf.Name)
-	}
-	dir, err := workflowsDir()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	path := filepath.Join(dir, wf.Name+".json")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stdout, "Saved workflow %q to %s\n", wf.Name, path)
+	fmt.Fprintf(os.Stdout, "Saved workflow %q\n", wf.Name)
 	return nil
 }
 
-// workflowRemove deletes a user workflow by name. It never touches a built-in.
+// saveUserWorkflow validates a JSON definition and writes it to the user workflow
+// directory under its own name, so an invalid or unsafely named workflow is rejected
+// rather than written. The CLI and the dashboard both save through here.
+func saveUserWorkflow(data []byte) (workflow.Workflow, error) {
+	wf, err := workflow.Parse(data)
+	if err != nil {
+		return workflow.Workflow{}, err
+	}
+	if !safeWorkflowName(wf.Name) {
+		return workflow.Workflow{}, fmt.Errorf("invalid workflow name %q", wf.Name)
+	}
+	dir, err := workflowsDir()
+	if err != nil {
+		return workflow.Workflow{}, err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return workflow.Workflow{}, err
+	}
+	if err := os.WriteFile(filepath.Join(dir, wf.Name+".json"), data, 0o600); err != nil {
+		return workflow.Workflow{}, err
+	}
+	return wf, nil
+}
+
+// workflowRemove deletes a user workflow by name.
 func workflowRemove(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("workflows remove: name a workflow")
 	}
-	name := args[0]
+	if err := removeUserWorkflow(args[0]); err != nil {
+		return fmt.Errorf("workflows remove: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Removed workflow %q\n", args[0])
+	return nil
+}
+
+// removeUserWorkflow deletes a user workflow by name. It never touches a built-in,
+// since those are not files in the user directory.
+func removeUserWorkflow(name string) error {
 	if !safeWorkflowName(name) {
-		return fmt.Errorf("workflows remove: invalid name %q", name)
+		return fmt.Errorf("invalid name %q", name)
 	}
 	dir, err := workflowsDir()
 	if err != nil {
@@ -109,11 +128,10 @@ func workflowRemove(args []string) error {
 	}
 	if err := os.Remove(filepath.Join(dir, name+".json")); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("workflows remove: no user workflow named %q", name)
+			return fmt.Errorf("no user workflow named %q", name)
 		}
 		return err
 	}
-	fmt.Fprintf(os.Stdout, "Removed workflow %q\n", name)
 	return nil
 }
 

@@ -105,6 +105,33 @@ func TestLoadUserOverride(t *testing.T) {
 	}
 }
 
+// TestRaw confirms Raw returns the definition bytes as written with the right source:
+// a user file wins over a built-in, a built-in falls through, and an unknown or unsafe
+// name is rejected.
+func TestRaw(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "pto.json"), `{"name":"pto","steps":[{"verb":"away"}]}`)
+	l := Loader{UserDir: dir}
+
+	data, source, err := l.Raw("pto")
+	if err != nil || source != SourceUser {
+		t.Fatalf("Raw(pto) source = %v, err = %v; want user", source, err)
+	}
+	if string(data) != `{"name":"pto","steps":[{"verb":"away"}]}` {
+		t.Errorf("Raw(pto) did not return the bytes as written: %s", data)
+	}
+	if _, source, err = l.Raw("away"); err != nil || source != SourceBuiltin {
+		t.Errorf("Raw(away) source = %v, err = %v; want builtin", source, err)
+	}
+	if _, _, err = l.Raw("ghost"); !errors.Is(err, ErrUnknownWorkflow) {
+		t.Errorf("Raw(ghost) err = %v, want ErrUnknownWorkflow", err)
+	}
+	if _, _, err = l.Raw("../evil"); !errors.Is(err, ErrUnknownWorkflow) {
+		t.Errorf("Raw(../evil) err = %v, want ErrUnknownWorkflow", err)
+	}
+}
+
 // TestList confirms listing merges built-ins with user overrides and sorts by name.
 func TestList(t *testing.T) {
 	t.Parallel()

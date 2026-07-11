@@ -137,7 +137,7 @@ Serve the vamoose Slack app: run vamoose from slash commands, with Approve and D
 
 `vamoose app [--addr 127.0.0.1:8787] [--no-open]`
 
-Open a local web dashboard in your browser: run a workflow, act on watched holds (check, promote, cancel), and read the run history. It binds to loopback only and refuses non-loopback or cross-origin requests, so the UI is reachable just from your machine. On macOS, `make app` packages it as a `Vamoose.app` you can drag to Applications and double-click.
+Open a local web dashboard in your browser: run a workflow, author or edit one in a JSON editor (saved through the same validation as `workflows add`), act on watched holds (check, promote, cancel), read the run history, and check your setup. It binds to loopback only and refuses non-loopback or cross-origin requests, so the UI is reachable just from your machine. On macOS, `make app` packages it as a `Vamoose.app` you can drag to Applications and double-click.
 
 ## Info
 

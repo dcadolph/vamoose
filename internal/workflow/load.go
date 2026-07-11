@@ -68,26 +68,37 @@ func Parse(data []byte) (Workflow, error) {
 // Load returns the workflow with the given name. A file in UserDir wins over a
 // built-in template of the same name.
 func (l Loader) Load(name string) (Workflow, error) {
+	data, _, err := l.Raw(name)
+	if err != nil {
+		return Workflow{}, err
+	}
+	return Parse(data)
+}
+
+// Raw returns a workflow's definition bytes and their source, without parsing, so a
+// caller can show or edit the JSON as written. A file in UserDir wins over a built-in
+// template of the same name.
+func (l Loader) Raw(name string) ([]byte, Source, error) {
 	if !validName(name) {
-		return Workflow{}, fmt.Errorf("%w: %q", ErrUnknownWorkflow, name)
+		return nil, "", fmt.Errorf("%w: %q", ErrUnknownWorkflow, name)
 	}
 	if l.UserDir != "" {
 		data, err := os.ReadFile(filepath.Join(l.UserDir, name+".json"))
 		switch {
 		case err == nil:
-			return Parse(data)
+			return data, SourceUser, nil
 		case !errors.Is(err, os.ErrNotExist):
-			return Workflow{}, fmt.Errorf("read workflow %q: %w", name, err)
+			return nil, "", fmt.Errorf("read workflow %q: %w", name, err)
 		}
 	}
 	data, err := builtinFS.ReadFile(path.Join(templateDir, name+".json"))
 	if errors.Is(err, fs.ErrNotExist) {
-		return Workflow{}, fmt.Errorf("%w: %q", ErrUnknownWorkflow, name)
+		return nil, "", fmt.Errorf("%w: %q", ErrUnknownWorkflow, name)
 	}
 	if err != nil {
-		return Workflow{}, err
+		return nil, "", err
 	}
-	return Parse(data)
+	return data, SourceBuiltin, nil
 }
 
 // List returns every available workflow, user definitions overriding built-ins of

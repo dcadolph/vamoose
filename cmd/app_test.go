@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -39,6 +40,50 @@ func TestAppAction(t *testing.T) {
 	h(w, jsonReq("/api/action", `{"action":"check","holdID":"X","provider":"caldav"}`))
 	if w.Code != http.StatusOK {
 		t.Errorf("valid action code = %d, want 200", w.Code)
+	}
+}
+
+// TestAppWorkflowAuthoring drives the dashboard authoring APIs end to end: save a
+// definition, read it back with its source, reject an invalid one, and delete it. It
+// isolates the config directory, so it is not parallel.
+func TestAppWorkflowAuthoring(t *testing.T) {
+	isolateConfig(t)
+	def := `{"name":"from-ui","description":"UI made.","steps":[{"verb":"away"}]}`
+
+	// Save a valid definition.
+	w := httptest.NewRecorder()
+	appWorkflowSave(w, jsonReq("/api/workflows/save", `{"definition":`+strconv.Quote(def)+`}`))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "from-ui") {
+		t.Fatalf("save = %d %s, want 200 with the name", w.Code, w.Body.String())
+	}
+
+	// Read it back as written, marked as a user workflow.
+	w = httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/workflow?name=from-ui", nil)
+	r.Host = "127.0.0.1:8787"
+	appWorkflowGet(w, r)
+	var got struct{ Name, Source, Definition string }
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil || got.Source != "user" || got.Definition != def {
+		t.Fatalf("get = %+v, %v; want the definition back as user", got, err)
+	}
+
+	// An invalid definition is rejected with the validation message.
+	w = httptest.NewRecorder()
+	appWorkflowSave(w, jsonReq("/api/workflows/save", `{"definition":"{\"name\":\"bad\",\"steps\":[]}"}`))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("invalid save code = %d, want 400", w.Code)
+	}
+
+	// Delete it, and a second delete reports it is gone.
+	w = httptest.NewRecorder()
+	appWorkflowDelete(w, jsonReq("/api/workflows/delete", `{"name":"from-ui"}`))
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete code = %d, want 200", w.Code)
+	}
+	w = httptest.NewRecorder()
+	appWorkflowDelete(w, jsonReq("/api/workflows/delete", `{"name":"from-ui"}`))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("second delete code = %d, want 400", w.Code)
 	}
 }
 

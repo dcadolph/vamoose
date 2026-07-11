@@ -82,6 +82,9 @@ func runApp(ctx context.Context, args []string) error {
 	}))
 	mux.HandleFunc("POST /api/run", appRun(exe))
 	mux.HandleFunc("POST /api/action", appAction(exe))
+	mux.HandleFunc("GET /api/workflow", appWorkflowGet)
+	mux.HandleFunc("POST /api/workflows/save", appWorkflowSave)
+	mux.HandleFunc("POST /api/workflows/delete", appWorkflowDelete)
 
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second}
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
@@ -243,6 +246,68 @@ func appRun(exe string) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}
+}
+
+// appWorkflowGet returns a workflow's raw JSON definition and source, so the dashboard
+// editor can show it as written.
+func appWorkflowGet(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
+	name := r.URL.Query().Get("name")
+	data, source, err := workflowLoader().Raw(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"name": name, "source": string(source), "definition": string(data),
+	})
+}
+
+// appWorkflowSave validates and saves a user workflow definition from the dashboard
+// editor, through the same path as the workflows add command. A validation failure
+// comes back as the response error text so the editor can show it.
+func appWorkflowSave(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
+	var req struct {
+		Definition string `json:"definition"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Definition) == "" {
+		http.Error(w, "a definition is required", http.StatusBadRequest)
+		return
+	}
+	wf, err := saveUserWorkflow([]byte(req.Definition))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"name": wf.Name})
+}
+
+// appWorkflowDelete removes a user workflow from the dashboard. Built-ins are not
+// files in the user directory, so they cannot be deleted, only shadowed.
+func appWorkflowDelete(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+		http.Error(w, "a name is required", http.StatusBadRequest)
+		return
+	}
+	if err := removeUserWorkflow(req.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
 // appAction runs check, promote, or cancel on a watched hold by shelling out, so the

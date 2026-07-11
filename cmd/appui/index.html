@@ -131,8 +131,12 @@
   .modal h3 { margin:0 0 1rem; font-size:1.1rem; }
   .modal h3 b { color:var(--amber); }
   label { display:block; color:var(--dim); font-size:.8rem; margin:.75rem 0 .28rem; }
-  input { width:100%; background:#141518; color:var(--fg); border:1px solid var(--line-hi); border-radius:9px; padding:.5rem .7rem; font:inherit; }
-  input:focus { outline:none; border-color:var(--amber-line); }
+  input, textarea { width:100%; background:#141518; color:var(--fg); border:1px solid var(--line-hi); border-radius:9px; padding:.5rem .7rem; font:inherit; }
+  input:focus, textarea:focus { outline:none; border-color:var(--amber-line); }
+  textarea { font-family:var(--mono); font-size:.84rem; line-height:1.5; resize:vertical; min-height:280px; }
+  .modal.wide { width:min(680px,100%); }
+  .page-actions { display:flex; justify-content:flex-end; margin:-.4rem 0 1rem; }
+  .wf-acts { display:flex; gap:.45rem; margin-top:.85rem; flex-wrap:wrap; }
   .modal-acts { display:flex; gap:.6rem; margin-top:1.2rem; align-items:center; }
   pre { background:#111214; border:1px solid var(--line); border-radius:10px; padding:.8rem; white-space:pre-wrap; word-break:break-word; color:var(--dim); max-height:240px; overflow:auto; font-family:var(--mono); font-size:.82rem; margin:1rem 0 0; }
   .toast { position:fixed; bottom:1.2rem; left:calc(50% + var(--side-w)/2); transform:translateX(-50%); background:var(--card-hi); border:1px solid var(--line-hi); border-radius:10px; padding:.6rem 1rem; box-shadow:var(--shadow); font-size:.9rem; display:none; z-index:60; }
@@ -179,7 +183,8 @@
 
   <main>
     <div class="page" id="page-workflows">
-      <p class="page-intro">Every workflow available to run, built in or authored by you. Time off is the flagship; each is a small state machine of steps.</p>
+      <p class="page-intro">Every workflow available to run, built in or authored by you. Time off is the flagship; each is a small state machine of steps. Open one to see or change its definition, or start a new one.</p>
+      <div class="page-actions"><button class="btn-primary btn-sm" onclick="openEditor(null)">+ New workflow</button></div>
       <div class="grid" id="workflows-grid"><div class="empty">Loading…</div></div>
     </div>
 
@@ -252,6 +257,20 @@
     <pre id="runout" style="display:none"></pre>
   </div>
 </div>
+
+<div class="overlay" id="editor-overlay">
+  <div class="modal wide" role="dialog" aria-modal="true">
+    <h3 id="editor-title">New workflow</h3>
+    <label>Definition (JSON; the <code>name</code> becomes the file name)</label>
+    <textarea id="editor-text" spellcheck="false"></textarea>
+    <div class="modal-acts">
+      <button class="btn-primary" onclick="saveEditor()">Save</button>
+      <span class="spacer"></span>
+      <button class="btn-quiet" onclick="closeEditor()">Close</button>
+    </div>
+    <pre id="editor-err" style="display:none"></pre>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -268,11 +287,16 @@ function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("sh
 async function loadWorkflows() {
   try {
     const wfs = await getJSON("/api/workflows");
-    $("workflows-grid").innerHTML = wfs.map(w =>
-      `<div class="card"><div class="wf-top"><span class="wf-name">${esc(w.name)}</span><span class="pill">${esc(w.source)}</span></div>
+    $("workflows-grid").innerHTML = wfs.map(w => {
+      const n = esc(w.name), user = w.source === "user";
+      return `<div class="card"><div class="wf-top"><span class="wf-name">${n}</span><span class="pill">${esc(w.source)}</span></div>
         <div class="wf-desc">${esc(w.description) || "&nbsp;"}</div>
-        <button class="btn-ghost btn-sm wf-run" onclick="openModal('${esc(w.name)}')">Run ▸</button></div>`
-    ).join("") || `<div class="empty">No workflows.</div>`;
+        <div class="wf-acts">
+          <button class="btn-ghost btn-sm" onclick="openModal('${n}')">Run ▸</button>
+          <button class="btn-quiet btn-sm" onclick="openEditor('${n}')">${user ? "Edit" : "View"}</button>
+          ${user ? `<button class="btn-danger btn-sm" onclick="deleteWorkflow('${n}')">Delete</button>` : ""}
+        </div></div>`;
+    }).join("") || `<div class="empty">No workflows.</div>`;
   } catch (e) { $("workflows-grid").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
@@ -341,7 +365,61 @@ function openModal(name) {
 }
 function closeModal() { $("overlay").classList.remove("open"); }
 $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeModal(); });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeEditor(); } });
+
+// Workflow editor: author or change a definition; a builtin saved unchanged in name
+// becomes a user override the loader prefers.
+const STARTER = `{
+  "name": "my-workflow",
+  "description": "What this does.",
+  "steps": [
+    { "id": "hold", "verb": "hold", "showAs": "free" },
+    { "id": "approval", "verb": "approve", "manager": true, "on": { "accepted": "notify" } },
+    { "id": "notify", "verb": "notify", "team": "optional", "next": "end" }
+  ]
+}
+`;
+async function openEditor(name) {
+  $("editor-err").style.display = "none"; $("editor-err").textContent = "";
+  if (name === null) {
+    $("editor-title").textContent = "New workflow";
+    $("editor-text").value = STARTER;
+  } else {
+    $("editor-title").textContent = "Edit " + name;
+    $("editor-text").value = "Loading…";
+    try {
+      const d = await getJSON("/api/workflow?name=" + encodeURIComponent(name));
+      $("editor-text").value = d.definition;
+      if (d.source === "builtin") $("editor-title").textContent = name + " (builtin; saving makes your copy)";
+    } catch (e) { $("editor-text").value = ""; toast(e.message); return; }
+  }
+  $("editor-overlay").classList.add("open");
+  $("editor-text").focus();
+}
+function closeEditor() { $("editor-overlay").classList.remove("open"); }
+$("editor-overlay").addEventListener("click", (e) => { if (e.target === $("editor-overlay")) closeEditor(); });
+
+async function saveEditor() {
+  const err = $("editor-err");
+  err.style.display = "none";
+  try {
+    const r = await fetch("/api/workflows/save", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ definition: $("editor-text").value }) });
+    if (!r.ok) { err.style.display = "block"; err.textContent = await r.text(); return; }
+    const d = await r.json();
+    closeEditor(); toast("Saved " + d.name); loadWorkflows();
+  } catch (e) { err.style.display = "block"; err.textContent = e.message; }
+}
+
+async function deleteWorkflow(name) {
+  if (!confirm("Delete the workflow " + name + "?")) return;
+  try {
+    const r = await fetch("/api/workflows/delete", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ name }) });
+    toast(r.ok ? "Deleted " + name : await r.text());
+  } catch (e) { toast(e.message); }
+  loadWorkflows();
+}
 
 async function doRun(dry) {
   const out = $("runout"); out.style.display = "block"; out.textContent = "Running…";
