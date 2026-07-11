@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dcadolph/vamoose/internal/metrics"
 )
 
 const (
@@ -81,6 +83,35 @@ type Server struct {
 	// perUserEnv supplies extra per-user environment, such as the watch file, added
 	// to a command's credentials in per-user mode.
 	perUserEnv func(team, user string) []string
+	// registry holds the process metrics served at /metrics.
+	registry *metrics.Registry
+	// mx holds the server's counters.
+	mx serverMetrics
+}
+
+// serverMetrics are the counters the Slack server tracks for observability.
+type serverMetrics struct {
+	// commands counts dispatched slash commands.
+	commands *metrics.Counter
+	// actions counts approval button clicks that ran.
+	actions *metrics.Counter
+	// actionsRejected counts button clicks refused: a forged value or a non-approver.
+	actionsRejected *metrics.Counter
+	// commandErrors counts slash commands whose run failed.
+	commandErrors *metrics.Counter
+	// installs counts completed workspace installs.
+	installs *metrics.Counter
+}
+
+// newServerMetrics registers the server counters on reg.
+func newServerMetrics(reg *metrics.Registry) serverMetrics {
+	return serverMetrics{
+		commands:        reg.Counter("vamoose_slack_commands_total", "Slash commands dispatched."),
+		actions:         reg.Counter("vamoose_slack_actions_total", "Approval button clicks that ran."),
+		actionsRejected: reg.Counter("vamoose_slack_actions_rejected_total", "Approval clicks refused as forged or unauthorized."),
+		commandErrors:   reg.Counter("vamoose_slack_command_errors_total", "Slash commands whose run failed."),
+		installs:        reg.Counter("vamoose_slack_installs_total", "Completed workspace installs."),
+	}
 }
 
 // Option configures a Server.
@@ -115,6 +146,8 @@ func NewServer(signingSecret string, run Runner, opts ...Option) *Server {
 	}
 	s.states = newStateStore(s.now)
 	s.linkStates = newLinkStateStore(s.now)
+	s.registry = metrics.New()
+	s.mx = newServerMetrics(s.registry)
 	return s
 }
 
@@ -164,6 +197,7 @@ func (s *Server) Handler() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "ok")
 	})
+	mux.HandleFunc("GET /metrics", s.registry.Handler())
 	if s.clientID != "" {
 		mux.HandleFunc("GET /slack/install", s.handleInstall)
 		mux.HandleFunc("GET /slack/oauth/callback", s.handleOAuthCallback)
@@ -213,6 +247,7 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, "ephemeral", "The `"+args[0]+"` command is not available from Slack.")
 		return
 	}
+	s.mx.commands.Inc()
 	// Per-user commands run as the invoking user's linked calendar; single-tenant
 	// commands run as the server. Either way the team is passed so an approval can bind
 	// the approver.
@@ -246,6 +281,7 @@ func (s *Server) runCommand(responseURL string, args, env []string, ownerTeam, o
 	defer cancel()
 	out, err := s.run(ctx, args, env)
 	if err != nil {
+		s.mx.commandErrors.Inc()
 		// Report the error to the invoker but log the raw output server side rather than
 		// posting it, so internal detail does not leak.
 		log.Printf("slack: command %q failed: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(out))
@@ -448,13 +484,16 @@ func (s *Server) handleInteractivity(w http.ResponseWriter, r *http.Request) {
 func (s *Server) runAction(responseURL, clicker, actionID, value string) {
 	p, ok := s.decodeApprovalValue(value)
 	if !ok {
+		s.mx.actionsRejected.Inc()
 		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "This approval action is invalid or has expired."})
 		return
 	}
 	if p.A != "" && clicker != p.A {
+		s.mx.actionsRejected.Inc()
 		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Only <@" + p.A + "> can act on this request."})
 		return
 	}
+	s.mx.actions.Inc()
 	var args []string
 	var done, verb string
 	switch actionID {

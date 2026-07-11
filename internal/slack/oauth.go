@@ -67,6 +67,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not save install", http.StatusInternalServerError)
 		return
 	}
+	s.mx.installs.Inc()
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte("vamoose installed to your workspace. You can close this tab."))
 }

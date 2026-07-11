@@ -310,6 +310,29 @@ func TestActionRejectsForgedValue(t *testing.T) {
 	}
 }
 
+// TestServerMetrics confirms the server counts commands and rejected actions and serves
+// them at /metrics in Prometheus text format.
+func TestServerMetrics(t *testing.T) {
+	t.Parallel()
+	s := NewServer("shh", noopRunner)
+	h := s.Handler()
+
+	// A dispatched command is counted (the increment is synchronous in handleCommand).
+	signedForm(t, h, "shh", "/slack/commands", url.Values{"text": {"off next week"}, "team_id": {"T1"}})
+	// A forged action click is rejected and counted.
+	s.runAction("", "U0", actionApprove, "forged.value")
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	body := w.Body.String()
+	for _, want := range []string{"vamoose_slack_commands_total 1", "vamoose_slack_actions_rejected_total 1"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics missing %q:\n%s", want, body)
+		}
+	}
+}
+
 // TestAllowedSubcommand checks the Slack slash allowlist: user calendar and workflow
 // verbs are reachable, host operations and the approval actions are not.
 func TestAllowedSubcommand(t *testing.T) {
