@@ -126,4 +126,15 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/vamoose.rb
           git commit -m "Update vamoose to ${VER}"
-          git push
+          # Another formula's release can push to the shared tap between our clone and
+          # push, so rebase and retry instead of failing on a non-fast-forward.
+          for attempt in 1 2 3; do
+            if git push; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "tap push failed after retries" >&2
+              exit 1
+            fi
+            git pull --rebase
+          done
