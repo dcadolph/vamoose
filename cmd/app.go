@@ -51,6 +51,12 @@ func runApp(ctx context.Context, args []string) error {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(index)
 	})
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		if !localOnly(w, r) {
+			return
+		}
+		_, _ = io.WriteString(w, "ok")
+	})
 	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, r *http.Request) {
 		if !localOnly(w, r) {
 			return

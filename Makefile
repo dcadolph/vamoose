@@ -1,6 +1,6 @@
 # vamoose build targets.
 
-.PHONY: build eventkit app test clean
+.PHONY: build eventkit app tray test clean
 
 # build compiles the vamoose CLI.
 build:
@@ -44,10 +44,24 @@ eventkit:
 		-Xlinker internal/eventkit/Info.plist
 	codesign --force --sign - $(APP)
 
+# tray builds the macOS menu bar companion: a status-bar moose showing watched holds
+# with check, promote, and cancel, backed by the local dashboard APIs. It bundles the
+# vamoose binary so it can start the app server and daemon itself. Requires macOS and
+# the Swift toolchain.
+TRAYAPP := VamooseTray.app
+tray: build
+	rm -rf $(TRAYAPP)
+	mkdir -p $(TRAYAPP)/Contents/MacOS
+	cp packaging/macos/tray-Info.plist $(TRAYAPP)/Contents/Info.plist
+	cp vamoose $(TRAYAPP)/Contents/MacOS/vamoose
+	swiftc -O -swift-version 5 internal/tray/vamoose-tray.swift -o $(TRAYAPP)/Contents/MacOS/vamoose-tray
+	codesign --force --deep --sign - $(TRAYAPP)
+	@echo "Built $(TRAYAPP). Open it and look for the moose in the menu bar."
+
 # test runs the Go test suite.
 test:
 	go test ./...
 
 # clean removes the built binaries.
 clean:
-	rm -rf vamoose vamoose-eventkit vamoose-eventkit.app Vamoose.app vamoose.iconset
+	rm -rf vamoose vamoose-eventkit vamoose-eventkit.app Vamoose.app VamooseTray.app vamoose.iconset
