@@ -94,14 +94,24 @@
   .hmeta { color:var(--faint); font-family:var(--mono); font-size:.8rem; margin-left:auto; white-space:nowrap; }
   .showall { margin-top:.8rem; }
 
-  .chk { display:flex; gap:.7rem; align-items:flex-start; padding:.6rem .9rem; border:1px solid var(--line);
-    border-radius:10px; margin-bottom:.5rem; background:var(--card); }
-  .chk-badge { width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:.8rem; font-weight:700; flex:none; margin-top:1px; }
+  .setup-sum { display:flex; align-items:center; gap:.55rem; padding:.75rem 1rem; border-radius:11px;
+    margin-bottom:.4rem; font-weight:600; }
+  .setup-sum.ok { background:rgba(91,189,122,.11); color:var(--green); border:1px solid rgba(91,189,122,.28); }
+  .setup-sum.warn { background:var(--amber-soft); color:var(--amber); border:1px solid var(--amber-line); }
+  .group-head { font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--faint);
+    margin:1.5rem 0 .55rem; font-weight:660; }
+  .rows { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--card); }
+  .chk { display:flex; gap:.75rem; align-items:center; padding:.62rem .95rem; border-top:1px solid var(--line); }
+  .chk:first-child { border-top:0; }
+  .chk-badge { width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font-size:.76rem;
+    font-weight:700; flex:none; }
   .chk-ok .chk-badge { background:rgba(91,189,122,.16); color:var(--green); }
   .chk-miss .chk-badge { background:rgba(224,103,76,.16); color:var(--red); }
   .chk-opt .chk-badge { background:rgba(255,255,255,.06); color:var(--dim); }
-  .chk-label { font-weight:560; }
-  .chk-hint { color:var(--dim); font-size:.85rem; margin-top:.12rem; }
+  .chk-label { font-weight:550; }
+  .chk-hint { color:var(--dim); font-size:.84rem; margin-top:.1rem; }
+  .steps { padding-left:1.15rem; color:var(--dim); }
+  .steps li { margin:.4rem 0; }
 
   .prose { max-width:74ch; }
   .prose h3 { font-size:1.02rem; margin:1.7rem 0 .6rem; color:var(--amber); }
@@ -192,6 +202,14 @@
       <div class="prose">
         <h3>What is vamoose</h3>
         <p>A smart calendar-workflow engine. Declare ordered steps that branch, wait, and gate on approval, and vamoose runs them across any calendar backend from your terminal, Claude, or Slack. Time off is the flagship workflow, not the whole scope.</p>
+        <h3>Getting started</h3>
+        <ol class="steps">
+          <li>Install: <code>brew install dcadolph/tap/vamoose</code></li>
+          <li>Sign in to your calendar with <code>vamoose login</code>, or set your provider on the Setup page.</li>
+          <li>Request time off: <code>vamoose off next week --watch</code></li>
+          <li>Advance approvals in the background: <code>vamoose daemon</code></li>
+          <li>Watch and act on it right here in the dashboard.</li>
+        </ol>
         <h3>Quick commands</h3>
         <ul>
           <li><code class="cmd">vamoose off next week</code> request time off from a phrase</li>
@@ -294,15 +312,23 @@ async function loadHistory() {
   catch (e) { $("history-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
+function chkRow(c) {
+  const cls = c.ok ? "chk-ok" : (c.optional ? "chk-opt" : "chk-miss");
+  const badge = c.ok ? "✓" : (c.optional ? "–" : "!");
+  return `<div class="chk ${cls}"><span class="chk-badge">${badge}</span>
+    <div><div class="chk-label">${esc(c.label)}</div>${(c.hint && !c.ok) ? `<div class="chk-hint">${esc(c.hint)}</div>` : ""}</div></div>`;
+}
 async function loadDoctor() {
   try {
     const checks = await getJSON("/api/doctor");
-    $("setup-list").innerHTML = checks.map(c => {
-      const cls = c.ok ? "chk-ok" : (c.optional ? "chk-opt" : "chk-miss");
-      const badge = c.ok ? "✓" : (c.optional ? "–" : "!");
-      return `<div class="chk ${cls}"><span class="chk-badge">${badge}</span>
-        <div><div class="chk-label">${esc(c.label)}</div>${(c.hint && !c.ok) ? `<div class="chk-hint">${esc(c.hint)}</div>` : ""}</div></div>`;
-    }).join("");
+    const req = checks.filter(c => !c.optional), opt = checks.filter(c => c.optional);
+    const missing = req.filter(c => !c.ok).length;
+    const sum = missing === 0
+      ? `<div class="setup-sum ok">✓ Everything required is configured</div>`
+      : `<div class="setup-sum warn">! ${missing} required setting${missing > 1 ? "s" : ""} still needed</div>`;
+    const group = (title, list) => list.length
+      ? `<div class="group-head">${title}</div><div class="rows">${list.map(chkRow).join("")}</div>` : "";
+    $("setup-list").innerHTML = sum + group("Required", req) + group("Optional", opt);
   } catch (e) { $("setup-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
