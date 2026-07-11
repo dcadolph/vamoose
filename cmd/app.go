@@ -67,6 +67,7 @@ func runApp(ctx context.Context, args []string) error {
 		return store.Events()
 	}))
 	mux.HandleFunc("POST /api/run", appRun(exe))
+	mux.HandleFunc("POST /api/action", appAction(exe))
 
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second}
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
@@ -195,6 +196,44 @@ func appRun(exe string) http.HandlerFunc {
 		}
 		if req.DryRun {
 			args = append(args, "--dry-run")
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, exe, args...).CombinedOutput()
+		resp := map[string]any{"output": string(out)}
+		if err != nil {
+			resp["error"] = err.Error()
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// appAction runs check, promote, or cancel on a watched hold by shelling out, so the
+// dashboard can act on a hold. The action is allowlisted to those hold-scoped commands.
+func appAction(exe string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !localOnly(w, r) {
+			return
+		}
+		var req struct {
+			Action   string `json:"action"`
+			Provider string `json:"provider"`
+			HoldID   string `json:"holdID"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.HoldID == "" {
+			http.Error(w, "an action and hold id are required", http.StatusBadRequest)
+			return
+		}
+		switch req.Action {
+		case "check", "promote", "cancel":
+		default:
+			http.Error(w, "unknown action", http.StatusBadRequest)
+			return
+		}
+		args := []string{req.Action, "--id", req.HoldID}
+		if req.Provider != "" {
+			args = append(args, "--provider", req.Provider)
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 		defer cancel()

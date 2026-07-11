@@ -5,137 +5,255 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>vamoose</title>
 <style>
-  :root { --bg:#191919; --panel:#212121; --line:#333; --amber:#d9a441; --fg:#e8e6e1; --dim:#9a978f; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg);
-    font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
-  header { display:flex; align-items:center; gap:.6rem; padding:1rem 1.4rem; border-bottom:1px solid var(--line); }
-  header h1 { font-size:1.2rem; margin:0; font-weight:700; letter-spacing:.02em; }
-  header .amber { color:var(--amber); }
-  header .ver { margin-left:auto; color:var(--dim); font-size:.85rem; }
-  main { max-width:1100px; margin:0 auto; padding:1.4rem; display:grid; gap:1.4rem;
-    grid-template-columns: 1fr 1fr; }
-  section { background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--amber);
-    border-radius:.7rem; padding:1.1rem 1.2rem; }
-  section.wide { grid-column: 1 / -1; }
-  h2 { font-size:1rem; margin:0 0 .8rem; color:var(--amber); }
-  .row { padding:.55rem 0; border-top:1px solid var(--line); }
-  .row:first-of-type { border-top:0; }
-  .name { font-weight:600; }
-  .desc, .meta { color:var(--dim); font-size:.86rem; }
-  button { background:var(--amber); color:#191919; border:0; border-radius:.4rem;
-    padding:.4rem .8rem; font-weight:600; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--amber); border:1px solid var(--amber); }
-  button:hover { filter:brightness(1.08); }
-  label { display:block; color:var(--dim); font-size:.8rem; margin:.5rem 0 .2rem; }
-  input, select { width:100%; background:#171717; color:var(--fg); border:1px solid var(--line);
-    border-radius:.4rem; padding:.45rem .6rem; }
-  .form-actions { display:flex; gap:.6rem; margin-top:.9rem; align-items:center; }
-  pre { background:#141414; border:1px solid var(--line); border-radius:.5rem; padding:.8rem;
-    white-space:pre-wrap; word-break:break-word; color:var(--dim); max-height:220px; overflow:auto; }
-  .pill { display:inline-block; font-size:.72rem; padding:.05rem .45rem; border-radius:1rem;
-    border:1px solid var(--line); color:var(--dim); margin-left:.4rem; }
-  .act { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--amber); }
-  .empty { color:var(--dim); font-style:italic; }
+  :root {
+    --bg:#161719; --panel:#1c1d20; --card:#202226; --card-hi:#26282d;
+    --line:rgba(255,255,255,.07); --line-hi:rgba(255,255,255,.14);
+    --amber:#e0a94a; --amber-soft:rgba(224,169,74,.13); --amber-line:rgba(224,169,74,.4);
+    --fg:#ececec; --dim:#9a9ba0; --faint:#6d6e73;
+    --green:#5bbd7a; --red:#e0674c; --blue:#6ea8d8;
+    --shadow:0 10px 34px rgba(0,0,0,.45);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { background:
+      radial-gradient(1100px 380px at 78% -8%, rgba(224,169,74,.09), transparent 70%),
+      var(--bg);
+    color:var(--fg); font:15px/1.55 var(--font); -webkit-font-smoothing:antialiased; }
+
+  header { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.7rem;
+    padding:.85rem 1.5rem; background:rgba(22,23,25,.82); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line); }
+  .brand { font-size:1.28rem; font-weight:750; letter-spacing:.01em; }
+  .brand .a { color:var(--amber); }
+  .brand .moose { font-size:1.35rem; margin-right:.1rem; }
+  .spacer { flex:1; }
+  .ver { color:var(--faint); font-size:.82rem; font-family:var(--mono); }
+
+  main { max-width:1180px; margin:0 auto; padding:1.6rem 1.5rem 3rem; }
+  .sec { margin-bottom:2rem; }
+  .sec-head { display:flex; align-items:baseline; gap:.7rem; margin:0 0 1rem; }
+  .sec-head h2 { font-size:1.06rem; font-weight:680; margin:0; }
+  .sec-head .count { color:var(--faint); font-size:.85rem; }
+  .sec-head::before { content:""; width:3px; height:1.05rem; background:var(--amber);
+    border-radius:2px; margin-right:.2rem; }
+
+  .grid { display:grid; gap:.9rem; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:1rem 1.1rem; transition:.18s ease; display:flex; flex-direction:column; }
+  .card:hover { background:var(--card-hi); border-color:var(--line-hi); transform:translateY(-2px);
+    box-shadow:var(--shadow); }
+  .wf-top { display:flex; align-items:center; gap:.5rem; margin-bottom:.35rem; }
+  .wf-name { font-weight:660; font-size:1rem; }
+  .pill { font-size:.68rem; letter-spacing:.03em; text-transform:uppercase; color:var(--dim);
+    border:1px solid var(--line-hi); border-radius:1rem; padding:.08rem .5rem; }
+  .wf-desc { color:var(--dim); font-size:.88rem; flex:1; }
+  .wf-run { align-self:flex-start; margin-top:.85rem; }
+
+  button { font:inherit; cursor:pointer; border-radius:9px; border:1px solid transparent;
+    padding:.42rem .9rem; font-weight:620; transition:.15s ease; }
+  .btn-primary { background:var(--amber); color:#1a1206; }
+  .btn-primary:hover { filter:brightness(1.07); }
+  .btn-ghost { background:transparent; color:var(--amber); border-color:var(--amber-line); }
+  .btn-ghost:hover { background:var(--amber-soft); }
+  .btn-sm { padding:.28rem .7rem; font-size:.83rem; }
+  .btn-quiet { background:transparent; color:var(--dim); border-color:var(--line-hi); }
+  .btn-quiet:hover { color:var(--fg); border-color:var(--line-hi); background:rgba(255,255,255,.04); }
+  .btn-danger { background:transparent; color:var(--red); border-color:rgba(224,103,76,.4); }
+  .btn-danger:hover { background:rgba(224,103,76,.12); }
+
+  .empty { color:var(--faint); font-style:italic; padding:.4rem 0; }
+
+  /* Watching */
+  .watch { background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:.85rem 1rem; margin-bottom:.7rem; }
+  .watch-top { display:flex; align-items:center; gap:.5rem; }
+  .watch-name { font-weight:620; }
+  .watch-meta { color:var(--dim); font-size:.85rem; margin-top:.15rem; }
+  .watch-acts { display:flex; gap:.45rem; margin-top:.7rem; }
+
+  /* History */
+  .hist { border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .hrow { display:flex; align-items:center; gap:.7rem; padding:.55rem .95rem;
+    border-top:1px solid var(--line); font-size:.9rem; }
+  .hrow:first-child { border-top:0; }
+  .hrow:hover { background:rgba(255,255,255,.02); }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; background:var(--dim); }
+  .act { font-weight:640; text-transform:capitalize; min-width:78px; }
+  .hwf { color:var(--fg); }
+  .hmeta { color:var(--faint); font-family:var(--mono); font-size:.8rem; margin-left:auto;
+    white-space:nowrap; }
+  .hactor { color:var(--dim); }
+
+  /* Modal */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:40; padding:1rem; }
+  .overlay.open { display:flex; }
+  .modal { width:min(520px,100%); background:var(--panel); border:1px solid var(--line-hi);
+    border-radius:16px; box-shadow:var(--shadow); padding:1.35rem 1.5rem 1.5rem; }
+  .modal h3 { margin:0 0 1rem; font-size:1.1rem; }
+  .modal h3 .a { color:var(--amber); }
+  label { display:block; color:var(--dim); font-size:.8rem; margin:.75rem 0 .28rem; }
+  input, select { width:100%; background:#141518; color:var(--fg); border:1px solid var(--line-hi);
+    border-radius:9px; padding:.5rem .7rem; font:inherit; }
+  input:focus, select:focus { outline:none; border-color:var(--amber-line); }
+  .modal-acts { display:flex; gap:.6rem; margin-top:1.2rem; align-items:center; }
+  .modal-acts .spacer { flex:1; }
+  pre { background:#111214; border:1px solid var(--line); border-radius:10px; padding:.8rem;
+    white-space:pre-wrap; word-break:break-word; color:var(--dim); max-height:240px;
+    overflow:auto; font-family:var(--mono); font-size:.82rem; margin:1rem 0 0; }
+  .toast { position:fixed; bottom:1.2rem; left:50%; transform:translateX(-50%);
+    background:var(--card-hi); border:1px solid var(--line-hi); border-radius:10px;
+    padding:.6rem 1rem; box-shadow:var(--shadow); font-size:.9rem; display:none; z-index:50; }
+  .toast.show { display:block; }
 </style>
 </head>
 <body>
 <header>
-  <h1>va<span class="amber">moose</span></h1>
+  <span class="brand"><span class="moose">🫎</span> va<span class="a">moose</span></span>
+  <span class="spacer"></span>
   <span class="ver" id="ver"></span>
 </header>
+
 <main>
-  <section>
-    <h2>Run a workflow</h2>
-    <label>Workflow</label>
-    <select id="wf"></select>
+  <div class="sec">
+    <div class="sec-head"><h2>Workflows</h2><span class="count" id="wfcount"></span></div>
+    <div class="grid" id="workflows"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><h2>Watching</h2><span class="count" id="wcount"></span></div>
+    <div id="watches"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><h2>Run history</h2></div>
+    <div id="history"><div class="empty">Loading…</div></div>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>Run <span class="a" id="runwf"></span></h3>
     <label>When (a phrase like "next week", or leave blank)</label>
     <input id="phrase" placeholder="next week">
     <label>Subject (optional)</label>
     <input id="subject" placeholder="Out: beach week">
     <label>Manager email (optional)</label>
     <input id="manager" placeholder="boss@work.com">
-    <div class="form-actions">
-      <button onclick="run(true)" class="ghost">Dry run</button>
-      <button onclick="run(false)">Run</button>
+    <div class="modal-acts">
+      <button class="btn-ghost" onclick="doRun(true)">Dry run</button>
+      <button class="btn-primary" onclick="doRun(false)">Run</button>
+      <span class="spacer"></span>
+      <button class="btn-quiet" onclick="closeModal()">Close</button>
     </div>
-    <pre id="runout" style="margin-top:.9rem; display:none"></pre>
-  </section>
+    <pre id="runout" style="display:none"></pre>
+  </div>
+</div>
 
-  <section>
-    <h2>Workflows</h2>
-    <div id="workflows"><div class="empty">Loading…</div></div>
-  </section>
-
-  <section class="wide">
-    <h2>Watching</h2>
-    <div id="watches"><div class="empty">Loading…</div></div>
-  </section>
-
-  <section class="wide">
-    <h2>Run history</h2>
-    <div id="history"><div class="empty">Loading…</div></div>
-  </section>
-</main>
+<div class="toast" id="toast"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const esc = (s) => (s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc = (s) => (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtTime = (t) => (t || "").replace("T", " ").slice(0, 19);
+const dotColor = { approved:"var(--green)", declined:"var(--red)", canceled:"var(--red)",
+  expired:"var(--red)", created:"var(--amber)", advanced:"var(--amber)",
+  notified:"var(--blue)", messaged:"var(--blue)", noted:"var(--blue)", filed:"var(--blue)" };
 
-async function getJSON(path) {
-  const r = await fetch(path);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
-}
+async function getJSON(p) { const r = await fetch(p); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 
 async function loadWorkflows() {
   try {
     const wfs = await getJSON("/api/workflows");
-    const sel = $("wf");
-    sel.innerHTML = wfs.map(w => `<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
+    $("wfcount").textContent = wfs.length + (wfs.length === 1 ? " workflow" : " workflows");
     $("workflows").innerHTML = wfs.map(w =>
-      `<div class="row"><div class="name">${esc(w.name)} <span class="pill">${esc(w.source)}</span></div>
-       <div class="desc">${esc(w.description)}</div></div>`).join("") || `<div class="empty">No workflows.</div>`;
+      `<div class="card">
+        <div class="wf-top"><span class="wf-name">${esc(w.name)}</span><span class="pill">${esc(w.source)}</span></div>
+        <div class="wf-desc">${esc(w.description) || "&nbsp;"}</div>
+        <button class="btn-ghost btn-sm wf-run" onclick="openModal('${esc(w.name)}')">Run ▸</button>
+      </div>`).join("") || `<div class="empty">No workflows.</div>`;
   } catch (e) { $("workflows").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
 async function loadWatches() {
   try {
     const items = await getJSON("/api/watches");
-    $("watches").innerHTML = items.length ? items.map(w =>
-      `<div class="row"><div class="name">${esc(w.subject || w.hold_id)} <span class="pill">${esc(w.provider)}</span></div>
-       <div class="meta">workflow ${esc(w.workflow)} · at step ${w.step}${w.approver ? " · awaiting " + esc(w.approver) : ""}</div></div>`
-    ).join("") : `<div class="empty">Nothing is being watched.</div>`;
+    $("wcount").textContent = items.length ? items.length + " held" : "";
+    $("watches").innerHTML = items.length ? items.map(w => {
+      const id = esc(w.hold_id), p = esc(w.provider);
+      return `<div class="watch">
+        <div class="watch-top"><span class="watch-name">${esc(w.subject || w.hold_id)}</span><span class="pill">${p}</span></div>
+        <div class="watch-meta">${esc(w.workflow)} · step ${w.step}${w.approver ? " · awaiting " + esc(w.approver) : ""}</div>
+        <div class="watch-acts">
+          <button class="btn-quiet btn-sm" data-a="check" data-id="${id}" data-p="${p}">Check</button>
+          <button class="btn-ghost btn-sm" data-a="promote" data-id="${id}" data-p="${p}">Promote</button>
+          <button class="btn-danger btn-sm" data-a="cancel" data-id="${id}" data-p="${p}">Cancel</button>
+        </div></div>`;
+    }).join("") : `<div class="empty">Nothing is being watched. Run a workflow with --watch and the daemon advances it here.</div>`;
   } catch (e) { $("watches").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
 async function loadHistory() {
   try {
     const evs = await getJSON("/api/history");
-    $("history").innerHTML = evs.length ? evs.slice().reverse().map(e =>
-      `<div class="row"><span class="act">${esc(e.action)}</span> ${esc(e.workflow || "")}
-       <span class="meta">${esc((e.time || "").replace("T"," ").slice(0,19))}${e.actor ? " · " + esc(e.actor) : ""}${e.hold_id ? " · " + esc(e.hold_id) : ""}</span></div>`
-    ).join("") : `<div class="empty">No run history yet.</div>`;
+    if (!evs.length) { $("history").innerHTML = `<div class="empty">No run history yet.</div>`; return; }
+    $("history").innerHTML = `<div class="hist">` + evs.slice().reverse().slice(0, 60).map(e =>
+      `<div class="hrow">
+        <span class="dot" style="background:${dotColor[e.action] || "var(--dim)"}"></span>
+        <span class="act">${esc(e.action)}</span>
+        <span class="hwf">${esc(e.workflow || "")}</span>
+        ${e.actor ? `<span class="hactor">· ${esc(e.actor)}</span>` : ""}
+        <span class="hmeta">${esc(fmtTime(e.time))}${e.hold_id ? " · " + esc(e.hold_id) : ""}</span>
+      </div>`).join("") + `</div>`;
   } catch (e) { $("history").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
-async function run(dry) {
-  const body = { workflow: $("wf").value, phrase: $("phrase").value,
-    subject: $("subject").value, manager: $("manager").value, dryRun: dry };
+let currentWf = "";
+function openModal(name) {
+  currentWf = name; $("runwf").textContent = name;
+  $("runout").style.display = "none"; $("runout").textContent = "";
+  $("phrase").value = ""; $("subject").value = ""; $("manager").value = "";
+  $("overlay").classList.add("open"); $("phrase").focus();
+}
+function closeModal() { $("overlay").classList.remove("open"); }
+$("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeModal(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+async function doRun(dry) {
   const out = $("runout"); out.style.display = "block"; out.textContent = "Running…";
   try {
-    const r = await fetch("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
-    const data = await r.json();
-    out.textContent = (data.error ? "Error: " + data.error + "\n\n" : "") + (data.output || "");
+    const r = await fetch("/api/run", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ workflow: currentWf, phrase: $("phrase").value,
+        subject: $("subject").value, manager: $("manager").value, dryRun: dry }) });
+    const d = await r.json();
+    out.textContent = (d.error ? "Error: " + d.error + "\n\n" : "") + (d.output || "");
+    if (!d.error && !dry) toast("Ran " + currentWf);
   } catch (e) { out.textContent = e.message; }
   loadWatches(); loadHistory();
 }
 
-async function loadVersion() {
-  try { $("ver").textContent = await (await fetch("/api/version")).text(); } catch {}
+async function action(a, id, provider) {
+  toast(a + " " + id + "…");
+  try {
+    const r = await fetch("/api/action", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ action:a, holdID:id, provider }) });
+    const d = await r.json();
+    toast(d.error ? a + " failed" : (d.output || a).split("\n")[0].slice(0, 80));
+  } catch (e) { toast(e.message); }
+  loadWatches(); loadHistory();
 }
+$("watches").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-a]");
+  if (b) action(b.dataset.a, b.dataset.id, b.dataset.p);
+});
 
-loadVersion(); loadWorkflows(); loadWatches(); loadHistory();
+(async () => { try { $("ver").textContent = await (await fetch("/api/version")).text(); } catch {} })();
+loadWorkflows(); loadWatches(); loadHistory();
 setInterval(() => { loadWatches(); loadHistory(); }, 15000);
 </script>
 </body>

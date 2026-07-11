@@ -5,8 +5,42 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+// jsonReq builds a loopback POST with a JSON body.
+func jsonReq(path, body string) *http.Request {
+	r := httptest.NewRequest("POST", path, strings.NewReader(body))
+	r.Host = "127.0.0.1:8787"
+	r.Header.Set("Content-Type", "application/json")
+	return r
+}
+
+// TestAppAction confirms the action handler allowlists the action and requires a hold id.
+func TestAppAction(t *testing.T) {
+	t.Parallel()
+	h := appAction("/bin/true")
+
+	// An action outside the allowlist is refused.
+	w := httptest.NewRecorder()
+	h(w, jsonReq("/api/action", `{"action":"delete","holdID":"X"}`))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("unknown action code = %d, want 400", w.Code)
+	}
+	// A missing hold id is refused.
+	w = httptest.NewRecorder()
+	h(w, jsonReq("/api/action", `{"action":"check"}`))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("missing id code = %d, want 400", w.Code)
+	}
+	// An allowlisted action runs.
+	w = httptest.NewRecorder()
+	h(w, jsonReq("/api/action", `{"action":"check","holdID":"X","provider":"caldav"}`))
+	if w.Code != http.StatusOK {
+		t.Errorf("valid action code = %d, want 200", w.Code)
+	}
+}
 
 // TestLocalOnly confirms only loopback hosts are served, blunting DNS rebinding.
 func TestLocalOnly(t *testing.T) {
