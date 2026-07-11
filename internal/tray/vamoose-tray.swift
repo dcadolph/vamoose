@@ -99,19 +99,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // ensureServices starts the dashboard server and the daemon when the server is not
     // already answering, so the tray works from a cold start but attaches to an
-    // existing `vamoose app` rather than fighting it for the port.
+    // existing `vamoose app` rather than fighting it for the port. If the tray dies
+    // without cleanup, an orphaned child keeps working; the daemon's own watch-file
+    // lock guarantees a relaunched tray can never start a duplicate of it.
+    var binaryMissing = false
     func ensureServices() {
         healthCheck { up in
             self.serverUp = up
             if up { return }
             // Do not stack children: if a spawn is already alive, give it time to bind.
             if self.serverProcess?.isRunning == true { return }
-            guard let bin = self.vamooseBinary() else { return }
+            guard let bin = self.vamooseBinary() else {
+                self.binaryMissing = true
+                return
+            }
+            self.binaryMissing = false
             self.serverProcess = self.spawn(bin, ["app", "--no-open"])
             if self.daemonProcess?.isRunning != true {
                 self.daemonProcess = self.spawn(bin, ["daemon"])
             }
+            // Refresh once the server has likely bound, and again in case it was slow.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.refresh() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.refresh() }
         }
     }
 
@@ -158,13 +167,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.statusItem.button?.title = "🫎"
                 return
             }
+            // The APIs return JSON null for an empty store, so these decode through a
+            // double optional: outer nil is a fetch failure, inner nil is null.
             self.fetch("api/watches", [Watch]?.self) { w in
-                self.watches = (w ?? nil) ?? []
+                self.watches = w.flatMap { $0 } ?? []
                 let n = self.watches.count
                 self.statusItem.button?.title = n > 0 ? "🫎 \(n)" : "🫎"
             }
             self.fetch("api/history", [Event]?.self) { h in
-                self.history = Array((((h ?? nil) ?? []).suffix(5)).reversed())
+                self.history = Array(((h.flatMap { $0 } ?? []).suffix(5)).reversed())
             }
             var req = URLRequest(url: baseURL.appendingPathComponent("api/version"))
             req.timeoutInterval = 2
@@ -180,7 +191,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
 
         if !serverUp {
-            menu.addItem(disabled("Starting the vamoose server…"))
+            if binaryMissing {
+                menu.addItem(disabled("vamoose binary not found; set VAMOOSE_TRAY_BIN"))
+            } else {
+                menu.addItem(disabled("Starting the vamoose server…"))
+            }
             ensureServices()
         } else if watches.isEmpty {
             menu.addItem(disabled("Nothing is being watched"))
@@ -234,14 +249,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return item
     }
 
+    // ActionBody is the JSON payload /api/action expects.
+    struct ActionBody: Encodable {
+        let action: String
+        let holdID: String
+        let provider: String
+    }
+
     // runHoldAction posts a check, promote, or cancel for a watched hold.
     @objc func runHoldAction(_ sender: NSMenuItem) {
         guard let ha = sender.representedObject as? HoldAction else { return }
+        guard let body = try? JSONEncoder().encode(ActionBody(action: ha.action, holdID: ha.holdID, provider: ha.provider)) else {
+            return
+        }
         var req = URLRequest(url: baseURL.appendingPathComponent("api/action"))
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: String] = ["action": ha.action, "holdID": ha.holdID, "provider": ha.provider]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        req.httpBody = body
         URLSession.shared.dataTask(with: req) { _, _, _ in
             DispatchQueue.main.async { self.refresh() }
         }.resume()

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -59,6 +60,15 @@ func runDaemon(ctx context.Context, args []string) error {
 		every = minInterval
 	}
 
+	// Only one daemon may advance a given watch file: a second one would repeat side
+	// effects. The lock keys on the watch file, so per-user daemons with their own
+	// files, as the Slack server runs, do not collide.
+	release, err := acquireDaemonLock()
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	logger := log.New(os.Stderr, "vamoose daemon: ", log.LstdFlags)
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -82,6 +92,33 @@ func runDaemon(ctx context.Context, args []string) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+// acquireDaemonLock takes an exclusive, non-blocking lock next to the watch file, so a
+// second daemon on the same watches exits with a clear error instead of doubling every
+// side effect. The returned release drops the lock and removes the file.
+func acquireDaemonLock() (func(), error) {
+	path, err := watchPath()
+	if err != nil {
+		return nil, err
+	}
+	lockPath := path + ".lock"
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("another vamoose daemon is already advancing these watches (lock %s)", lockPath)
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = f.Close()
+		_ = os.Remove(lockPath)
+	}, nil
 }
 
 // pollAll advances every watched hold once, rewriting the watch list to drop the

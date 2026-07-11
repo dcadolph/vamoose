@@ -618,6 +618,26 @@ func TestCheckpointForPersists(t *testing.T) {
 	}
 }
 
+// TestDaemonLock confirms the daemon lock is exclusive per watch file: a second acquire
+// fails while the first holds it, and succeeds again after release. It sets environment,
+// so it is not parallel.
+func TestDaemonLock(t *testing.T) {
+	t.Setenv("VAMOOSE_WATCH_FILE", filepath.Join(t.TempDir(), "watches.json"))
+	release, err := acquireDaemonLock()
+	if err != nil {
+		t.Fatalf("first acquire: %v", err)
+	}
+	if _, err := acquireDaemonLock(); err == nil {
+		t.Fatal("second acquire should fail while the lock is held")
+	}
+	release()
+	release2, err := acquireDaemonLock()
+	if err != nil {
+		t.Fatalf("acquire after release: %v", err)
+	}
+	release2()
+}
+
 // TestWatchPathOverride confirms VAMOOSE_WATCH_FILE overrides the default location,
 // which the Slack server uses to give each linked user their own watch file.
 func TestWatchPathOverride(t *testing.T) {
