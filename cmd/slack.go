@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -41,7 +40,7 @@ func runSlack(ctx context.Context, args []string) error {
 		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}
-	logger := log.New(os.Stderr, "vamoose slack: ", log.LstdFlags)
+	logger := newLogger()
 
 	// A hosted multi-tenant server backs its per-workspace tokens and per-user links with
 	// a single embedded database when VAMOOSE_DB_PATH is set; otherwise they are files.
@@ -54,7 +53,7 @@ func runSlack(ctx context.Context, args []string) error {
 		}
 		defer opened.Close()
 		db = opened
-		logger.Printf("store: embedded database at %s", path)
+		logger.Info("store: embedded database", "path", path)
 	}
 
 	var opts []slack.Option
@@ -64,7 +63,7 @@ func runSlack(ctx context.Context, args []string) error {
 			return fmt.Errorf("slack token store: %w", serr)
 		}
 		opts = append(opts, slack.WithOAuth(id, sec, pub, store))
-		logger.Printf("install flow enabled: %s/slack/install", pub)
+		logger.Info("install flow enabled", "url", pub+"/slack/install")
 	}
 	perUserOn := false
 	if perUser := os.Getenv("VAMOOSE_SLACK_PER_USER"); perUser != "" && perUser != "0" {
@@ -95,8 +94,9 @@ func runSlack(ctx context.Context, args []string) error {
 		}
 		opts = append(opts, slack.WithPublicURL(pub), slack.WithLinkers(links, linkers...), slack.WithPerUserEnv(slackUserFilesEnv))
 		perUserOn = true
-		logger.Printf("per-user mode: %d provider(s); each user runs /vamoose link <provider>", len(linkers))
+		logger.Info("per-user mode enabled", "providers", len(linkers))
 	}
+	opts = append(opts, slack.WithLogger(logger))
 	srv := slack.NewServer(secret, runner, opts...)
 
 	httpSrv := &http.Server{
@@ -130,14 +130,14 @@ func runSlack(ctx context.Context, args []string) error {
 				}
 			}
 		}()
-		logger.Printf("per-user auto-advance: polling watched holds every %s", time.Minute)
+		logger.Info("per-user auto-advance enabled", "interval", time.Minute)
 	}
 
-	logger.Printf("listening on %s (slash: /slack/commands, interactivity: /slack/interactivity)", *addr)
+	logger.Info("listening", "addr", *addr, "endpoints", "/slack/commands /slack/interactivity /metrics /health")
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("slack server: %w", err)
 	}
-	logger.Println("stopped")
+	logger.Info("stopped")
 	return nil
 }
 

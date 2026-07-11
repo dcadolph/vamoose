@@ -228,7 +228,7 @@ Messaging (for `message` steps, optional):
 | `VAMOOSE_SMTP_PASSWORD`    | SMTP password.                                                   |
 | `VAMOOSE_SMTP_FROM`        | Sender address.                                                  |
 
-The Slack server also reads `VAMOOSE_SLACK_SIGNING_SECRET` and, for install and per-user mode, `VAMOOSE_SLACK_CLIENT_ID`, `VAMOOSE_SLACK_CLIENT_SECRET`, and `VAMOOSE_SLACK_PUBLIC_URL`. See [Slack](slack.md).
+The Slack server also reads `VAMOOSE_SLACK_SIGNING_SECRET` and, for install and per-user mode, `VAMOOSE_SLACK_CLIENT_ID`, `VAMOOSE_SLACK_CLIENT_SECRET`, and `VAMOOSE_SLACK_PUBLIC_URL`. See [Slack](slack.md). For a hosted server, `VAMOOSE_LOG_FORMAT=json` and `VAMOOSE_LOG_LEVEL` set structured logging, and the server serves `/metrics` (Prometheus) and `/health`. See [hosting](hosting.md).
 
 ## Files and storage
 

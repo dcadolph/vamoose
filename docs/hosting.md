@@ -50,3 +50,9 @@ Slack needs a public HTTPS URL for its slash command, interactivity, and OAuth c
 By default, tokens, per-user links, and watch state are files under the config directory, encrypted when a key is set. Set `VAMOOSE_DB_PATH` to back the server's per-workspace tokens and per-user links with a single embedded database (bbolt) instead, for atomic transactional writes and multi-tenant scale past what a rewritten JSON file handles well. The server owns this database; keep `VAMOOSE_DB_PATH` set only on the long-running server, not on ad-hoc CLI commands, since the database takes an exclusive file lock. Values in it are encrypted at rest with the same `VAMOOSE_SECRET_KEY`.
 
 Run history and watch state stay in files even with `VAMOOSE_DB_PATH` set, because the shelled-out per-user commands write them concurrently. The daemon writes watch progress after each step, so a crash resumes mid-workflow rather than replaying it.
+
+## Observability
+
+The server serves Prometheus metrics at `/metrics` (dispatched commands, approval actions, rejected actions, command errors, and installs) and a liveness check at `/health`. Point a scraper at `/metrics`.
+
+Set `VAMOOSE_LOG_FORMAT=json` for machine-parseable structured logs, and `VAMOOSE_LOG_LEVEL` (`debug`, `info`, `warn`, `error`, default `info`) to set verbosity. Events carry the workspace, user, command, and outcome as fields, so a command run, an approval, or a rejected click is one queryable line.

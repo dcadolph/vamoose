@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -87,6 +87,8 @@ type Server struct {
 	registry *metrics.Registry
 	// mx holds the server's counters.
 	mx serverMetrics
+	// logger records structured server events. It is never nil.
+	logger *slog.Logger
 }
 
 // serverMetrics are the counters the Slack server tracks for observability.
@@ -123,6 +125,9 @@ func WithHTTPClient(c *http.Client) Option { return func(s *Server) { s.httpClie
 // WithClock sets the time source, for tests.
 func WithClock(now func() time.Time) Option { return func(s *Server) { s.now = now } }
 
+// WithLogger sets the structured logger for server events.
+func WithLogger(l *slog.Logger) Option { return func(s *Server) { s.logger = l } }
+
 // NewServer returns a Slack Server that runs vamoose subcommands via run. It panics
 // on an empty signing secret or a nil runner, signaling developer error.
 func NewServer(signingSecret string, run Runner, opts ...Option) *Server {
@@ -143,6 +148,9 @@ func NewServer(signingSecret string, run Runner, opts ...Option) *Server {
 	}
 	for _, o := range opts {
 		o(s)
+	}
+	if s.logger == nil {
+		s.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	s.states = newStateStore(s.now)
 	s.linkStates = newLinkStateStore(s.now)
@@ -248,6 +256,7 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mx.commands.Inc()
+	s.logger.Info("command dispatched", "team", form.Get("team_id"), "user", form.Get("user_id"), "command", args[0])
 	// Per-user commands run as the invoking user's linked calendar; single-tenant
 	// commands run as the server. Either way the team is passed so an approval can bind
 	// the approver.
@@ -284,7 +293,7 @@ func (s *Server) runCommand(responseURL string, args, env []string, ownerTeam, o
 		s.mx.commandErrors.Inc()
 		// Report the error to the invoker but log the raw output server side rather than
 		// posting it, so internal detail does not leak.
-		log.Printf("slack: command %q failed: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(out))
+		s.logger.Error("command failed", "command", strings.Join(args, " "), "err", err, "output", strings.TrimSpace(out))
 		s.post(responseURL, map[string]any{
 			"response_type": "ephemeral",
 			"text":          "Command failed: " + err.Error(),
@@ -297,7 +306,7 @@ func (s *Server) runCommand(responseURL string, args, env []string, ownerTeam, o
 		// channel could approve. Withhold the buttons in every mode and fall back to the
 		// calendar invite the approver can accept, which the daemon or poll loop advances.
 		if approver == "" {
-			log.Printf("slack: withholding approval buttons for hold %s: could not resolve the approver to a Slack user (needs the users:read.email scope and the approver in the workspace)", id)
+			s.logger.Warn("withholding approval buttons: approver not resolved to a Slack user (needs the users:read.email scope and the approver in the workspace)", "hold", id)
 			s.post(responseURL, map[string]any{
 				"response_type": "in_channel",
 				"text":          firstLine(out) + " The approver can accept the calendar invite to approve.",
@@ -393,7 +402,7 @@ func (s *Server) resolveApproverID(ctx context.Context, team, out string) string
 	}
 	id, err := s.lookupUserByEmail(ctx, botToken, m[1])
 	if err != nil {
-		log.Printf("slack: could not resolve approver %s to a Slack user: %v", m[1], err)
+		s.logger.Warn("could not resolve approver to a Slack user", "email", m[1], "err", err)
 		return ""
 	}
 	return id
@@ -485,11 +494,13 @@ func (s *Server) runAction(responseURL, clicker, actionID, value string) {
 	p, ok := s.decodeApprovalValue(value)
 	if !ok {
 		s.mx.actionsRejected.Inc()
+		s.logger.Warn("approval action rejected", "reason", "forged value", "clicker", clicker)
 		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "This approval action is invalid or has expired."})
 		return
 	}
 	if p.A != "" && clicker != p.A {
 		s.mx.actionsRejected.Inc()
+		s.logger.Warn("approval action rejected", "reason", "unauthorized clicker", "hold", p.H, "clicker", clicker, "approver", p.A)
 		s.post(responseURL, map[string]any{"response_type": "ephemeral", "text": "Only <@" + p.A + "> can act on this request."})
 		return
 	}
@@ -519,8 +530,10 @@ func (s *Server) runAction(responseURL, clicker, actionID, value string) {
 	if err != nil {
 		// Log the details server side rather than echoing raw command output to the
 		// channel, which could leak internal information.
-		log.Printf("slack: %s failed for hold %s: %v: %s", verb, p.H, err, strings.TrimSpace(out))
+		s.logger.Error("approval action failed", "action", verb, "hold", p.H, "clicker", clicker, "err", err, "output", strings.TrimSpace(out))
 		text = "Could not " + verb + ": the server logged the details."
+	} else {
+		s.logger.Info("approval action ran", "action", verb, "hold", p.H, "clicker", clicker)
 	}
 	s.post(responseURL, map[string]any{"replace_original": true, "text": text})
 }

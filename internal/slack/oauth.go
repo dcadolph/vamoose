@@ -68,6 +68,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mx.installs.Inc()
+	s.logger.Info("workspace installed", "team", teamID)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte("vamoose installed to your workspace. You can close this tab."))
 }

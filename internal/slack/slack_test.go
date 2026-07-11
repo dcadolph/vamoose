@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -307,6 +308,22 @@ func TestActionRejectsForgedValue(t *testing.T) {
 	}
 	if !bytes.Contains(body, []byte("invalid")) {
 		t.Errorf("want an invalid-action message, got: %s", body)
+	}
+}
+
+// TestServerStructuredLog confirms the server emits a structured event with fields for a
+// dispatched command.
+func TestServerStructuredLog(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	s := NewServer("shh", noopRunner, WithLogger(slog.New(slog.NewJSONHandler(&buf, nil))))
+	h := s.Handler()
+	signedForm(t, h, "shh", "/slack/commands", url.Values{"text": {"off"}, "team_id": {"T1"}, "user_id": {"U1"}})
+	out := buf.String()
+	for _, want := range []string{`"msg":"command dispatched"`, `"team":"T1"`, `"user":"U1"`, `"command":"off"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("structured log missing %s:\n%s", want, out)
+		}
 	}
 }
 
