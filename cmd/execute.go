@@ -46,6 +46,8 @@ func Execute(args []string) int {
 		return run(runMCP(ctx, rest))
 	case "slack":
 		return run(runSlack(ctx, rest))
+	case "app":
+		return run(runApp(ctx, rest))
 	case "login":
 		return run(runLogin(ctx, rest))
 	case "whoami":

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vamoose</title>
+<style>
+  :root { --bg:#191919; --panel:#212121; --line:#333; --amber:#d9a441; --fg:#e8e6e1; --dim:#9a978f; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+    font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { display:flex; align-items:center; gap:.6rem; padding:1rem 1.4rem; border-bottom:1px solid var(--line); }
+  header h1 { font-size:1.2rem; margin:0; font-weight:700; letter-spacing:.02em; }
+  header .amber { color:var(--amber); }
+  header .ver { margin-left:auto; color:var(--dim); font-size:.85rem; }
+  main { max-width:1100px; margin:0 auto; padding:1.4rem; display:grid; gap:1.4rem;
+    grid-template-columns: 1fr 1fr; }
+  section { background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--amber);
+    border-radius:.7rem; padding:1.1rem 1.2rem; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { font-size:1rem; margin:0 0 .8rem; color:var(--amber); }
+  .row { padding:.55rem 0; border-top:1px solid var(--line); }
+  .row:first-of-type { border-top:0; }
+  .name { font-weight:600; }
+  .desc, .meta { color:var(--dim); font-size:.86rem; }
+  button { background:var(--amber); color:#191919; border:0; border-radius:.4rem;
+    padding:.4rem .8rem; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--amber); border:1px solid var(--amber); }
+  button:hover { filter:brightness(1.08); }
+  label { display:block; color:var(--dim); font-size:.8rem; margin:.5rem 0 .2rem; }
+  input, select { width:100%; background:#171717; color:var(--fg); border:1px solid var(--line);
+    border-radius:.4rem; padding:.45rem .6rem; }
+  .form-actions { display:flex; gap:.6rem; margin-top:.9rem; align-items:center; }
+  pre { background:#141414; border:1px solid var(--line); border-radius:.5rem; padding:.8rem;
+    white-space:pre-wrap; word-break:break-word; color:var(--dim); max-height:220px; overflow:auto; }
+  .pill { display:inline-block; font-size:.72rem; padding:.05rem .45rem; border-radius:1rem;
+    border:1px solid var(--line); color:var(--dim); margin-left:.4rem; }
+  .act { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--amber); }
+  .empty { color:var(--dim); font-style:italic; }
+</style>
+</head>
+<body>
+<header>
+  <h1>va<span class="amber">moose</span></h1>
+  <span class="ver" id="ver"></span>
+</header>
+<main>
+  <section>
+    <h2>Run a workflow</h2>
+    <label>Workflow</label>
+    <select id="wf"></select>
+    <label>When (a phrase like "next week", or leave blank)</label>
+    <input id="phrase" placeholder="next week">
+    <label>Subject (optional)</label>
+    <input id="subject" placeholder="Out: beach week">
+    <label>Manager email (optional)</label>
+    <input id="manager" placeholder="boss@work.com">
+    <div class="form-actions">
+      <button onclick="run(true)" class="ghost">Dry run</button>
+      <button onclick="run(false)">Run</button>
+    </div>
+    <pre id="runout" style="margin-top:.9rem; display:none"></pre>
+  </section>
+
+  <section>
+    <h2>Workflows</h2>
+    <div id="workflows"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section class="wide">
+    <h2>Watching</h2>
+    <div id="watches"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section class="wide">
+    <h2>Run history</h2>
+    <div id="history"><div class="empty">Loading…</div></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function getJSON(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function loadWorkflows() {
+  try {
+    const wfs = await getJSON("/api/workflows");
+    const sel = $("wf");
+    sel.innerHTML = wfs.map(w => `<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
+    $("workflows").innerHTML = wfs.map(w =>
+      `<div class="row"><div class="name">${esc(w.name)} <span class="pill">${esc(w.source)}</span></div>
+       <div class="desc">${esc(w.description)}</div></div>`).join("") || `<div class="empty">No workflows.</div>`;
+  } catch (e) { $("workflows").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function loadWatches() {
+  try {
+    const items = await getJSON("/api/watches");
+    $("watches").innerHTML = items.length ? items.map(w =>
+      `<div class="row"><div class="name">${esc(w.subject || w.hold_id)} <span class="pill">${esc(w.provider)}</span></div>
+       <div class="meta">workflow ${esc(w.workflow)} · at step ${w.step}${w.approver ? " · awaiting " + esc(w.approver) : ""}</div></div>`
+    ).join("") : `<div class="empty">Nothing is being watched.</div>`;
+  } catch (e) { $("watches").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function loadHistory() {
+  try {
+    const evs = await getJSON("/api/history");
+    $("history").innerHTML = evs.length ? evs.slice().reverse().map(e =>
+      `<div class="row"><span class="act">${esc(e.action)}</span> ${esc(e.workflow || "")}
+       <span class="meta">${esc((e.time || "").replace("T"," ").slice(0,19))}${e.actor ? " · " + esc(e.actor) : ""}${e.hold_id ? " · " + esc(e.hold_id) : ""}</span></div>`
+    ).join("") : `<div class="empty">No run history yet.</div>`;
+  } catch (e) { $("history").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function run(dry) {
+  const body = { workflow: $("wf").value, phrase: $("phrase").value,
+    subject: $("subject").value, manager: $("manager").value, dryRun: dry };
+  const out = $("runout"); out.style.display = "block"; out.textContent = "Running…";
+  try {
+    const r = await fetch("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    const data = await r.json();
+    out.textContent = (data.error ? "Error: " + data.error + "\n\n" : "") + (data.output || "");
+  } catch (e) { out.textContent = e.message; }
+  loadWatches(); loadHistory();
+}
+
+async function loadVersion() {
+  try { $("ver").textContent = await (await fetch("/api/version")).text(); } catch {}
+}
+
+loadVersion(); loadWorkflows(); loadWatches(); loadHistory();
+setInterval(() => { loadWatches(); loadHistory(); }, 15000);
+</script>
+</body>
+</html>

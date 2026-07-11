@@ -133,6 +133,12 @@ Serve vamoose to Claude over the Model Context Protocol on stdio. See [Claude](c
 
 Serve the vamoose Slack app: run vamoose from slash commands, with Approve and Decline buttons. Needs `VAMOOSE_SLACK_SIGNING_SECRET` and a public URL. See [Slack](slack.md).
 
+### app
+
+`vamoose app [--addr 127.0.0.1:8787] [--no-open]`
+
+Open a local web dashboard in your browser: list workflows, run one, watch pending approvals, and read the run history. It binds to loopback only and refuses non-loopback hosts, so the UI is reachable just from your machine.
+
 ## Info
 
 ### login
