@@ -148,24 +148,34 @@ func scheduleAdd(_ context.Context, args []string) error {
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
-	if _, err := workflowLoader().Load(name); err != nil {
+	item, err := newSchedule(name, *every, *phrase, *subject, *manager, *provider)
+	if err != nil {
 		return fmt.Errorf("schedule add: %w", err)
-	}
-	if d, err := time.ParseDuration(*every); err != nil || d < minScheduleEvery {
-		return fmt.Errorf("schedule add: --every must be a duration of at least %s, such as 168h", minScheduleEvery)
-	}
-	if *phrase == "" {
-		return fmt.Errorf("schedule add: --phrase is required, the date window to run for, e.g. \"next week\"")
-	}
-	item := scheduleItem{
-		Workflow: name, Provider: *provider, Every: *every,
-		NextRun: time.Now(), Phrase: *phrase, Subject: *subject, Manager: *manager,
 	}
 	if err := addSchedule(item); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stdout, "Scheduled %q every %s for %q. Run 'vamoose daemon' to fire it.\n", name, *every, *phrase)
 	return nil
+}
+
+// newSchedule validates and builds a schedule: the workflow must exist, the interval
+// must parse and clear the floor, and the phrase is required since it is the window
+// resolved at every run. The CLI and the dashboard both build schedules through here.
+func newSchedule(name, every, phrase, subject, manager, provider string) (scheduleItem, error) {
+	if _, err := workflowLoader().Load(name); err != nil {
+		return scheduleItem{}, err
+	}
+	if d, err := time.ParseDuration(every); err != nil || d < minScheduleEvery {
+		return scheduleItem{}, fmt.Errorf("every must be a duration of at least %s, such as 168h", minScheduleEvery)
+	}
+	if phrase == "" {
+		return scheduleItem{}, fmt.Errorf("a phrase is required, the date window to run for, e.g. \"next week\"")
+	}
+	return scheduleItem{
+		Workflow: name, Provider: provider, Every: every,
+		NextRun: time.Now(), Phrase: phrase, Subject: subject, Manager: manager,
+	}, nil
 }
 
 // scheduleList prints the current schedules with their index for removal.
@@ -194,20 +204,30 @@ func scheduleRemove(args []string) error {
 	if err != nil {
 		return fmt.Errorf("schedule remove: %q is not an index", args[0])
 	}
+	removed, err := removeScheduleAt(idx)
+	if err != nil {
+		return fmt.Errorf("schedule remove: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "Removed schedule %d (%s).\n", idx, removed)
+	return nil
+}
+
+// removeScheduleAt drops the schedule at index and returns its workflow name. The CLI
+// and the dashboard both remove through here.
+func removeScheduleAt(idx int) (string, error) {
 	items, err := loadSchedules()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if idx < 0 || idx >= len(items) {
-		return fmt.Errorf("schedule remove: no schedule at index %d", idx)
+		return "", fmt.Errorf("no schedule at index %d", idx)
 	}
 	removed := items[idx].Workflow
 	items = append(items[:idx], items[idx+1:]...)
 	if err := saveSchedules(items); err != nil {
-		return err
+		return "", err
 	}
-	fmt.Fprintf(os.Stdout, "Removed schedule %d (%s).\n", idx, removed)
-	return nil
+	return removed, nil
 }
 
 // scheduleRunner runs a due schedule. It is injected so the daemon loop is testable.

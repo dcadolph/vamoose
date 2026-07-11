@@ -91,6 +91,9 @@ func runApp(ctx context.Context, args []string) error {
 	mux.HandleFunc("GET /api/workflow", appWorkflowGet)
 	mux.HandleFunc("POST /api/workflows/save", appWorkflowSave)
 	mux.HandleFunc("POST /api/workflows/delete", appWorkflowDelete)
+	mux.HandleFunc("GET /api/schedules", appJSON(appSchedules))
+	mux.HandleFunc("POST /api/schedules/add", appScheduleAdd)
+	mux.HandleFunc("POST /api/schedules/remove", appScheduleRemove)
 
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second}
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
@@ -315,6 +318,95 @@ func appWorkflowDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+// appSchedule is a schedule row for the UI, its index carried for removal.
+type appSchedule struct {
+	// Index is the schedule's position, the handle remove uses.
+	Index int `json:"index"`
+	// Workflow is the workflow the schedule reruns.
+	Workflow string `json:"workflow"`
+	// Provider is the calendar provider, empty for the default.
+	Provider string `json:"provider,omitempty"`
+	// Every is the interval between runs.
+	Every string `json:"every"`
+	// NextRun is when the daemon next fires it.
+	NextRun string `json:"next_run"`
+	// Phrase is the date window resolved at each run.
+	Phrase string `json:"phrase,omitempty"`
+	// Subject is the event subject passed to the run.
+	Subject string `json:"subject,omitempty"`
+	// Manager is the approver email passed to the run.
+	Manager string `json:"manager,omitempty"`
+}
+
+// appSchedules lists the recurring schedules for the UI.
+func appSchedules() (any, error) {
+	items, err := loadSchedules()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]appSchedule, 0, len(items))
+	for i, s := range items {
+		out = append(out, appSchedule{
+			Index: i, Workflow: s.Workflow, Provider: s.Provider, Every: s.Every,
+			NextRun: s.NextRun.Format(time.RFC3339), Phrase: s.Phrase,
+			Subject: s.Subject, Manager: s.Manager,
+		})
+	}
+	return out, nil
+}
+
+// appScheduleAdd records a recurring schedule from the dashboard, through the same
+// validation as the schedule add command.
+func appScheduleAdd(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
+	var req struct {
+		Workflow string `json:"workflow"`
+		Every    string `json:"every"`
+		Phrase   string `json:"phrase"`
+		Subject  string `json:"subject"`
+		Manager  string `json:"manager"`
+		Provider string `json:"provider"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Workflow == "" {
+		http.Error(w, "a workflow is required", http.StatusBadRequest)
+		return
+	}
+	item, err := newSchedule(req.Workflow, req.Every, req.Phrase, req.Subject, req.Manager, req.Provider)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := addSchedule(item); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+// appScheduleRemove drops a schedule by its listed index.
+func appScheduleRemove(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
+	var req struct {
+		Index *int `json:"index"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Index == nil {
+		http.Error(w, "an index is required", http.StatusBadRequest)
+		return
+	}
+	removed, err := removeScheduleAt(*req.Index)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"removed": removed})
 }
 
 // appAction runs check, promote, or cancel on a watched hold by shelling out, so the

@@ -131,8 +131,8 @@
   .modal h3 { margin:0 0 1rem; font-size:1.1rem; }
   .modal h3 b { color:var(--amber); }
   label { display:block; color:var(--dim); font-size:.8rem; margin:.75rem 0 .28rem; }
-  input, textarea { width:100%; background:#141518; color:var(--fg); border:1px solid var(--line-hi); border-radius:9px; padding:.5rem .7rem; font:inherit; }
-  input:focus, textarea:focus { outline:none; border-color:var(--amber-line); }
+  input, textarea, select { width:100%; background:#141518; color:var(--fg); border:1px solid var(--line-hi); border-radius:9px; padding:.5rem .7rem; font:inherit; }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:var(--amber-line); }
   textarea { font-family:var(--mono); font-size:.84rem; line-height:1.5; resize:vertical; min-height:280px; }
   .modal.wide { width:min(680px,100%); }
   .page-actions { display:flex; justify-content:flex-end; margin:-.4rem 0 1rem; }
@@ -159,6 +159,7 @@
     <a href="#workflows" class="nav-link" data-page="workflows"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5v9A1.5 1.5 0 0112.5 14h-9A1.5 1.5 0 012 12.5v-9zM3.5 3a.5.5 0 00-.5.5V6h10V3.5a.5.5 0 00-.5-.5h-9zM13 7H3v5.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V7z"/></svg>Workflows</a>
     <a href="#watching" class="nav-link" data-page="watching"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 3C4.5 3 1.7 5.1.5 8 1.7 10.9 4.5 13 8 13s6.3-2.1 7.5-5C14.3 5.1 11.5 3 8 3zm0 8a3 3 0 110-6 3 3 0 010 6zm0-1.5A1.5 1.5 0 108 6.5a1.5 1.5 0 000 3z"/></svg>Watching<span class="nav-badge" id="nav-w"></span></a>
     <a href="#runs" class="nav-link" data-page="runs"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 107 7 .75.75 0 00-1.5 0A5.5 5.5 0 118 2.5V5l3.5-2.5L8 0v1z"/><path d="M7.25 4.5v4l3 1.8.75-1.25-2.25-1.35V4.5z"/></svg>Runs</a>
+    <a href="#schedules" class="nav-link" data-page="schedules"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a6 6 0 104.47 10L11.3 10.9A4.5 4.5 0 118 3.5V6l3.5-2.5L8 1v1z"/><path d="M13.5 8.75h-3l1.5 2.6 1.5-2.6z"/></svg>Schedules</a>
     <a href="#setup" class="nav-link" data-page="setup"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 5a3 3 0 100 6 3 3 0 000-6zm0 1.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/><path d="M6.9.8a1 1 0 011.02-.8h.16A1 1 0 019.1.8l.2 1.2c.3.1.6.24.87.4l1.1-.5a1 1 0 011.24.4l.4.7a1 1 0 01-.22 1.28l-1 .8c.02.16.03.33.03.5s-.01.34-.03.5l1 .8a1 1 0 01.22 1.28l-.4.7a1 1 0 01-1.24.4l-1.1-.5c-.27.16-.56.3-.87.4l-.2 1.2a1 1 0 01-1.02.8h-.16A1 1 0 016.9 15.2l-.2-1.2a4.9 4.9 0 01-.87-.4l-1.1.5a1 1 0 01-1.24-.4l-.4-.7a1 1 0 01.22-1.28l1-.8a5 5 0 010-1l-1-.8a1 1 0 01-.22-1.28l.4-.7a1 1 0 011.24-.4l1.1.5c.27-.16.56-.3.87-.4l.2-1.2z"/></svg>Setup</a>
     <a href="#help" class="nav-link" data-page="help"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zM7 11h2v2H7v-2zm2.9-3.3c-.5.4-.9.8-.9 1.6H7c0-1.3.6-2 1.3-2.5.5-.4.7-.7.7-1.1 0-.6-.5-1-1.1-1-.7 0-1.1.4-1.3 1L4.9 5C5.2 3.9 6.1 3 7.9 3 9.5 3 11 3.9 11 5.6c0 1-.5 1.6-1.1 2.1z"/></svg>Help</a>
   </nav>
@@ -196,6 +197,12 @@
     <div class="page" id="page-runs">
       <p class="page-intro">What every hold did and who approved it, newest first.</p>
       <div id="history-list"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="page" id="page-schedules">
+      <p class="page-intro">Workflows the daemon reruns on an interval, with the date window resolved fresh at every run. The daemon must be running to fire them.</p>
+      <div class="page-actions"><button class="btn-primary btn-sm" onclick="openSchedModal()">+ New schedule</button></div>
+      <div id="sched-list"><div class="empty">Loading…</div></div>
     </div>
 
     <div class="page" id="page-setup">
@@ -258,6 +265,28 @@
   </div>
 </div>
 
+<div class="overlay" id="sched-overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>New <b>schedule</b></h3>
+    <label>Workflow</label>
+    <select id="sched-wf"></select>
+    <label>Every (a duration like 168h for weekly)</label>
+    <input id="sched-every" placeholder="168h">
+    <label>Window phrase (resolved fresh each run)</label>
+    <input id="sched-phrase" placeholder="next week">
+    <label>Subject (optional)</label>
+    <input id="sched-subject" placeholder="Out of office">
+    <label>Manager email (optional)</label>
+    <input id="sched-manager" placeholder="boss@work.com">
+    <div class="modal-acts">
+      <button class="btn-primary" onclick="saveSchedule()">Schedule</button>
+      <span class="spacer"></span>
+      <button class="btn-quiet" onclick="closeSchedModal()">Close</button>
+    </div>
+    <pre id="sched-err" style="display:none"></pre>
+  </div>
+</div>
+
 <div class="overlay" id="editor-overlay">
   <div class="modal wide" role="dialog" aria-modal="true">
     <h3 id="editor-title">New workflow</h3>
@@ -284,9 +313,11 @@ const dotColor = { approved:"var(--green)", declined:"var(--red)", canceled:"var
 async function getJSON(p) { const r = await fetch(p); if (!r.ok) throw new Error(await r.text()); return r.json(); }
 function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 
+let allWorkflows = [];
 async function loadWorkflows() {
   try {
     const wfs = await getJSON("/api/workflows");
+    allWorkflows = wfs;
     $("workflows-grid").innerHTML = wfs.map(w => {
       const n = esc(w.name), user = w.source === "user";
       return `<div class="card"><div class="wf-top"><span class="wf-name">${n}</span><span class="pill">${esc(w.source)}</span></div>
@@ -342,6 +373,52 @@ function chkRow(c) {
   return `<div class="chk ${cls}"><span class="chk-badge">${badge}</span>
     <div><div class="chk-label">${esc(c.label)}</div>${(c.hint && !c.ok) ? `<div class="chk-hint">${esc(c.hint)}</div>` : ""}</div></div>`;
 }
+async function loadSchedules() {
+  try {
+    const items = (await getJSON("/api/schedules")) ?? [];
+    $("sched-list").innerHTML = items.length ? items.map(s =>
+      `<div class="watch"><div class="watch-top"><span class="watch-name">${esc(s.workflow)}</span><span class="pill">every ${esc(s.every)}</span></div>
+        <div class="watch-meta">window "${esc(s.phrase)}" · next ${esc(fmtTime(s.next_run))}${s.manager ? " · manager " + esc(s.manager) : ""}${s.provider ? " · " + esc(s.provider) : ""}</div>
+        <div class="watch-acts"><button class="btn-danger btn-sm" data-sched="${s.index}">Remove</button></div></div>`
+    ).join("") : `<div class="empty">No schedules. Add one and run the daemon to fire it.</div>`;
+  } catch (e) { $("sched-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+function openSchedModal() {
+  $("sched-err").style.display = "none";
+  $("sched-wf").innerHTML = allWorkflows.map(w => `<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
+  if (!allWorkflows.length) { loadWorkflows().then(() => openSchedModal()); return; }
+  $("sched-every").value = "168h"; $("sched-phrase").value = "next week";
+  $("sched-subject").value = ""; $("sched-manager").value = "";
+  $("sched-overlay").classList.add("open");
+}
+function closeSchedModal() { $("sched-overlay").classList.remove("open"); }
+$("sched-overlay").addEventListener("click", (e) => { if (e.target === $("sched-overlay")) closeSchedModal(); });
+
+async function saveSchedule() {
+  const err = $("sched-err");
+  err.style.display = "none";
+  try {
+    const r = await fetch("/api/schedules/add", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ workflow: $("sched-wf").value, every: $("sched-every").value,
+        phrase: $("sched-phrase").value, subject: $("sched-subject").value, manager: $("sched-manager").value }) });
+    if (!r.ok) { err.style.display = "block"; err.textContent = await r.text(); return; }
+    closeSchedModal(); toast("Scheduled " + $("sched-wf").value); loadSchedules();
+  } catch (e) { err.style.display = "block"; err.textContent = e.message; }
+}
+
+$("sched-list").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-sched]");
+  if (!b) return;
+  try {
+    const r = await fetch("/api/schedules/remove", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ index: Number(b.dataset.sched) }) });
+    const d = r.ok ? await r.json() : { removed: "" };
+    toast(r.ok ? "Removed " + d.removed : await r.text());
+  } catch (e) { toast(e.message); }
+  loadSchedules();
+});
+
 async function loadDoctor() {
   try {
     const checks = await getJSON("/api/doctor");
@@ -365,7 +442,7 @@ function openModal(name) {
 }
 function closeModal() { $("overlay").classList.remove("open"); }
 $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeModal(); });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeEditor(); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeEditor(); closeSchedModal(); } });
 
 // Workflow editor: author or change a definition; a builtin saved unchanged in name
 // becomes a user override the loader prefers.
@@ -457,9 +534,9 @@ $("hamb").addEventListener("click", () => setNav(!$("sidebar").classList.contain
 $("scrim").addEventListener("click", () => setNav(false));
 
 // Page router: the sidebar switches whole pages, no scrolling between them.
-const pages = ["workflows","watching","runs","setup","help"];
-const titles = { workflows:"Workflows", watching:"Watching", runs:"Run history", setup:"Setup", help:"Help" };
-const loaders = { workflows:loadWorkflows, watching:loadWatches, runs:loadHistory, setup:loadDoctor };
+const pages = ["workflows","watching","runs","schedules","setup","help"];
+const titles = { workflows:"Workflows", watching:"Watching", runs:"Run history", schedules:"Schedules", setup:"Setup", help:"Help" };
+const loaders = { workflows:loadWorkflows, watching:loadWatches, runs:loadHistory, schedules:loadSchedules, setup:loadDoctor };
 let activePage = "workflows";
 function showPage(p) {
   if (!pages.includes(p)) p = "workflows";

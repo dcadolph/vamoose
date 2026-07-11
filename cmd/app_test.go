@@ -87,6 +87,49 @@ func TestAppWorkflowAuthoring(t *testing.T) {
 	}
 }
 
+// TestAppScheduleAPIs drives the schedule endpoints end to end: add through the shared
+// validation, list it back with its index, reject a bad interval, and remove it. It
+// isolates the config directory, so it is not parallel.
+func TestAppScheduleAPIs(t *testing.T) {
+	isolateConfig(t)
+
+	// A bad interval is rejected with the validation message.
+	w := httptest.NewRecorder()
+	appScheduleAdd(w, jsonReq("/api/schedules/add", `{"workflow":"pto","every":"5s","phrase":"next week"}`))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("bad interval code = %d, want 400", w.Code)
+	}
+
+	// A valid schedule is added.
+	w = httptest.NewRecorder()
+	appScheduleAdd(w, jsonReq("/api/schedules/add", `{"workflow":"pto","every":"168h","phrase":"next week","manager":"boss@x.com"}`))
+	if w.Code != http.StatusOK {
+		t.Fatalf("add code = %d: %s", w.Code, w.Body.String())
+	}
+
+	// It lists back with index 0 and the fields intact.
+	got, err := appSchedules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, ok := got.([]appSchedule)
+	if !ok || len(list) != 1 || list[0].Index != 0 || list[0].Workflow != "pto" || list[0].Manager != "boss@x.com" {
+		t.Fatalf("list = %+v, want one pto schedule at index 0", got)
+	}
+
+	// Remove drops it; a second remove reports the empty list.
+	w = httptest.NewRecorder()
+	appScheduleRemove(w, jsonReq("/api/schedules/remove", `{"index":0}`))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "pto") {
+		t.Fatalf("remove = %d %s, want 200 naming pto", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	appScheduleRemove(w, jsonReq("/api/schedules/remove", `{"index":0}`))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("second remove code = %d, want 400", w.Code)
+	}
+}
+
 // TestLocalOnly confirms only loopback hosts are served, blunting DNS rebinding.
 func TestLocalOnly(t *testing.T) {
 	t.Parallel()
