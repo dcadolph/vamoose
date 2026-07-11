@@ -132,12 +132,11 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 			remaining = append(remaining, updated)
 		}
 	}
-	// The watch list is persisted once, after the pass runs each hold's side effects. A
-	// crash between a hold's side effects and this save replays that hold's branch on the
-	// next start, because the gate still reads resolved and the drop was never recorded.
-	// A non-idempotent side effect (a message or a note) can then repeat, and the audit
-	// log can show the outcome twice. Within a single process this does not happen; the
-	// durable fix is a transactional store, which is the seam the DB-backed store fills.
+	// This end-of-pass save records each hold's final state. Crash-safety across it comes
+	// from the per-step checkpoint the daemon writes while a branch runs (see
+	// checkpointFor): a crash resumes at the next step rather than replaying the branch. A
+	// single step can still repeat if the crash lands between its side effect and its
+	// checkpoint write; a transactional store would close that last window.
 	if err := saveWatches(remaining); err != nil {
 		logger.Printf("save watches: %v", err)
 	}
@@ -164,20 +163,24 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 	if err != nil {
 		return pollFailed, item, err
 	}
+	// A run whose branch already completed, whose Done marker survived a crash before the
+	// drop, is dropped now without replaying the finished branch.
+	if item.Done {
+		return pollApproved, item, nil
+	}
 	hold, err := prov.GetHold(ctx, item.HoldID)
 	if err != nil {
 		return pollFailed, item, err
 	}
-	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder()}
 	if item.Step < 0 || item.Step >= len(wf.Steps) {
 		return pollPending, item, nil
 	}
+	deps := stepDeps{notifier: resolveNotifier(), recorder: resolveRecorder(), checkpoint: checkpointFor(item)}
 
-	// A prior poll ran this branch partway before a transient failure. Earlier steps
-	// already took effect, so the branch is committed: resume at the checkpoint and run
-	// it to completion, without re-reading the gate, so a response that changed since
-	// (a late decline after the team was already notified) cannot switch branches or
-	// repeat completed steps. Completing drops the watch.
+	// A prior poll ran this branch partway. Earlier steps already took effect, so the
+	// branch is committed: resume at the checkpoint and run it to completion, without
+	// re-reading the gate, so a response that changed since (a late decline after the team
+	// was already notified) cannot switch branches or repeat completed steps.
 	if item.Resume > 0 {
 		return advanceToNextGate(ctx, prov, deps, wf, item, hold, item.Resume, pollApproved)
 	}
@@ -187,7 +190,29 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 		return pollPending, item, nil
 	}
 	recordGateOutcome(ctx, deps.recorder, wf, item, hold, onEnd)
+	// Commit to the branch durably before running it, so a crash resumes here rather than
+	// re-evaluating the gate and recording the outcome a second time.
+	deps.checkpointAt(from)
 	return advanceToNextGate(ctx, prov, deps, wf, item, hold, from, onEnd)
+}
+
+// checkpointFor returns a function that durably records a watched hold's branch progress
+// after each step: resume is the next step to run, or negative when the branch has
+// completed, which marks the hold done so it is dropped on the next poll. Writing right
+// away means a daemon crash resumes at the next step rather than replaying side effects.
+func checkpointFor(item watchItem) func(resume int) {
+	return func(resume int) {
+		it := item
+		if resume < 0 {
+			it.Done = true
+			it.Resume = 0
+		} else {
+			it.Resume = resume
+		}
+		if err := addWatch(it); err != nil {
+			fmt.Fprintf(os.Stderr, "vamoose daemon: checkpoint failed: %v\n", err)
+		}
+	}
 }
 
 // recordGateOutcome records the audit event for a gate that just resolved: an approval,

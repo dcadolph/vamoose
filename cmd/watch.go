@@ -19,10 +19,13 @@ type watchItem struct {
 	// Step is the index of the pending step, the approval gate the daemon waits on.
 	Step int `json:"step"`
 	// Resume, when nonzero, is the step index at which to continue the branch the gate
-	// opened after a transient failure ran it partway. It lets a retry pick up at the
-	// failed step instead of repeating completed side effects. Zero starts the branch
-	// from the gate.
+	// opened. The daemon writes it after each completed step, so a crash resumes at the
+	// next step instead of repeating completed side effects. Zero starts from the gate.
 	Resume int `json:"resume,omitempty"`
+	// Done marks a run whose branch has completed. The daemon sets it just before the
+	// hold is dropped, so a crash before the drop persists drops the hold on the next
+	// start rather than replaying the finished branch.
+	Done bool `json:"done,omitempty"`
 	// Approver is the email the current gate waits on, so the daemon checks the right
 	// person in a multi-approver chain. Empty falls back to the first required attendee.
 	Approver string `json:"approver,omitempty"`

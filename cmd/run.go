@@ -17,13 +17,25 @@ import (
 )
 
 // stepDeps carries the side-effect adapters the executor uses: the comms notifier for
-// message steps, and the audit recorder for run history. Either may be nil, in which
-// case that side effect is skipped.
+// message steps, the audit recorder for run history, and the checkpoint that persists
+// branch progress. Any may be nil, in which case that effect is skipped.
 type stepDeps struct {
 	// notifier posts message steps to a comms channel.
 	notifier comms.Notifier
 	// recorder appends run-history events.
 	recorder audit.Recorder
+	// checkpoint durably records how far the branch has run: resume is the next step to
+	// run, or negative when the branch has completed. The daemon sets it so a crash
+	// resumes rather than replaying; the run command leaves it nil.
+	checkpoint func(resume int)
+}
+
+// checkpointAt persists the branch's progress when a checkpoint is set, so a daemon crash
+// resumes at `resume` (or drops the run when resume is negative) instead of replaying.
+func (d stepDeps) checkpointAt(resume int) {
+	if d.checkpoint != nil {
+		d.checkpoint(resume)
+	}
 }
 
 // resolveNotifier returns the configured comms notifier, or nil when none is set. A
@@ -247,22 +259,26 @@ func walkSteps(ctx context.Context, prov calendar.Provider, deps stepDeps, provi
 				return i, err
 			}
 			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionNotified, ""))
+			deps.checkpointAt(wf.Next(i, ""))
 		case workflow.VerbNote:
 			if err := createNote(ctx, prov, wf.Steps[i], hold); err != nil {
 				return i, err
 			}
 			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionNoted, wf.Steps[i].Subject))
+			deps.checkpointAt(wf.Next(i, ""))
 		case workflow.VerbMessage:
 			if err := sendMessage(ctx, deps.notifier, wf.Steps[i], hold); err != nil {
 				return i, err
 			}
 			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionMessaged, wf.Steps[i].Channel))
+			deps.checkpointAt(wf.Next(i, ""))
 		case workflow.VerbCancel:
 			if err := prov.DeleteHold(ctx, hold.ID); err != nil {
 				return i, fmt.Errorf("cancel hold: %w", err)
 			}
 			forgetHold(holdRef{Provider: providerName, ID: hold.ID})
 			recordAudit(ctx, deps.recorder, stepEvent(wf, providerName, hold, audit.ActionCanceled, ""))
+			deps.checkpointAt(-1)
 			fmt.Fprintf(os.Stdout, "Canceled hold %s.\n", hold.ID)
 			return -1, nil
 		}

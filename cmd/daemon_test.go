@@ -13,6 +13,7 @@ import (
 
 	"github.com/dcadolph/vamoose/internal/audit"
 	"github.com/dcadolph/vamoose/internal/calendar"
+	"github.com/dcadolph/vamoose/internal/workflow"
 )
 
 // mockProvider is a calendar.Provider whose responses are set per test.
@@ -495,6 +496,125 @@ func TestAdvanceRunRecordsAudit(t *testing.T) {
 	}
 	if !sawApproved || !sawNotified {
 		t.Errorf("audit events = %+v; want approved by mgr@x.com and notified", events)
+	}
+}
+
+// TestWalkStepsCheckpoints confirms the executor records branch progress after each
+// committed step: the next step to run, then a completion marker (-1) at the end.
+func TestWalkStepsCheckpoints(t *testing.T) {
+	isolateConfig(t)
+	wf := workflow.Workflow{Name: "cp", Steps: []workflow.Step{
+		{Verb: workflow.VerbHold},
+		{Verb: workflow.VerbNotify, Team: calendar.RoleOptional},
+		{Verb: workflow.VerbNote, Subject: "logged", Next: "end"},
+	}}
+	var cps []int
+	prov := &mockProvider{team: []calendar.Person{{Email: "peer@x.com"}}}
+	deps := stepDeps{checkpoint: func(r int) { cps = append(cps, r) }}
+	gate, err := walkSteps(context.Background(), prov, deps, "graph", wf, 1, calendar.Hold{ID: "h1"})
+	if err != nil || gate != -1 {
+		t.Fatalf("walk = %d, %v; want -1, nil", gate, err)
+	}
+	// notify at step 1 checkpoints its next (step 2); note at step 2 checkpoints -1 (end).
+	if len(cps) != 2 || cps[0] != 2 || cps[1] != -1 {
+		t.Errorf("checkpoints = %v, want [2 -1]", cps)
+	}
+}
+
+// TestAdvanceRunResumesFromCheckpoint confirms that after a crash mid-branch (modeled by
+// a persisted Resume), the daemon resumes at the checkpoint without replaying the steps
+// that already ran. It isolates HOME to load a user workflow, so it is not parallel.
+func TestAdvanceRunResumesFromCheckpoint(t *testing.T) {
+	isolateConfig(t)
+	dir, err := workflowsDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wf := `{"name":"cp","steps":[
+		{"id":"hold","verb":"hold"},
+		{"id":"gate","verb":"approve","manager":true,"on":{"accepted":"tell","declined":"end"}},
+		{"id":"tell","verb":"notify","team":"optional"},
+		{"id":"mark","verb":"note","subject":"logged","next":"end"}]}`
+	if err := os.WriteFile(filepath.Join(dir, "cp.json"), []byte(wf), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	accepted := managerHold(calendar.ResponseAccepted)
+	accepted.ID = "id"
+	// The prior poll's checkpoint persisted Resume=3 (the note) after notify ran.
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "cp", Step: 1, Resume: 3}
+	prov := &mockProvider{hold: accepted, team: []calendar.Person{{Email: "peer@x.com"}}}
+	res, _, err := advanceRun(context.Background(), prov, item)
+	if res != pollApproved || err != nil {
+		t.Fatalf("res = %v, err = %v; want pollApproved", res, err)
+	}
+	if prov.updated != nil {
+		t.Error("notify replayed on resume; the checkpoint should have skipped it")
+	}
+	if prov.created == nil {
+		t.Error("the note (the resume step) did not run")
+	}
+}
+
+// TestAdvanceRunDropsDone confirms a hold marked done is dropped without fetching it or
+// replaying its branch, so a crash before the drop cannot repeat side effects.
+func TestAdvanceRunDropsDone(t *testing.T) {
+	isolateConfig(t)
+	prov := &mockProvider{getErr: errors.New("GetHold should not be called for a done item")}
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "pto", Step: 1, Done: true}
+	res, _, err := advanceRun(context.Background(), prov, item)
+	if res != pollApproved || err != nil {
+		t.Fatalf("done item res = %v, err = %v; want pollApproved, nil", res, err)
+	}
+}
+
+// TestAdvanceRunCheckpointsToCompletion confirms an accepted run drives the checkpoint to
+// a done marker in the watch store, and that re-polling that done item, as would happen on
+// a crash before the drop, drops it without replaying the notify.
+func TestAdvanceRunCheckpointsToCompletion(t *testing.T) {
+	isolateConfig(t)
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "pto", Step: 1}
+	if err := addWatch(item); err != nil {
+		t.Fatal(err)
+	}
+	prov := &mockProvider{hold: managerHold(calendar.ResponseAccepted), team: []calendar.Person{{Email: "peer@x.com"}}}
+	if res, _, _ := advanceRun(context.Background(), prov, item); res != pollApproved {
+		t.Fatalf("completion res = %v, want pollApproved", res)
+	}
+	got, err := loadWatches()
+	if err != nil || len(got) != 1 || !got[0].Done {
+		t.Fatalf("watch after completion = %+v, %v; want one done item", got, err)
+	}
+
+	// Recovery: re-poll the done item; it drops without touching the calendar again.
+	recover := &mockProvider{hold: managerHold(calendar.ResponseAccepted), team: []calendar.Person{{Email: "peer@x.com"}}}
+	if res, _, _ := advanceRun(context.Background(), recover, got[0]); res != pollApproved {
+		t.Errorf("recovery res = %v, want pollApproved", res)
+	}
+	if recover.updated != nil {
+		t.Error("recovery replayed the notify on a done item")
+	}
+}
+
+// TestCheckpointForPersists confirms the checkpoint writes the resume cursor and the done
+// marker to the watch store immediately.
+func TestCheckpointForPersists(t *testing.T) {
+	isolateConfig(t)
+	item := watchItem{Provider: "graph", HoldID: "id", Workflow: "cp", Step: 1}
+	if err := addWatch(item); err != nil {
+		t.Fatal(err)
+	}
+	cp := checkpointFor(item)
+
+	cp(3)
+	if got, _ := loadWatches(); len(got) != 1 || got[0].Resume != 3 || got[0].Done {
+		t.Fatalf("after cp(3) = %+v, want Resume 3 not done", got)
+	}
+	cp(-1)
+	if got, _ := loadWatches(); len(got) != 1 || !got[0].Done {
+		t.Fatalf("after cp(-1) = %+v, want done", got)
 	}
 }
 
