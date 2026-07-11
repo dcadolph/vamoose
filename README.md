@@ -16,7 +16,7 @@
 
 The moose does the paperwork. You go to the beach.
 
-Four calendar backends behind one workflow engine that branches, approves, waits, and recurs, driven from your terminal, Claude, or Slack, and authorable by an AI agent over MCP. Install with `brew install dcadolph/tap/vamoose`.
+Four calendar backends behind one workflow engine that branches, approves, waits, recurs, and files real leave with your HR system, driven from your terminal, Claude, Slack, or a local dashboard, and authorable by an AI agent over MCP. Every run is recorded, and the daemon resumes exactly where it left off after a crash. Install with `brew install dcadolph/tap/vamoose`.
 
 Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
 wait for a nod, then re-send the event to the team so nobody schedules over you.
@@ -25,18 +25,34 @@ background. Time off is the flagship workflow, and you can define your own.
 
 <p align="center"><img src="assets/vamoose-demo.gif" alt="vamoose demo" width="100%"></p>
 
+## Two minutes to running
+
+```sh
+brew install dcadolph/tap/vamoose
+vamoose login --provider google   # sign in; Outlook and iCloud setup in docs
+vamoose off next week --watch     # hold the dates, invite your manager
+vamoose daemon                    # advances the workflow when the manager accepts
+vamoose app                       # or watch and run everything from a dashboard
+```
+
+That is the whole flow: the hold shows as free so it blocks nobody, your manager's
+calendar accept is the approval, and the daemon notifies your team the moment it lands.
+
 ## How it works
 
-1. `vamoose request` creates a calendar event over your dates, shown as **free**
-   so it blocks nobody, and invites your **manager** as a required attendee.
-2. Your manager **accepts the invite**. That acceptance is the approval signal.
-   There is no separate approval product to buy or install.
-3. `vamoose promote` adds your whole **team as optional attendees** and resends,
-   so everyone sees you are out without their calendars getting blocked.
+1. **Declare.** A workflow is ordered steps in JSON: create a hold, gate on approval,
+   branch on the outcome, wait, message a channel, file the leave. Time off ships built
+   in; author your own in a file, the dashboard editor, or through an AI agent.
+2. **Run.** Drive it from the terminal, Claude, Slack, or `vamoose app`, against
+   Microsoft Graph, Google, iCloud, or any CalDAV host. Same workflow, any backend.
+3. **Advance.** The daemon moves runs forward on its own: your manager accepting the
+   invite is the approval signal (no separate approval product), timeouts and waits
+   fire on the clock, recurring schedules re-run, and every step lands in the run
+   history.
 
-These three steps are the built-in **pto** workflow, and `request`, `check`, and
-`promote` are fronts over its steps. vamoose runs other workflows too, and you can
-define your own. See [Workflows](#workflows).
+The built-in **pto** workflow is the flagship: hold shown **free**, manager approves by
+accepting, team added as **optional attendees** so nobody's calendar gets blocked.
+`request`, `check`, and `promote` are fronts over its steps. See [Workflows](#workflows).
 
 Four backends ship behind one provider interface: Microsoft Graph (Outlook,
 Microsoft 365, and Teams), Google Calendar, Apple iCloud, and any standard CalDAV host.
@@ -174,6 +190,12 @@ vamoose daemon
 
 # Run the daemon unattended (prints a launchd or systemd manifest to install).
 vamoose service
+
+# See what every hold did and who approved it.
+vamoose history
+
+# Open the local dashboard: run workflows, author them, act on holds.
+vamoose app
 ```
 
 Times accept `YYYY-MM-DD` for all-day holds or RFC3339 for partial days. Pass
@@ -285,10 +307,11 @@ Authenticate once first with `vamoose whoami`; the server reuses the cached toke
 
 ## Roadmap
 
-- A hosted, always-on server so per-user Slack and background advance run without a laptop.
-- Workflows that repeat on a schedule, beyond the one-shot wait step.
+- Live-prove per-user Slack against a real workspace, then drop its experimental label.
+- A signed, notarized native desktop app wrapping the dashboard.
 - Auto-promote via Graph change-notification webhooks instead of polling.
 - Set the scheduled out-of-office auto-reply for the time-off window.
+- More HR systems behind the leave seam, as users ask.
 
 ## License
 

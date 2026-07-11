@@ -13,7 +13,7 @@ hide:
 
 <p class="tagline">Calendar workflows, minus the tedium.</p>
 
-<p class="subtitle">The moose does the paperwork. You go to the beach. Four calendar backends behind one workflow engine, driven from your terminal, Claude, or Slack.</p>
+<p class="subtitle">The moose does the paperwork. You go to the beach. Four calendar backends behind one workflow engine, driven from your terminal, Claude, Slack, or a local dashboard.</p>
 
 [Get started](quickstart.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/dcadolph/vamoose){ .md-button }
@@ -70,7 +70,7 @@ brew install dcadolph/tap/vamoose
 
     ---
 
-    Wait steps pause a run. Schedules rerun a whole workflow weekly. It moves on its own, in the background.
+    Wait steps pause a run. Schedules rerun a whole workflow weekly. It moves on its own in the background, and resumes where it left off after a crash.
 
 -   :material-robot-happy:{ .lg .middle } __Drivable by AI__
 
@@ -78,11 +78,11 @@ brew install dcadolph/tap/vamoose
 
     Over MCP, an agent discovers, previews, runs, schedules, and even authors workflows. The calendar-workflow layer for Claude.
 
--   :material-bullhorn:{ .lg .middle } __Tells everyone__
+-   :material-bullhorn:{ .lg .middle } __Finishes the job__
 
     ---
 
-    Fan out to the team as optional attendees, and announce the outcome to a Slack channel or by email.
+    Fan out to the team, announce to Slack or email, file the leave in your HR system, and keep a run history of who approved what.
 
 </div>
 
