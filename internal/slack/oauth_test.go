@@ -73,6 +73,26 @@ func TestStateStore(t *testing.T) {
 	}
 }
 
+// TestStateStoreReaps confirms issuing a new state drops expired entries, so the
+// unauthenticated install endpoint cannot grow the map without bound.
+func TestStateStoreReaps(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(1000, 0)
+	s := newStateStore(func() time.Time { return now })
+
+	for range 5 {
+		s.issue()
+	}
+	if len(s.states) != 5 {
+		t.Fatalf("issued states = %d, want 5", len(s.states))
+	}
+	now = now.Add(11 * time.Minute)
+	s.issue()
+	if len(s.states) != 1 {
+		t.Errorf("live states after reap = %d, want 1 (expired entries not reaped)", len(s.states))
+	}
+}
+
 func TestFileStore(t *testing.T) {
 	t.Parallel()
 	fs := NewFileStore(filepath.Join(t.TempDir(), "sub", "tokens.json"))

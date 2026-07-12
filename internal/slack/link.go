@@ -68,11 +68,24 @@ func (s *linkStateStore) issue(team, user, provider string) string {
 	tok := hex.EncodeToString(b)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.reapLocked()
 	s.states[tok] = linkState{team: team, user: user, provider: provider, expiry: s.now().Add(s.ttl)}
 	return tok
 }
 
-// consume validates and removes a state token, returning its pending link.
+// reapLocked drops expired pending links so an abandoned flow cannot grow the map
+// without bound. Callers hold s.mu.
+func (s *linkStateStore) reapLocked() {
+	now := s.now()
+	for tok, st := range s.states {
+		if !now.Before(st.expiry) {
+			delete(s.states, tok)
+		}
+	}
+}
+
+// consume validates and removes a state token, returning its pending link. A token is
+// valid until, but not at, its expiry, matching the install state store.
 func (s *linkStateStore) consume(tok string) (linkState, bool) {
 	if tok == "" {
 		return linkState{}, false
@@ -84,7 +97,7 @@ func (s *linkStateStore) consume(tok string) (linkState, bool) {
 		return linkState{}, false
 	}
 	delete(s.states, tok)
-	if s.now().After(st.expiry) {
+	if !s.now().Before(st.expiry) {
 		return linkState{}, false
 	}
 	return st, true
