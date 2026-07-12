@@ -48,32 +48,43 @@ func TestEmailNotifyEmptyRecipient(t *testing.T) {
 	}
 }
 
-// TestRoute confirms channels route by shape: an address to email, otherwise Slack, and
-// a missing backend errors.
+// TestRoute confirms channels route by shape: a URL to the webhook, an address to email,
+// otherwise Slack, and a missing backend errors.
 func TestRoute(t *testing.T) {
 	t.Parallel()
-	var slackCh, emailCh string
+	var slackCh, emailCh, webhookCh string
 	slack := NotifierFunc(func(_ context.Context, ch, _ string) error { slackCh = ch; return nil })
 	email := NotifierFunc(func(_ context.Context, ch, _ string) error { emailCh = ch; return nil })
-	r := Route(slack, email)
+	webhook := NotifierFunc(func(_ context.Context, ch, _ string) error { webhookCh = ch; return nil })
+	r := Route(slack, email, webhook)
 
 	if err := r.Notify(context.Background(), "#team", "x"); err != nil {
 		t.Fatalf("slack route: %v", err)
 	}
-	if slackCh != "#team" || emailCh != "" {
-		t.Errorf("slack route: slack=%q email=%q, want slack #team", slackCh, emailCh)
+	if slackCh != "#team" || emailCh != "" || webhookCh != "" {
+		t.Errorf("slack route: slack=%q email=%q webhook=%q, want slack #team", slackCh, emailCh, webhookCh)
 	}
-	slackCh, emailCh = "", ""
+	slackCh, emailCh, webhookCh = "", "", ""
 	if err := r.Notify(context.Background(), "person@x.com", "x"); err != nil {
 		t.Fatalf("email route: %v", err)
 	}
-	if emailCh != "person@x.com" || slackCh != "" {
-		t.Errorf("email route: slack=%q email=%q, want email person@x.com", slackCh, emailCh)
+	if emailCh != "person@x.com" || slackCh != "" || webhookCh != "" {
+		t.Errorf("email route: slack=%q email=%q webhook=%q, want email person@x.com", slackCh, emailCh, webhookCh)
 	}
-	if err := Route(nil, email).Notify(context.Background(), "#team", "x"); err == nil {
+	slackCh, emailCh, webhookCh = "", "", ""
+	if err := r.Notify(context.Background(), "https://hooks.example.com/abc", "x"); err != nil {
+		t.Fatalf("webhook route: %v", err)
+	}
+	if webhookCh != "https://hooks.example.com/abc" || slackCh != "" || emailCh != "" {
+		t.Errorf("webhook route: slack=%q email=%q webhook=%q, want the webhook url", slackCh, emailCh, webhookCh)
+	}
+	if err := Route(nil, email, webhook).Notify(context.Background(), "#team", "x"); err == nil {
 		t.Error("want an error when Slack is not configured")
 	}
-	if err := Route(slack, nil).Notify(context.Background(), "a@x.com", "x"); err == nil {
+	if err := Route(slack, nil, webhook).Notify(context.Background(), "a@x.com", "x"); err == nil {
 		t.Error("want an error when email is not configured")
+	}
+	if err := Route(slack, email, nil).Notify(context.Background(), "https://x.example.com", "x"); err == nil {
+		t.Error("want an error when the webhook backend is not configured")
 	}
 }

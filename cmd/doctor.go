@@ -114,6 +114,7 @@ func doctorChecks(getenv func(string) string) []doctorCheck {
 		doctorCheck{Label: "Time zone: " + tz, OK: true, Optional: true},
 		doctorCheck{Label: "Slack messaging (VAMOOSE_SLACK_BOT_TOKEN)", OK: set("VAMOOSE_SLACK_BOT_TOKEN"), Optional: true, Hint: "set for message steps to Slack"},
 		doctorCheck{Label: "Email messaging (VAMOOSE_SMTP_HOST)", OK: set("VAMOOSE_SMTP_HOST"), Optional: true, Hint: "set for message steps to email"},
+		doctorCheck{Label: "Webhook messaging: use an https URL as a message channel for Teams, Google Chat, and similar", OK: true, Optional: true},
 		doctorCheck{Label: "HR leave filing (BambooHR or webhook)", OK: set("VAMOOSE_BAMBOOHR_SUBDOMAIN") || set("VAMOOSE_LEAVE_WEBHOOK_URL"), Optional: true, Hint: "set VAMOOSE_BAMBOOHR_* or VAMOOSE_LEAVE_WEBHOOK_URL to file approved time off as real leave"},
 		doctorCheck{Label: "Secrets: " + secrets, OK: true, Optional: true},
 		doctorCheck{Label: "Run history: recorded to the audit log (see 'vamoose history')", OK: true, Optional: true},

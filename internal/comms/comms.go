@@ -23,20 +23,28 @@ func (f NotifierFunc) Notify(ctx context.Context, channel, text string) error {
 	return f(ctx, channel, text)
 }
 
-// Route returns a Notifier that dispatches by the channel: an address containing "@"
-// goes to email, anything else to Slack. A message for a backend that is not configured
-// returns a clear error naming the setting to set.
-func Route(slack, email Notifier) Notifier {
+// Route returns a Notifier that dispatches by the channel: an http or https URL is
+// posted to as an incoming webhook, an address containing "@" goes to email, anything
+// else to Slack. A message for a backend that is not configured returns a clear error
+// naming the setting to set.
+func Route(slack, email, webhook Notifier) Notifier {
 	return NotifierFunc(func(ctx context.Context, channel, text string) error {
-		if strings.Contains(channel, "@") {
+		switch {
+		case strings.HasPrefix(channel, "https://") || strings.HasPrefix(channel, "http://"):
+			if webhook == nil {
+				return fmt.Errorf("no webhook backend for %q", channel)
+			}
+			return webhook.Notify(ctx, channel, text)
+		case strings.Contains(channel, "@"):
 			if email == nil {
 				return fmt.Errorf("no email backend for %q: set VAMOOSE_SMTP_HOST", channel)
 			}
 			return email.Notify(ctx, channel, text)
+		default:
+			if slack == nil {
+				return fmt.Errorf("no slack backend for %q: set VAMOOSE_SLACK_BOT_TOKEN", channel)
+			}
+			return slack.Notify(ctx, channel, text)
 		}
-		if slack == nil {
-			return fmt.Errorf("no slack backend for %q: set VAMOOSE_SLACK_BOT_TOKEN", channel)
-		}
-		return slack.Notify(ctx, channel, text)
 	})
 }
