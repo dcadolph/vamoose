@@ -18,10 +18,11 @@ The moose does the paperwork. You go to the beach.
 
 Four calendar backends behind one workflow engine that branches, approves, waits, recurs, and files real leave with your HR system, driven from your terminal, Claude, Slack, or a local dashboard, and authorable by an AI agent over MCP. Every run is recorded, and the daemon resumes exactly where it left off after a crash. Install with `brew install dcadolph/tap/vamoose`.
 
-Calendar busywork is death by a thousand cuts: block the dates, ping your manager,
-wait for a nod, then re-send the event to the team so nobody schedules over you.
-vamoose turns those chores into **workflows** it runs for you and advances in the
-background. Time off is the flagship workflow, and you can define your own.
+Calendar busywork is death by a thousand cuts: create the hold marked free, invite
+your manager, Slack them for the yes, go back in and add the team one by one, add a
+second blocked event so your own calendar says away, then file the leave in the HR
+portal. vamoose turns those chores into **workflows** it runs for you and advances
+in the background. Time off is the flagship workflow, and you can define your own.
 
 <p align="center"><img src="assets/vamoose-demo.gif" alt="vamoose demo" width="100%"></p>
 

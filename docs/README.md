@@ -43,11 +43,11 @@ brew install dcadolph/tap/vamoose
 <p class="oldway-label">By hand</p>
 <p class="oldway-title">Booking a week off</p>
 <ol class="oldway-steps">
-<li>Create the event. In Outlook. No, wait, this job is on Google.</li>
-<li>Email your manager and ask nicely.</li>
-<li>Wait. Email your manager again.</li>
-<li>Approved. Now invite the teammates covering for you.</li>
-<li>Announce it in Slack so nobody books over you.</li>
+<li>Open the work calendar, Google or Exchange. Create the event, mark it Free, invite exactly one person: your manager, as optional.</li>
+<li>Slack your manager so the invite doesn't land cold: "thinking about the 20th through the 24th, that OK?"</li>
+<li>Approved. Back into the event: add every teammate covering for you, one at a time.</li>
+<li>Triple-check it still shows Free, or six calendars go busy for a week.</li>
+<li>Your own calendar still shows you open, so create a second event, just you, marked Out of office.</li>
 <li>Log in to the HR portal and file the leave.</li>
 <li>Next quarter, do all of it again from memory.</li>
 </ol>
@@ -56,7 +56,7 @@ brew install dcadolph/tap/vamoose
 <div class="oldway-panel oldway-new">
 <p class="oldway-label oldway-label-new">With vamoose</p>
 <p class="oldway-cmd"><span class="p">$</span> vamoose off next week</p>
-<p class="oldway-body">One workflow runs the whole thing. The hold goes out, the approval gets chased, silence escalates to the next approver, the team gets invited, Slack and email get told, the leave gets filed in HR.</p>
+<p class="oldway-body">One workflow runs the whole thing. The hold goes out marked Free with your manager on it, their calendar accept is the approval, the team lands as optional attendees the moment it arrives, Slack and email get told, the leave gets filed in HR. The blocked-out event for your own calendar is one more line: <code>vamoose away</code>.</p>
 <p class="oldway-body">Same command whether this job runs on Microsoft, Google, or iCloud. The workflow never notices which service is behind it, so neither do you.</p>
 </div>
 </div>
