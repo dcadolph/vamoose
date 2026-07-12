@@ -23,6 +23,12 @@ func TestParse(t *testing.T) {
 		JSON: `{"name":"x","steps":[{"verb":"notify"}]}`, Want: ErrInvalid,
 	}, { // Test 4: An unknown verb is reported.
 		JSON: `{"name":"x","steps":[{"verb":"nope"}]}`, Want: ErrUnknownVerb,
+	}, { // Test 5: A second JSON value after the workflow is rejected.
+		JSON: `{"name":"x","steps":[{"verb":"away"}]} {"name":"evil"}`, Want: ErrInvalid,
+	}, { // Test 6: Trailing non-JSON garbage is rejected.
+		JSON: `{"name":"x","steps":[{"verb":"away"}]} garbage`, Want: ErrInvalid,
+	}, { // Test 7: Trailing whitespace is fine.
+		JSON: "{\"name\":\"x\",\"steps\":[{\"verb\":\"away\"}]}\n\t ", Want: nil,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

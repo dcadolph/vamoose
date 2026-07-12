@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -58,6 +59,9 @@ func Parse(data []byte) (Workflow, error) {
 	var w Workflow
 	if err := dec.Decode(&w); err != nil {
 		return Workflow{}, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return Workflow{}, fmt.Errorf("%w: unexpected data after the workflow definition", ErrInvalid)
 	}
 	if err := w.Validate(); err != nil {
 		return Workflow{}, err

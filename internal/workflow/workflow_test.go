@@ -172,6 +172,52 @@ func TestValidateRejectsCycle(t *testing.T) {
 	}
 }
 
+// TestValidateAllowsMappedGateBranches confirms cycle detection does not fabricate a
+// fall-through edge for an approve step whose accepted and declined outcomes are both
+// mapped. The step after the gate is unreachable at run time, so its loop back to the
+// gate can never fire and must not be rejected as a cycle.
+func TestValidateAllowsMappedGateBranches(t *testing.T) {
+	t.Parallel()
+	wf := Workflow{
+		Name: "branch",
+		Steps: []Step{
+			{Verb: VerbHold, ID: "hold"},
+			{Verb: VerbApprove, ID: "ok", Manager: true, On: map[string]string{"accepted": "done", "declined": "done"}},
+			{Verb: VerbNote, ID: "orphan", Next: "ok"},
+			{Verb: VerbNotify, ID: "done", Next: "end"},
+		},
+	}
+	if err := wf.Validate(); err != nil {
+		t.Errorf("Validate mapped-branch workflow = %v, want nil", err)
+	}
+}
+
+// TestValidateRejectsGuardOnGate confirms a when guard on an approve or wait step is
+// rejected, since a denied guard would skip the step and bypass the approval or delay.
+func TestValidateRejectsGuardOnGate(t *testing.T) {
+	t.Parallel()
+	hold := Step{ID: "hold", Verb: VerbHold}
+	tests := []struct {
+		Gate Step
+		Want error
+	}{{ // Test 0: A guard on an approve step is rejected.
+		Gate: Step{Verb: VerbApprove, Manager: true, When: When{MaxAttendees: 1}}, Want: ErrInvalid,
+	}, { // Test 1: A guard on a wait step is rejected.
+		Gate: Step{Verb: VerbWait, For: "24h", When: When{DayOfWeek: "mon-fri"}}, Want: ErrInvalid,
+	}, { // Test 2: A guard on a non-gate step is allowed.
+		Gate: Step{Verb: VerbNotify, When: When{DayOfWeek: "mon-fri"}}, Want: nil,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			wf := Workflow{Name: "t", Steps: []Step{hold, test.Gate}}
+			if err := wf.Validate(); !errors.Is(err, test.Want) {
+				t.Errorf("Validate err = %v, want %v", err, test.Want)
+			}
+		})
+	}
+}
+
 func TestVerbClass(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
