@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // Token holds an OAuth access token and its refresh material.
@@ -80,5 +82,5 @@ func (s *FileStore) Save(t Token) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, b, 0o600)
+	return util.WriteFileAtomic(s.path, b, 0o600)
 }

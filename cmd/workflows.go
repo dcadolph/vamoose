@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dcadolph/vamoose/internal/util"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
 
@@ -98,7 +99,7 @@ func saveUserWorkflow(data []byte) (workflow.Workflow, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return workflow.Workflow{}, err
 	}
-	if err := os.WriteFile(filepath.Join(dir, wf.Name+".json"), data, 0o600); err != nil {
+	if err := util.WriteFileAtomic(filepath.Join(dir, wf.Name+".json"), data, 0o600); err != nil {
 		return workflow.Workflow{}, err
 	}
 	return wf, nil

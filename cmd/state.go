@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // state holds cross-invocation vamoose data, currently the last hold created.
@@ -64,7 +66,7 @@ func saveState(s state) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o600)
+	return util.WriteFileAtomic(path, b, 0o600)
 }
 
 // resolveHold returns the hold to act on: an explicit id paired with the
