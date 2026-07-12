@@ -3,6 +3,7 @@ package google
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
@@ -113,5 +114,25 @@ func TestFromGoogleEventReadsDatesAndOOF(t *testing.T) {
 	}
 	if got := h.End.Format("2006-01-02"); got != "2026-07-25" {
 		t.Errorf("end = %q, want 2026-07-25", got)
+	}
+}
+
+// TestBoundaryConvertsTimedToProviderZone confirms a timed boundary is converted into
+// the provider zone before formatting, so an input carrying a different offset keeps its
+// instant instead of being relabeled and silently shifted.
+func TestBoundaryConvertsTimedToProviderZone(t *testing.T) {
+	t.Parallel()
+	p := NewProvider(staticToken) // provider zone defaults to UTC
+	start := time.Date(2026, 8, 3, 9, 0, 0, 0, time.FixedZone("CDT", -5*3600))
+	got := p.boundary(start, false)
+	if got.DateTime != "2026-08-03T14:00:00" {
+		t.Errorf("timed dateTime = %q, want 2026-08-03T14:00:00 (09:00-05:00 in UTC)", got.DateTime)
+	}
+	if got.TimeZone != "UTC" {
+		t.Errorf("timeZone = %q, want UTC", got.TimeZone)
+	}
+	// An all-day boundary names a calendar day and must not be zone-converted.
+	if day := p.boundary(start, true); day.Date != "2026-08-03" {
+		t.Errorf("all-day date = %q, want 2026-08-03", day.Date)
 	}
 }
