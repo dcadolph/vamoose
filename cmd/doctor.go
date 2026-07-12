@@ -2,10 +2,14 @@ package cmd
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/dcadolph/vamoose/internal/calendar"
 	"github.com/dcadolph/vamoose/internal/secret"
 )
 
@@ -22,10 +26,32 @@ type doctorCheck struct {
 }
 
 // runDoctor checks the environment for the selected provider and comms backends and
-// prints a report of what is set up and what is missing, to ease first-time setup.
-func runDoctor(_ context.Context, _ []string) error {
+// prints a report of what is set up and what is missing, to ease first-time setup. With
+// --live it also probes the provider with a real API call to confirm access works.
+func runDoctor(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
+	var (
+		live     = fs.Bool("live", false, "Probe the provider with a real API call to confirm access")
+		provider = fs.String("provider", "", "Calendar provider to check; overrides VAMOOSE_PROVIDER")
+		tzFlag   = fs.String("tz", "", "IANA time zone for the live check")
+	)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	getenv := os.Getenv
+	if *provider != "" {
+		base := getenv
+		getenv = func(k string) string {
+			if k == envProvider {
+				return *provider
+			}
+			return base(k)
+		}
+	}
+
 	missing := 0
-	for _, c := range doctorChecks(os.Getenv) {
+	for _, c := range doctorChecks(getenv) {
 		switch {
 		case c.OK:
 			fmt.Fprintf(os.Stdout, "[ok]   %s\n", c.Label)
@@ -39,12 +65,49 @@ func runDoctor(_ context.Context, _ []string) error {
 	if dir, err := os.UserConfigDir(); err == nil {
 		fmt.Fprintf(os.Stdout, "[ok]   Config directory: %s\n", filepath.Join(dir, "vamoose"))
 	}
+	if *live {
+		doctorLive(ctx, resolveProvider(*provider), resolveTimeZone(*tzFlag))
+	}
 	if missing == 0 {
 		fmt.Fprintln(os.Stdout, "\nReady. Run 'vamoose whoami' to confirm access.")
 	} else {
 		fmt.Fprintf(os.Stdout, "\n%d required setting(s) missing. See the hints above.\n", missing)
 	}
 	return nil
+}
+
+// doctorLive probes the provider with real API calls, so the report can confirm not just
+// that settings are present but that they reach the calendar and resolve the manager.
+func doctorLive(ctx context.Context, provName, tz string) {
+	fmt.Fprintf(os.Stdout, "\nLive check (%s):\n", provName)
+	prov, err := newProvider(provName, tz)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "[miss] Build provider: %v\n", err)
+		return
+	}
+	reportProbe(ctx, os.Stdout, prov)
+}
+
+// reportProbe writes the result of signing in and resolving the manager to w. It is split
+// from doctorLive so it can be tested against a stub provider.
+func reportProbe(ctx context.Context, w io.Writer, prov calendar.Provider) {
+	me, err := prov.Me(ctx)
+	if err != nil {
+		fmt.Fprintf(w, "[miss] Sign-in: %v\n", err)
+		return
+	}
+	fmt.Fprintf(w, "[ok]   Signed in as %s\n", personLabel(me))
+	mgr, err := prov.Manager(ctx)
+	switch {
+	case errors.Is(err, calendar.ErrNoManager):
+		fmt.Fprintln(w, "[--]   Manager: none set in the directory")
+	case errors.Is(err, calendar.ErrNoDirectory):
+		fmt.Fprintln(w, "[--]   Manager: this backend has no directory")
+	case err != nil:
+		fmt.Fprintf(w, "[--]   Manager: %v\n", err)
+	default:
+		fmt.Fprintf(w, "[ok]   Manager: %s\n", personLabel(mgr))
+	}
 }
 
 // hintSuffix formats a hint for display, or an empty string when there is none.
