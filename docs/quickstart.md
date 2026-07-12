@@ -1,3 +1,7 @@
+---
+description: Install vamoose with Homebrew, sign in to Google or Microsoft 365, and get a first approved time-off hold in minutes.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # Quickstart

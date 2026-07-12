@@ -1,3 +1,7 @@
+---
+description: Holds, calendar-accept approval, and workflows. The moving parts behind vamoose time-off automation.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # Concepts

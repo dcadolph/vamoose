@@ -1,3 +1,7 @@
+---
+description: Every vamoose command, flag, and environment variable, from request and promote to daemon, schedule, history, and app.
+---
+
 <p align="center"><img src="assets/vamoose-mapmoose.png" alt="vamoose" width="100%"></p>
 
 # Commands

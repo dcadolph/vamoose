@@ -1,3 +1,8 @@
+---
+title: Slack approval buttons for time off
+description: Drive vamoose from Slack. Slash commands, approval buttons bound to the real approver, per-user calendar linking, and background auto-advance.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # Slack

@@ -1,4 +1,9 @@
 ---
+title: Automate time off and calendar workflows
+description: >-
+  vamoose books time off for you. It holds the dates, gets your manager's approval from
+  the calendar accept, invites the team, announces in Slack, and files the leave in HR.
+  Works with Outlook, Google Calendar, iCloud, and CalDAV.
 hide:
   - navigation
   - toc

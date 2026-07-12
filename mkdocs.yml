@@ -1,5 +1,5 @@
 site_name: vamoose
-site_description: Calendar workflows, minus the tedium.
+site_description: "Calendar workflows, minus the tedium. vamoose automates time off: hold the dates, get the manager's approval, invite the team, announce in Slack, and file the leave, on Outlook, Google Calendar, iCloud, or CalDAV."
 site_url: https://vamoose.dev/
 repo_url: https://github.com/dcadolph/vamoose
 repo_name: dcadolph/vamoose

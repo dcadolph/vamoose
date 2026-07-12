@@ -1,3 +1,8 @@
+---
+title: Custom calendar workflows in JSON
+description: Author calendar workflows in JSON. Branch on approval, chain approvers, wait, guard by day or headcount, message Slack or email, and file HR leave.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # Workflows

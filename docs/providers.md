@@ -1,3 +1,8 @@
+---
+title: Outlook, Google Calendar, iCloud, and CalDAV setup
+description: Set up Microsoft Graph for Outlook and Microsoft 365, Google Calendar, Apple iCloud, or any CalDAV server as the vamoose calendar backend.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # Providers

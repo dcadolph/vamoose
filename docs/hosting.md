@@ -1,3 +1,7 @@
+---
+description: Run vamoose on a server or in Docker. Headless auth, secrets encrypted at rest, and a doctor command to verify setup.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # Hosting

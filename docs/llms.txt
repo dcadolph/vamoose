@@ -1,0 +1,21 @@
+# vamoose
+
+> vamoose is a calendar workflow engine that automates time off. One command holds the dates on your calendar, invites your manager, treats their calendar accept as the approval, fans the event out to the team as optional attendees, announces in Slack or email, and files the leave in your HR system. It runs on Microsoft Graph (Outlook and Microsoft 365), Google Calendar, Apple iCloud, and any CalDAV server, driven from the CLI, Claude over MCP, Slack, or a local dashboard.
+
+Install: `brew install dcadolph/tap/vamoose`
+
+## Docs
+
+- [Quickstart](https://vamoose.dev/quickstart.html): install to first approved hold in minutes
+- [Concepts](https://vamoose.dev/concepts.html): holds, calendar-accept approval, workflows
+- [Commands](https://vamoose.dev/commands.html): every command, flag, and environment variable
+- [Workflows](https://vamoose.dev/workflows.html): author workflows in JSON with branching, approver chains, waits, guards, messages, and HR leave filing
+- [Providers](https://vamoose.dev/providers.html): Outlook, Google Calendar, iCloud, and CalDAV setup
+- [Slack](https://vamoose.dev/slack.html): slash commands and approval buttons
+- [Claude](https://vamoose.dev/claude-guide.html): the MCP server for AI agents
+- [Hosting](https://vamoose.dev/hosting.html): server and Docker deployment, secrets encrypted at rest
+- [Architecture](https://vamoose.dev/architecture.html): surfaces, core, and adapters
+
+## Source
+
+- [GitHub](https://github.com/dcadolph/vamoose): Go source under the Business Source License 1.1

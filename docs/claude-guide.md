@@ -1,3 +1,8 @@
+---
+title: Drive vamoose from Claude over MCP
+description: An AI agent books time off, previews and runs workflows, and authors new ones through the vamoose MCP server.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # vamoose with Claude

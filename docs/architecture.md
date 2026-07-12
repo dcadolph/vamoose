@@ -1,3 +1,7 @@
+---
+description: How vamoose is built. Doors (CLI, MCP, Slack, dashboard) in front of one workflow core, with swappable calendar backends.
+---
+
 <p align="center"><img src="assets/vamoose-moosercycle.png" alt="vamoose" width="100%"></p>
 
 # Architecture
