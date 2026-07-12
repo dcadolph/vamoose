@@ -75,6 +75,10 @@ vamoose daemon
 
 `vamoose service` prints a launchd or systemd manifest to run the daemon unattended.
 
+## 6. Prefer clicking?
+
+`vamoose app` opens a local dashboard: run workflows, act on watched holds, edit workflow JSON, manage schedules, and read the run history. On macOS, `make tray` builds a menu bar moose that badges your watched holds and keeps the daemon running for you.
+
 ## Where next
 
 | Guide                            | What's in it                                             &nbsp; |

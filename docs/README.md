@@ -65,7 +65,7 @@ brew install dcadolph/tap/vamoose
 
 <div class="flow">
 <div class="flow-step"><span class="num">1</span><div class="flow-text"><strong>Declare</strong><span>A workflow is ordered steps: create a hold, branch on the outcome, wait, and gate on approval. Time off is built in, or author your own in JSON or with an AI agent.</span></div></div>
-<div class="flow-step"><span class="num">2</span><div class="flow-text"><strong>Run</strong><span>Drive it from your terminal, Claude, or Slack, on Microsoft Graph, Google, iCloud, or any CalDAV host. Swappable doors, swappable backends.</span></div></div>
+<div class="flow-step"><span class="num">2</span><div class="flow-text"><strong>Run</strong><span>Drive it from your terminal, Claude, Slack, a local dashboard, or the menu bar moose, on Microsoft Graph, Google, iCloud, or any CalDAV host. Swappable doors, swappable backends.</span></div></div>
 <div class="flow-step"><span class="num">3</span><div class="flow-text"><strong>Advance</strong><span>The daemon moves it along on its own: approvals, timeouts, waits, recurring schedules, and the notify, note, and message steps.</span></div></div>
 </div>
 
