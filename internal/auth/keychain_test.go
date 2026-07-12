@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -28,6 +29,11 @@ func TestKeychainStore(t *testing.T) {
 	}
 	if got.AccessToken != "old" {
 		t.Errorf("migrated token = %q, want old", got.AccessToken)
+	}
+
+	// The plaintext legacy file is removed once the token is in the keychain.
+	if _, statErr := os.Stat(fs.path); !os.IsNotExist(statErr) {
+		t.Errorf("legacy token file still present after migration, stat err = %v", statErr)
 	}
 
 	// Subsequent saves and loads go through the keychain.
