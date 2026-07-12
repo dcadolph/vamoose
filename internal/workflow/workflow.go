@@ -101,7 +101,9 @@ type Step struct {
 	// branch in On.
 	Timeout string `json:"timeout,omitempty"`
 	// When guards the step: it runs only when the guard's conditions hold at
-	// execution time, otherwise the flow skips it. The zero value never gates.
+	// execution time, otherwise the flow skips it. The zero value never gates. A
+	// creating step and a gate step (approve or wait) cannot be guarded, since skipping
+	// one would drop the hold or bypass the approval or delay.
 	When When `json:"when,omitempty"`
 	// ShowAs overrides the free/busy status for creating steps. Empty uses the verb
 	// default: free for hold and event, out of office for away.
@@ -354,6 +356,9 @@ func (w Workflow) Validate() error {
 		if s.Verb.Creates() && s.When != (When{}) {
 			return fmt.Errorf("%w: step %d: the creating step cannot have a when guard", ErrInvalid, i)
 		}
+		if s.Verb.Waits() && s.When != (When{}) {
+			return fmt.Errorf("%w: step %d: a %q step cannot have a when guard, which would skip the gate", ErrInvalid, i, s.Verb)
+		}
 		if s.Verb.Creates() {
 			creators++
 			if i != 0 {
@@ -434,9 +439,12 @@ func (w Workflow) hasCycle() bool {
 	return false
 }
 
-// jumpTargets returns the distinct step indices step i can move to at run time: its
-// fall-through or explicit next, and each of its branch outcomes. Targets of "end" and
-// unknown ids are omitted.
+// jumpTargets returns the distinct step indices step i can move to at run time. For a
+// gate (approve) step this is exactly its outcome edges: accepted and declined always,
+// expired only when a timeout is set. It is not the empty-outcome fall-through, because
+// the daemon always advances a gate with a real outcome, so an i+1 that no outcome can
+// reach must not be counted as a cycle. Every other step has the single fall-through or
+// explicit next edge. Targets of "end" and unknown ids are omitted.
 func (w Workflow) jumpTargets(i int) []int {
 	seen := make(map[int]bool)
 	var out []int
@@ -446,10 +454,16 @@ func (w Workflow) jumpTargets(i int) []int {
 			out = append(out, n)
 		}
 	}
-	add(w.Next(i, ""))
-	for outcome := range w.Steps[i].On {
-		add(w.Next(i, outcome))
+	s := w.Steps[i]
+	if s.Verb == VerbApprove {
+		add(w.Next(i, OutcomeAccepted))
+		add(w.Next(i, OutcomeDeclined))
+		if s.Timeout != "" {
+			add(w.Next(i, OutcomeExpired))
+		}
+		return out
 	}
+	add(w.Next(i, ""))
 	return out
 }
 
