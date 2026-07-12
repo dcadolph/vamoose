@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 const (
@@ -94,7 +96,7 @@ func saveSchedules(items []scheduleItem) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o600)
+	return util.WriteFileAtomic(path, b, 0o600)
 }
 
 // addSchedule appends a schedule to the list.

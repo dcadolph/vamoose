@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/dcadolph/vamoose/internal/secret"
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // defaultMax is how many events the file keeps before dropping the oldest, so the
@@ -109,5 +110,5 @@ func (s *FileStore) store(events []Event) error {
 			return err
 		}
 	}
-	return os.WriteFile(s.path, b, 0o600)
+	return util.WriteFileAtomic(s.path, b, 0o600)
 }

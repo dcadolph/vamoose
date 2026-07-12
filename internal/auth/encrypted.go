@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/dcadolph/vamoose/internal/secret"
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // EncryptedStore stores the token as an AES-256-GCM sealed file, for a headless host
@@ -70,5 +71,5 @@ func (s *EncryptedStore) Save(t Token) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, sealed, 0o600)
+	return util.WriteFileAtomic(s.path, sealed, 0o600)
 }

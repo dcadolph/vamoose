@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/dcadolph/vamoose/internal/secret"
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // ErrNotLinked reports that a Slack user has not linked a calendar.
@@ -197,5 +198,5 @@ func (s *UserLinkFileStore) store(m map[string]UserLink) error {
 			return err
 		}
 	}
-	return os.WriteFile(s.path, b, 0o600)
+	return util.WriteFileAtomic(s.path, b, 0o600)
 }

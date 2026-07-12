@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // teamSource labels where a resolved team came from.
@@ -65,7 +66,7 @@ func saveTeamConfig(emails []string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o600)
+	return util.WriteFileAtomic(path, b, 0o600)
 }
 
 // clearTeamConfig removes the team config file, reverting to directory lookup.

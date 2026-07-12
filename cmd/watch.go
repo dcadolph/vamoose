@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // watchItem is a workflow run the daemon advances when the manager responds.
@@ -83,7 +85,7 @@ func saveWatches(items []watchItem) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o600)
+	return util.WriteFileAtomic(path, b, 0o600)
 }
 
 // addWatch appends a hold to the watch list, replacing any existing entry with

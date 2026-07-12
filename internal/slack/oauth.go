@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/secret"
+	"github.com/dcadolph/vamoose/internal/util"
 )
 
 // installScopes are the bot scopes vamoose requests during OAuth install. users:read.email
@@ -209,7 +210,7 @@ func (f *FileStore) Save(teamID, botToken string) error {
 			return err
 		}
 	}
-	return os.WriteFile(f.path, b, 0o600)
+	return util.WriteFileAtomic(f.path, b, 0o600)
 }
 
 // Get returns a workspace's bot token, or an error when it is not installed.
