@@ -1,0 +1,50 @@
+# CI builds, vets, lints, and race-tests vamoose on every push and pull request. Tests
+# run on both Linux and macOS: Linux is the hosting and Docker target, macOS is the
+# primary desktop target for the menu bar app and the EventKit bridge.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Cancel an in-progress run when a newer commit lands on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Coverage total
+        run: go tool cover -func=coverage.out | tail -1
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
