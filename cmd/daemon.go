@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -41,6 +42,9 @@ const (
 	pollExpired
 	// pollFailed means the poll or promotion errored.
 	pollFailed
+	// pollGone means the hold was deleted out of band, so the watch is dropped rather
+	// than retried against a hold that no longer exists.
+	pollGone
 )
 
 // runDaemon polls watched holds and auto-promotes them when the manager approves.
@@ -167,6 +171,8 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 		case pollFailed:
 			logger.Printf("%s: %v", label(w), aerr)
 			remaining = append(remaining, updated)
+		case pollGone:
+			logger.Printf("%s: hold no longer exists; no longer watching", label(w))
 		}
 	}
 	// This end-of-pass save records each hold's final state. Crash-safety across it comes
@@ -207,6 +213,9 @@ func advanceRun(ctx context.Context, prov calendar.Provider, item watchItem) (po
 	}
 	hold, err := prov.GetHold(ctx, item.HoldID)
 	if err != nil {
+		if errors.Is(err, calendar.ErrNotFound) {
+			return pollGone, item, nil
+		}
 		return pollFailed, item, err
 	}
 	if item.Step < 0 || item.Step >= len(wf.Steps) {
