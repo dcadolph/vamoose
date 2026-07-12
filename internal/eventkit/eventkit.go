@@ -46,11 +46,37 @@ func Status(ctx context.Context, uid string) (map[string]calendar.Response, erro
 	}
 	m := make(map[string]calendar.Response, len(parsed.Attendees))
 	for _, a := range parsed.Attendees {
-		if a.Email != "" {
-			m[strings.ToLower(a.Email)] = responseFrom(a.Status)
+		if a.Email == "" {
+			continue
+		}
+		key := strings.ToLower(a.Email)
+		next := responseFrom(a.Status)
+		// The same uid can match in more than one synced calendar, so an attendee may
+		// appear twice. Keep the stronger response so a stale non-reply copy does not
+		// overwrite a real accept or decline.
+		if cur, ok := m[key]; !ok || responseRank(next) > responseRank(cur) {
+			m[key] = next
 		}
 	}
 	return m, nil
+}
+
+// responseRank orders responses so that when the same attendee appears under more than
+// one matched calendar, a definitive reply beats a non-reply. A decline outranks an
+// accept so a conflict is never read as approval.
+func responseRank(r calendar.Response) int {
+	switch r {
+	case calendar.ResponseDeclined:
+		return 4
+	case calendar.ResponseAccepted:
+		return 3
+	case calendar.ResponseTentative:
+		return 2
+	case calendar.ResponseNotResponded:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // helperPath locates the helper binary: an explicit override, next to the running

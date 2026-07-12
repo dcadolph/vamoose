@@ -32,6 +32,32 @@ func TestStatus(t *testing.T) {
 	}
 }
 
+// TestStatusDuplicatePrefersStronger confirms that when the same attendee appears twice,
+// from a uid matched in two calendars, the stronger response wins regardless of order, so
+// a stale non-reply cannot mask a real accept.
+func TestStatusDuplicatePrefersStronger(t *testing.T) {
+	dir := t.TempDir()
+	helper := filepath.Join(dir, "vamoose-eventkit")
+	// boss appears pending-then-accepted; peer appears accepted-then-pending.
+	script := "#!/bin/sh\n" +
+		`printf '{"attendees":[{"email":"boss@x.com","status":"pending"},{"email":"boss@x.com","status":"accepted"},{"email":"peer@x.com","status":"accepted"},{"email":"peer@x.com","status":"pending"}]}'` + "\n"
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatalf("write helper: %v", err)
+	}
+	t.Setenv("VAMOOSE_EVENTKIT_HELPER", helper)
+
+	got, err := Status(context.Background(), "uid-1")
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if got["boss@x.com"] != calendar.ResponseAccepted {
+		t.Errorf("boss = %q, want accepted (stronger wins over pending)", got["boss@x.com"])
+	}
+	if got["peer@x.com"] != calendar.ResponseAccepted {
+		t.Errorf("peer = %q, want accepted (order independent)", got["peer@x.com"])
+	}
+}
+
 // TestStatusHelperMissing confirms a missing helper errors rather than panicking.
 func TestStatusHelperMissing(t *testing.T) {
 	t.Setenv("VAMOOSE_EVENTKIT_HELPER", filepath.Join(t.TempDir(), "nope"))
