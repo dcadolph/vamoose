@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"os"
 
 	"github.com/zalando/go-keyring"
 
@@ -46,7 +47,8 @@ type keychainStore struct {
 }
 
 // Load returns the token from the keychain, migrating from the legacy file when the
-// keychain has none. A missing token yields a zero Token and no error.
+// keychain has none and then removing that plaintext file. A missing token yields a
+// zero Token and no error.
 func (s *keychainStore) Load() (Token, error) {
 	secret, err := keyring.Get(keychainService, s.user)
 	if err == nil {
@@ -61,7 +63,11 @@ func (s *keychainStore) Load() (Token, error) {
 	}
 	if s.legacy != nil {
 		if t, ferr := s.legacy.Load(); ferr == nil && t.AccessToken != "" {
-			_ = s.Save(t)
+			// Once the token lives in the keychain, remove the plaintext file so the
+			// refresh material is not left on disk in the clear.
+			if serr := s.Save(t); serr == nil {
+				_ = os.Remove(s.legacy.path)
+			}
 			return t, nil
 		}
 	}
