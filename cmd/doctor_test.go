@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/dcadolph/vamoose/internal/calendar"
 )
 
 // TestDoctorChecks confirms the report counts the right number of missing required
@@ -40,6 +45,36 @@ func TestDoctorChecks(t *testing.T) {
 			}
 			if missing != test.WantMissing {
 				t.Errorf("%s: missing = %d, want %d", test.Name, missing, test.WantMissing)
+			}
+		})
+	}
+}
+
+// TestReportProbe confirms the live probe reports the signed-in user and the manager
+// state, including the no-manager case for a directory-less backend.
+func TestReportProbe(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Name    string
+		Prov    *mockProvider
+		WantHas []string
+	}{{ // Test 0: A resolved manager is reported.
+		Name: "with manager", Prov: &mockProvider{mgr: calendar.Person{Email: "boss@x.com"}},
+		WantHas: []string{"Signed in as", "Manager: boss@x.com"},
+	}, { // Test 1: A directory-less backend reports no manager rather than an error.
+		Name: "no manager", Prov: &mockProvider{mgrErr: calendar.ErrNoManager},
+		WantHas: []string{"Signed in as", "none set in the directory"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			var buf bytes.Buffer
+			reportProbe(context.Background(), &buf, test.Prov)
+			out := buf.String()
+			for _, want := range test.WantHas {
+				if !strings.Contains(out, want) {
+					t.Errorf("%s: output %q missing %q", test.Name, out, want)
+				}
 			}
 		})
 	}
