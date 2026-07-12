@@ -41,6 +41,28 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// FuzzParse confirms Parse never panics on arbitrary input, only returns an error. It
+// exercises the decode, unknown-field, trailing-data, and validation paths, including
+// cycle detection, against inputs a hand editor or an AI agent might produce.
+func FuzzParse(f *testing.F) {
+	seeds := []string{
+		`{"name":"x","steps":[{"verb":"away"}]}`,
+		`{"name":"pto","steps":[{"verb":"hold","id":"h"},{"verb":"approve","manager":true,"on":{"accepted":"end"}}]}`,
+		`{"name":"loop","steps":[{"verb":"hold","id":"a","next":"a"}]}`,
+		`{"name":"x","steps":[{"verb":"approve","when":{"maxAttendees":1}}]}`,
+		`{"name":"x","steps":[]}`,
+		`{}`,
+		`not json`,
+		`{"name":"x","steps":[{"verb":"away"}]} trailing`,
+	}
+	for _, s := range seeds {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(_ *testing.T, data []byte) {
+		_, _ = Parse(data)
+	})
+}
+
 // TestLoadBuiltin confirms the embedded templates load and unknown or unsafe names
 // are rejected.
 func TestLoadBuiltin(t *testing.T) {
