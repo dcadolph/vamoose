@@ -238,11 +238,12 @@ type scheduleRunner func(ctx context.Context, s scheduleItem) error
 // fireSchedules runs every schedule whose next run has passed and advances each to its
 // next interval, returning the updated list to persist. A run error is logged and the
 // schedule still advances, so a failing run does not retry every poll or catch up on
-// missed intervals after downtime.
+// missed intervals after downtime. A zero next run, from a hand-edited file, is treated
+// as due now so it fires once and is normalized rather than staying dead forever.
 func fireSchedules(ctx context.Context, now time.Time, schedules []scheduleItem, run scheduleRunner, logger *log.Logger) []scheduleItem {
 	out := make([]scheduleItem, 0, len(schedules))
 	for _, s := range schedules {
-		if !s.NextRun.IsZero() && !s.NextRun.After(now) {
+		if s.NextRun.IsZero() || !s.NextRun.After(now) {
 			if err := run(ctx, s); err != nil {
 				logger.Printf("schedule %q: %v", s.Workflow, err)
 			} else {

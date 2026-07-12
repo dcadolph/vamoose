@@ -104,6 +104,9 @@ func TestAdvanceRun(t *testing.T) {
 	}, { // Test 4: An unknown workflow fails.
 		Name: "unknown workflow", Response: calendar.ResponseAccepted, Workflow: "ghost",
 		WantRes: pollFailed,
+	}, { // Test 5: A hold deleted out of band drops the watch rather than retrying.
+		Name: "hold deleted", Response: calendar.ResponseAccepted, GetErr: calendar.ErrNotFound,
+		Workflow: "pto", WantRes: pollGone,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

@@ -89,6 +89,28 @@ func TestFireSchedules(t *testing.T) {
 	}
 }
 
+// TestFireSchedulesZeroNextRun confirms a schedule with a zero next run, such as from a
+// hand-edited file, fires once and is normalized rather than staying dead forever.
+func TestFireSchedulesZeroNextRun(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC)
+	var ran []string
+	runner := func(_ context.Context, s scheduleItem) error {
+		ran = append(ran, s.Workflow)
+		return nil
+	}
+	logger := log.New(io.Discard, "", 0)
+	schedules := []scheduleItem{{Workflow: "orphan", Every: "168h"}} // zero NextRun
+	out := fireSchedules(context.Background(), now, schedules, runner, logger)
+
+	if len(ran) != 1 || ran[0] != "orphan" {
+		t.Fatalf("ran = %v, want [orphan]", ran)
+	}
+	if !out[0].NextRun.Equal(now.Add(168 * time.Hour)) {
+		t.Errorf("orphan next run = %v, want it normalized to now+168h", out[0].NextRun)
+	}
+}
+
 // TestPollSchedules confirms the daemon fires a due schedule, and that a run against an
 // unbuildable provider still advances the schedule instead of retrying every poll.
 func TestPollSchedules(t *testing.T) {
