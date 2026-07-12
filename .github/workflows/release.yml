@@ -86,7 +86,7 @@ jobs:
           cat > tap/Formula/vamoose.rb <<EOF
           class Vamoose < Formula
             desc "Calendar workflow engine for time off, approvals, and quick actions"
-            homepage "https://github.com/dcadolph/vamoose"
+            homepage "https://vamoose.dev"
             version "${VER}"
             license "BUSL-1.1"
 

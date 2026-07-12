@@ -7,6 +7,8 @@
 <p align="center">Calendar workflows, minus the tedium.</p>
 
 <p align="center">
+  <a href="https://vamoose.dev"><img
+    src="https://img.shields.io/badge/docs-vamoose.dev-d9a441" alt="Docs at vamoose.dev"></a>
   <a href="https://github.com/dcadolph/vamoose/releases"><img
     src="https://img.shields.io/github/v/release/dcadolph/vamoose" alt="Latest release"></a>
   <img src="https://img.shields.io/github/go-mod/go-version/dcadolph/vamoose" alt="Go version">
@@ -293,6 +295,8 @@ tools so Claude can book time off for you. Point an MCP client at the binary:
 Authenticate once first with `vamoose whoami`; the server reuses the cached token.
 
 ## Docs
+
+These guides are also on the site at [vamoose.dev](https://vamoose.dev).
 
 | Guide                                    | What                                                   &nbsp; |
 | ---------------------------------------- | ------------------------------------------------------------ |
