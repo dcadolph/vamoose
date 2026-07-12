@@ -389,14 +389,19 @@ func TestRunWorkflowWaitGate(t *testing.T) {
 	}
 }
 
-// TestResolveNotifier confirms the notifier is nil when nothing is configured and set
-// when a comms backend is present.
+// TestResolveNotifier confirms the notifier always routes webhook channels, and that
+// Slack and email channels are enabled by their settings.
 func TestResolveNotifier(t *testing.T) {
-	t.Run("none", func(t *testing.T) {
+	t.Run("none still routes webhooks", func(t *testing.T) {
 		t.Setenv("VAMOOSE_SLACK_BOT_TOKEN", "")
 		t.Setenv("VAMOOSE_SMTP_HOST", "")
-		if resolveNotifier() != nil {
-			t.Error("want nil when no comms backend is configured")
+		n := resolveNotifier()
+		if n == nil {
+			t.Fatal("want a notifier so a webhook channel works with no other backend")
+		}
+		// A Slack channel with no token still errors clearly rather than silently passing.
+		if err := n.Notify(context.Background(), "#team", "x"); err == nil {
+			t.Error("want an error for a Slack channel when no token is set")
 		}
 	})
 	t.Run("email only", func(t *testing.T) {

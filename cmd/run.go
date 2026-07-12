@@ -42,10 +42,12 @@ func (d stepDeps) checkpointAt(resume int) {
 	}
 }
 
-// resolveNotifier returns the configured comms notifier, or nil when none is set. A
-// Slack bot token (VAMOOSE_SLACK_BOT_TOKEN) enables Slack, and SMTP settings
-// (VAMOOSE_SMTP_HOST and friends) enable email. When both are set, a message routes by
-// its channel: an address goes to email, anything else to Slack.
+// resolveNotifier returns the comms notifier that routes a message by its channel. A
+// Slack bot token (VAMOOSE_SLACK_BOT_TOKEN) enables Slack channels, SMTP settings
+// (VAMOOSE_SMTP_HOST and friends) enable email addresses, and an http or https channel
+// is posted to as an incoming webhook, so a Microsoft Teams, Google Chat, or similar URL
+// works with no extra setup. A message to a backend that is not set returns a clear
+// error naming the setting to set.
 func resolveNotifier() comms.Notifier {
 	var slack, email comms.Notifier
 	if token := os.Getenv("VAMOOSE_SLACK_BOT_TOKEN"); token != "" {
@@ -60,10 +62,8 @@ func resolveNotifier() comms.Notifier {
 			From:     os.Getenv("VAMOOSE_SMTP_FROM"),
 		})
 	}
-	if slack == nil && email == nil {
-		return nil
-	}
-	return comms.Route(slack, email)
+	webhook := comms.NewWebhookNotifier(os.Getenv("VAMOOSE_WEBHOOK_AUTH"))
+	return comms.Route(slack, email, webhook)
 }
 
 // resolveFiler returns the configured HR leave filer, or nil when none is set. BambooHR
