@@ -138,11 +138,25 @@ func (s *stateStore) issue() string {
 	tok := hex.EncodeToString(b)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.reapLocked()
 	s.states[tok] = s.now().Add(s.ttl)
 	return tok
 }
 
-// consume validates and removes a state token, reporting whether it was valid.
+// reapLocked drops expired state tokens so an abandoned or flooded OAuth flow cannot
+// grow the map without bound. The unauthenticated install endpoint issues a state on
+// every request, so without this an attacker could exhaust memory. Callers hold s.mu.
+func (s *stateStore) reapLocked() {
+	now := s.now()
+	for tok, exp := range s.states {
+		if !now.Before(exp) {
+			delete(s.states, tok)
+		}
+	}
+}
+
+// consume validates and removes a state token, reporting whether it was valid. A token
+// is valid until, but not at, its expiry.
 func (s *stateStore) consume(tok string) bool {
 	if tok == "" {
 		return false
