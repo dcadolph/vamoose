@@ -77,13 +77,24 @@ func (p *Provider) toGoogleEvent(h calendar.Hold) googleEvent {
 	}
 }
 
-// boundary renders a time as a Calendar event boundary. All-day boundaries use a
-// bare date; timed boundaries use a wall-clock date-time in the provider zone.
+// boundary renders a time as a Calendar event boundary. All-day boundaries use a bare
+// date and name a calendar day, so they are not converted between zones. Timed
+// boundaries are converted into the provider zone before formatting, so the labeled
+// wall-clock string denotes the same instant even when t carries a different offset.
 func (p *Provider) boundary(t time.Time, allDay bool) *googleEventDateTime {
 	if allDay {
 		return &googleEventDateTime{Date: t.Format("2006-01-02")}
 	}
-	return &googleEventDateTime{DateTime: t.Format("2006-01-02T15:04:05"), TimeZone: p.timeZone}
+	return &googleEventDateTime{DateTime: t.In(p.location()).Format("2006-01-02T15:04:05"), TimeZone: p.timeZone}
+}
+
+// location returns the provider's time zone, falling back to UTC when the configured
+// zone name does not load.
+func (p *Provider) location() *time.Location {
+	if loc, err := time.LoadLocation(p.timeZone); err == nil {
+		return loc
+	}
+	return time.UTC
 }
 
 // toGoogleAttendees converts calendar attendees into Calendar attendees.

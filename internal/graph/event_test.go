@@ -3,6 +3,7 @@ package graph
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
@@ -79,5 +80,20 @@ func TestRoleToGraph(t *testing.T) {
 				t.Errorf("roleToGraph(%q) = %q, want %q", test.In, got, test.WantResult)
 			}
 		})
+	}
+}
+
+// TestFormatTimeConvertsToLabelZone confirms a timed value is converted into the zone it
+// is labeled with, so an input carrying a different offset keeps its instant instead of
+// being relabeled and silently shifted. All-day values name a calendar day and are not
+// converted.
+func TestFormatTimeConvertsToLabelZone(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 8, 3, 9, 0, 0, 0, time.FixedZone("CDT", -5*3600))
+	if got := formatTime(start, false, time.UTC); got != "2026-08-03T14:00:00" {
+		t.Errorf("timed = %q, want 2026-08-03T14:00:00 (09:00-05:00 in UTC)", got)
+	}
+	if got := formatTime(start, true, time.UTC); got != "2026-08-03T00:00:00" {
+		t.Errorf("all-day = %q, want 2026-08-03T00:00:00 (not zone-converted)", got)
 	}
 }

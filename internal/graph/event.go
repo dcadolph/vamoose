@@ -89,13 +89,14 @@ type graphEvent struct {
 
 // toGraphEvent converts a Hold into a Graph event for create requests.
 func (p *Provider) toGraphEvent(h calendar.Hold) graphEvent {
+	loc := p.location()
 	ev := graphEvent{
 		Subject:           h.Subject,
 		IsAllDay:          h.AllDay,
 		ShowAs:            showAsToGraph(h.ShowAs),
 		ResponseRequested: true,
-		Start:             &graphDateTime{DateTime: formatTime(h.Start, h.AllDay), TimeZone: p.timeZone},
-		End:               &graphDateTime{DateTime: formatTime(h.End, h.AllDay), TimeZone: p.timeZone},
+		Start:             &graphDateTime{DateTime: formatTime(h.Start, h.AllDay, loc), TimeZone: p.timeZone},
+		End:               &graphDateTime{DateTime: formatTime(h.End, h.AllDay, loc), TimeZone: p.timeZone},
 		Attendees:         toGraphAttendees(h.Attendees),
 	}
 	if h.Body != "" {
@@ -119,13 +120,24 @@ func toGraphAttendees(in []calendar.Attendee) []graphAttendee {
 	return out
 }
 
-// formatTime renders a time as a Graph wall-clock string. All-day events are
-// pinned to midnight so Graph treats the date boundaries correctly.
-func formatTime(t time.Time, allDay bool) string {
+// formatTime renders a time as a Graph wall-clock string in loc, the zone the string is
+// labeled with, so the stored instant is preserved even when t carries a different
+// offset. All-day events name a calendar day rather than an instant, so they are pinned
+// to midnight on their own date and not converted between zones.
+func formatTime(t time.Time, allDay bool, loc *time.Location) string {
 	if allDay {
 		return t.Format("2006-01-02T00:00:00")
 	}
-	return t.Format("2006-01-02T15:04:05")
+	return t.In(loc).Format("2006-01-02T15:04:05")
+}
+
+// location returns the provider's time zone, falling back to UTC when the configured
+// zone name does not load.
+func (p *Provider) location() *time.Location {
+	if loc, err := time.LoadLocation(p.timeZone); err == nil {
+		return loc
+	}
+	return time.UTC
 }
 
 // fromGraphEvent converts a Graph event into a Hold.
