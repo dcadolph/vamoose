@@ -23,6 +23,7 @@ func TestRegisterTools(t *testing.T) {
 	want := []string{
 		"whoami", "request_time_off", "time_off_status",
 		"promote_to_team", "cancel_hold", "set_away", "create_event",
+		"leave_balance", "team_coverage",
 		"list_workflows", "preview_workflow", "run_workflow",
 		"list_schedules", "schedule_workflow", "create_workflow",
 	}

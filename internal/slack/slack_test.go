@@ -360,6 +360,7 @@ func TestAllowedSubcommand(t *testing.T) {
 	}{
 		{"off", true}, {"request", true}, {"run", true}, {"workflows", true},
 		{"check", true}, {"schedule", true}, {"away", true}, {"event", true},
+		{"balance", true}, {"coverage", true},
 		{"promote", false}, {"cancel", false}, {"daemon", false}, {"slack", false},
 		{"mcp", false}, {"login", false}, {"service", false}, {"bogus", false},
 	}

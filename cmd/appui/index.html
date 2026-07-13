@@ -54,6 +54,7 @@
   .page.active { display:block; animation:fade .2s ease; }
   @keyframes fade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
   .page-intro { color:var(--dim); margin:-.3rem 0 1.4rem; max-width:70ch; }
+  .sub-head { font-size:.95rem; font-weight:600; color:var(--dim); margin:2rem 0 .8rem; text-transform:uppercase; letter-spacing:.06em; }
 
   .grid { display:grid; gap:.9rem; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:1rem 1.1rem;
@@ -192,6 +193,8 @@
     <div class="page" id="page-watching">
       <p class="page-intro">Holds the daemon is advancing. Check the approval, promote to the team, or cancel.</p>
       <div id="watches"><div class="empty">Loading…</div></div>
+      <h2 class="sub-head">Off in the next four weeks</h2>
+      <div id="coverage-list"><div class="empty">Loading…</div></div>
     </div>
 
     <div class="page" id="page-runs">
@@ -346,6 +349,18 @@ async function loadWatches() {
         </div></div>`;
     }).join("") : `<div class="empty">Nothing is being watched. Run a workflow with --watch and the daemon advances it here.</div>`;
   } catch (e) { $("watches").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+
+async function loadCoverage() {
+  try {
+    const items = await getJSON("/api/coverage");
+    $("coverage-list").innerHTML = items.length ? items.map(e => {
+      const from = (e.start || "").slice(0, 10), to = (e.end || "").slice(0, 10);
+      return `<div class="hrow"><span class="dot" style="background:var(--accent)"></span>
+        <span class="act">${esc(e.owner)}</span><span>${esc(from)} to ${esc(to)}</span>
+        <span class="hmeta">${esc(e.subject || "")}</span></div>`;
+    }).join("") : `<div class="empty">No one has time off booked through vamoose in the next four weeks.</div>`;
+  } catch (e) { $("coverage-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
 
 let allHist = [], histExpanded = false;
@@ -536,7 +551,7 @@ $("scrim").addEventListener("click", () => setNav(false));
 // Page router: the sidebar switches whole pages, no scrolling between them.
 const pages = ["workflows","watching","runs","schedules","setup","help"];
 const titles = { workflows:"Workflows", watching:"Watching", runs:"Run history", schedules:"Schedules", setup:"Setup", help:"Help" };
-const loaders = { workflows:loadWorkflows, watching:loadWatches, runs:loadHistory, schedules:loadSchedules, setup:loadDoctor };
+const loaders = { workflows:loadWorkflows, watching:() => { loadWatches(); loadCoverage(); }, runs:loadHistory, schedules:loadSchedules, setup:loadDoctor };
 let activePage = "workflows";
 function showPage(p) {
   if (!pages.includes(p)) p = "workflows";
@@ -554,7 +569,7 @@ window.addEventListener("hashchange", route);
 (async () => { try { $("ver").textContent = await (await fetch("/api/version")).text(); } catch {} })();
 loadWatches(); // keep the sidebar badge fresh regardless of page
 route();
-setInterval(() => { if (activePage === "watching") loadWatches(); if (activePage === "runs") loadHistory(); loadWatches(); }, 15000);
+setInterval(() => { if (activePage === "watching") { loadWatches(); loadCoverage(); } if (activePage === "runs") loadHistory(); loadWatches(); }, 15000);
 </script>
 </body>
 </html>

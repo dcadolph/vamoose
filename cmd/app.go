@@ -79,6 +79,7 @@ func runApp(ctx context.Context, args []string) error {
 	mux.HandleFunc("GET /api/workflows", appJSON(appWorkflows))
 	mux.HandleFunc("GET /api/doctor", appJSON(appDoctor))
 	mux.HandleFunc("GET /api/watches", appJSON(func() (any, error) { return loadWatches() }))
+	mux.HandleFunc("GET /api/coverage", appJSON(appCoverage))
 	mux.HandleFunc("GET /api/history", appJSON(func() (any, error) {
 		store, serr := auditStore()
 		if serr != nil {

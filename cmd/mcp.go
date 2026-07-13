@@ -113,6 +113,44 @@ func registerTools(srv *mcp.Server) {
 		},
 	})
 	srv.Register(mcp.Tool{
+		Name:        "leave_balance",
+		Description: "Show remaining time off read from the configured HR system.",
+		InputSchema: objectSchema(nil, map[string]any{
+			"as_of": strProp("Date to check the balance as of, YYYY-MM-DD; omit for today"),
+		}),
+		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
+			m := parseArgs(raw)
+			args := []string{"balance"}
+			if v := argString(m, "as_of"); v != "" {
+				args = append(args, "--as-of", v)
+			}
+			return execSelf(ctx, args...)
+		},
+	})
+	srv.Register(mcp.Tool{
+		Name:        "team_coverage",
+		Description: "Show who already has time off booked in a window, before booking or approving more.",
+		InputSchema: objectSchema(nil, map[string]any{
+			"phrase": strProp("Date phrase such as \"next week\"; omit for next week"),
+			"start":  strProp("Explicit start date as YYYY-MM-DD; overrides the phrase"),
+			"end":    strProp("Explicit end date as YYYY-MM-DD; overrides the phrase"),
+		}),
+		Handler: func(ctx context.Context, raw json.RawMessage) (string, error) {
+			m := parseArgs(raw)
+			args := []string{"coverage"}
+			if v := argString(m, "phrase"); v != "" {
+				args = append(args, v)
+			}
+			if v := argString(m, "start"); v != "" {
+				args = append(args, "--start", v)
+			}
+			if v := argString(m, "end"); v != "" {
+				args = append(args, "--end", v)
+			}
+			return execSelf(ctx, args...)
+		},
+	})
+	srv.Register(mcp.Tool{
 		Name:        "create_event",
 		Description: "Create a quick calendar event, optionally inviting attendees.",
 		InputSchema: objectSchema([]string{"start", "end", "subject"}, map[string]any{
