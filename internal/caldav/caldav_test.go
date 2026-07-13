@@ -3,6 +3,7 @@ package caldav
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -17,6 +18,95 @@ import (
 // testProvider returns a Provider usable for mapping tests without a network client.
 func testProvider() *Provider {
 	return &Provider{username: "me@icloud.com", timeZone: "UTC", prodID: "-//vamoose//test//EN"}
+}
+
+// TestNewProviderValidation confirms the constructor requires an endpoint, username, and
+// password, and that the options set their fields.
+func TestNewProviderValidation(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Endpoint string
+		Username string
+		Password string
+	}{
+		{"", "u", "p"},
+		{"https://dav.example.com", "", "p"},
+		{"https://dav.example.com", "u", ""},
+	}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if _, err := NewProvider(test.Endpoint, test.Username, test.Password); !errors.Is(err, ErrCalDAV) {
+				t.Errorf("NewProvider err = %v, want ErrCalDAV", err)
+			}
+		})
+	}
+
+	p, err := NewProvider("https://dav.example.com", "u", "p", WithTimeZone("America/Chicago"), WithCalendarName("Work"))
+	if err != nil {
+		t.Fatalf("NewProvider: %v", err)
+	}
+	if p.timeZone != "America/Chicago" {
+		t.Errorf("timeZone = %q, want America/Chicago", p.timeZone)
+	}
+	if p.calendarName != "Work" {
+		t.Errorf("calendarName = %q, want Work", p.calendarName)
+	}
+}
+
+// TestIdentity confirms Me returns the account and the directory methods report their
+// absence, since CalDAV has no directory.
+func TestIdentity(t *testing.T) {
+	t.Parallel()
+	p := testProvider()
+	me, err := p.Me(context.Background())
+	if err != nil || me.Email != "me@icloud.com" {
+		t.Errorf("Me = %+v, %v; want me@icloud.com", me, err)
+	}
+	if _, err := p.Manager(context.Background()); !errors.Is(err, calendar.ErrNoManager) {
+		t.Errorf("Manager err = %v, want ErrNoManager", err)
+	}
+	if _, err := p.Team(context.Background()); !errors.Is(err, calendar.ErrNoDirectory) {
+		t.Errorf("Team err = %v, want ErrNoDirectory", err)
+	}
+}
+
+// TestWithStatus confirms the option wires an external attendee-status source.
+func TestWithStatus(t *testing.T) {
+	t.Parallel()
+	called := false
+	fn := func(context.Context, string) (map[string]calendar.Response, error) {
+		called = true
+		return nil, nil
+	}
+	p := &Provider{}
+	WithStatus(fn)(p)
+	if p.status == nil {
+		t.Fatal("WithStatus did not set the status func")
+	}
+	_, _ = p.status(context.Background(), "uid")
+	if !called {
+		t.Error("status func was not wired through")
+	}
+}
+
+// TestNewUID confirms generated UIDs are unique and carry the vamoose suffix.
+func TestNewUID(t *testing.T) {
+	t.Parallel()
+	seen := make(map[string]bool)
+	for range 100 {
+		uid, err := newUID()
+		if err != nil {
+			t.Fatalf("newUID: %v", err)
+		}
+		if !strings.HasSuffix(uid, "@vamoose") {
+			t.Errorf("uid %q missing @vamoose suffix", uid)
+		}
+		if seen[uid] {
+			t.Errorf("duplicate uid %q", uid)
+		}
+		seen[uid] = true
+	}
 }
 
 // TestHoldRoundTrip builds a hold, serializes it to iCalendar, decodes it, and maps
