@@ -77,7 +77,9 @@ func timeLocation(tz string) *time.Location {
 // day's date, in loc. A half-day hold is a real timed block, not an all-day event, so it
 // shows the person out for only part of the day.
 func halfDayWindow(day time.Time, loc *time.Location, portion string) (start, end time.Time, err error) {
-	y, m, d := day.In(loc).Date()
+	// Use day's own calendar date, not its date as seen from loc, so a midnight value in
+	// one zone does not shift to the previous or next day when built in another.
+	y, m, d := day.Date()
 	at := func(hour int) time.Time { return time.Date(y, m, d, hour, 0, 0, 0, loc) }
 	switch portion {
 	case "am", "morning":
@@ -106,10 +108,11 @@ func portionLabel(portion string) string {
 }
 
 // applyHalfDay narrows a window to the given half of its start day, returning a timed
-// window in loc. It errors when the window spans more than one day, since a half day
-// applies to a single day.
+// window in loc. It errors when the window spans more than one calendar day, since a half
+// day applies to a single day. The check is by calendar day, not elapsed hours, so a
+// daylight-saving day of 23 or 25 hours is still one day.
 func applyHalfDay(startAt, endAt time.Time, loc *time.Location, portion string) (start, end time.Time, err error) {
-	if endAt.Sub(startAt) > 24*time.Hour {
+	if endAt.After(startOfDay(startAt).AddDate(0, 0, 1)) {
 		return time.Time{}, time.Time{}, fmt.Errorf("a half day applies to a single day, not a range")
 	}
 	return halfDayWindow(startAt, loc, portion)

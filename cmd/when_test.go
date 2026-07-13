@@ -44,6 +44,28 @@ func TestHalfDayWindow(t *testing.T) {
 	}
 }
 
+// TestHalfDayWindowKeepsDate confirms the calendar day does not shift when the source
+// value is midnight in one zone and the window is built in another behind it.
+func TestHalfDayWindowKeepsDate(t *testing.T) {
+	t.Parallel()
+	chicago, err := time.LoadLocation("America/Chicago")
+	if err != nil {
+		t.Skipf("no tzdata: %v", err)
+	}
+	// Midnight UTC on Aug 3; viewed from Chicago this is the evening of Aug 2.
+	midnightUTC := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
+	s, _, err := halfDayWindow(midnightUTC, chicago, "am")
+	if err != nil {
+		t.Fatalf("halfDayWindow: %v", err)
+	}
+	if got := s.Format("2006-01-02"); got != "2026-08-03" {
+		t.Errorf("half-day date = %s, want 2026-08-03 (must not shift to Aug 2)", got)
+	}
+	if got := s.Format("15:04"); got != "09:00" {
+		t.Errorf("half-day start = %s, want 09:00 in the provider zone", got)
+	}
+}
+
 // TestApplyHalfDay confirms a single day is narrowed and a multi-day range is rejected.
 func TestApplyHalfDay(t *testing.T) {
 	t.Parallel()
@@ -57,6 +79,24 @@ func TestApplyHalfDay(t *testing.T) {
 	}
 	if s.Format("15:04") != "13:00" || e.Format("15:04") != "17:00" {
 		t.Errorf("pm window = %s-%s, want 13:00-17:00", s.Format("15:04"), e.Format("15:04"))
+	}
+}
+
+// TestApplyHalfDayDSTDay confirms a single calendar day that is 25 hours long, on the
+// autumn daylight-saving change, is still accepted rather than read as a range.
+func TestApplyHalfDayDSTDay(t *testing.T) {
+	t.Parallel()
+	la, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Skipf("no tzdata: %v", err)
+	}
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, la) // US clocks fall back this day
+	end := start.AddDate(0, 0, 1)                    // next midnight, 25 hours later
+	if end.Sub(start) <= 24*time.Hour {
+		t.Skip("tzdata does not model the DST change here")
+	}
+	if _, _, err := applyHalfDay(start, end, la, "am"); err != nil {
+		t.Errorf("a single 25-hour DST day should be accepted, got %v", err)
 	}
 }
 
