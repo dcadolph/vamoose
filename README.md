@@ -172,8 +172,16 @@ vamoose whoami
 # Create the hold and invite your manager. Manager is resolved from the directory.
 vamoose request --start 2026-07-20 --end 2026-07-24 --subject "Out: beach week"
 
-# Or request time off from a plain-language phrase.
+# Or request time off from a plain-language phrase. It reports the working days,
+# skipping weekends and configured holidays.
 vamoose off next week --subject "Out: beach week"
+
+# Just the afternoon.
+vamoose off tomorrow --half pm
+
+# Who else is off that week, and what do you have left?
+vamoose coverage next week
+vamoose balance
 
 # See whether your manager has approved.
 vamoose check

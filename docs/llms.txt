@@ -1,6 +1,6 @@
 # vamoose
 
-> vamoose is a calendar workflow engine that automates time off. One command holds the dates on your calendar, invites your manager, treats their calendar accept as the approval, fans the event out to the team as optional attendees, announces in Slack or email, and files the leave in your HR system. It runs on Microsoft Graph (Outlook and Microsoft 365), Google Calendar, Apple iCloud, and any CalDAV server, driven from the CLI, Claude over MCP, Slack, or a local dashboard.
+> vamoose is a calendar workflow engine that automates time off. One command holds the dates on your calendar, invites your manager, treats their calendar accept as the approval, fans the event out to the team as optional attendees, announces in Slack, email, or any webhook, and files the leave in your HR system. It books half days, counts working days around weekends and holidays, reads your remaining leave balance, and warns when too many teammates are already off. It runs on Microsoft Graph (Outlook and Microsoft 365), Google Calendar, Apple iCloud, and any CalDAV server, driven from the CLI, Claude over MCP, Slack, or a local dashboard.
 
 Install: `brew install dcadolph/tap/vamoose`
 

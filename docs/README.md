@@ -88,7 +88,7 @@ brew install dcadolph/tap/vamoose
 
     ---
 
-    Branch on outcomes, gate on approval, guard by day or headcount. A state machine in JSON, not a dumb calendar rule.
+    Branch on outcomes, gate on approval, guard by day or headcount. It books half days, counts working days around holidays, and warns when too many teammates are already off. A state machine in JSON, not a dumb calendar rule.
 
 -   :material-account-check:{ .lg .middle } __Approvals that mean it__
 
@@ -112,7 +112,7 @@ brew install dcadolph/tap/vamoose
 
     ---
 
-    Fan out to the team, announce to Slack or email, file the leave in your HR system, and keep a run history of who approved what.
+    Fan out to the team, announce to Slack, email, or any webhook, file the leave in your HR system, show what you have left, and keep a run history of who approved what.
 
 </div>
 
