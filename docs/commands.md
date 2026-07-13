@@ -278,7 +278,7 @@ The Slack server also reads `VAMOOSE_SLACK_SIGNING_SECRET` and, for install and 
 ## Files and storage
 
 - **Tokens** are stored in the OS keychain when it is reachable, otherwise a `0600` file under your config directory. They refresh automatically. No setup needed. On a server, set `VAMOOSE_SECRET_KEY` (a base64 32-byte key, from `openssl rand -base64 32`) and tokens and per-user links are sealed with AES-256-GCM at rest instead. See [hosting](hosting.md).
-- **Config directory** is the OS user config directory, `vamoose/` within it: `~/.config/vamoose` on Linux, `~/Library/Application Support/vamoose` on macOS.
+- **Config directory** is the OS user config directory, `vamoose/` within it: `~/.config/vamoose` on Linux, `~/Library/Application Support/vamoose` on macOS, `%AppData%\vamoose` on Windows.
 - **Watch state** for `--watch` holds is `watches.json` in the config directory, or the path in `VAMOOSE_WATCH_FILE` when set (the Slack server uses this to give each linked user their own file).
 - **Schedules** from `vamoose schedule` are `schedules.json` in the config directory, which the daemon reads to fire recurring runs.
 - **Run history** is `audit.json` in the config directory, an append-only log of workflow events that `vamoose history` reads. It is capped to the most recent events, and sealed with AES-256-GCM when `VAMOOSE_SECRET_KEY` is set. Set `VAMOOSE_AUDIT_FILE` to override the path (the Slack server gives each linked user their own).
