@@ -393,6 +393,21 @@
   height: 1.7rem;
 }
 
+/* ---------- Landing tables span the content width. Material renders tables as a
+   shrink-to-fit inline block, which looks stranded on the wide landing grid, so the
+   page holding the hero stretches them edge to edge instead. ---------- */
+
+.md-content:has(.hero-split) .md-typeset table:not([class]) {
+  display: table;
+  width: 100%;
+}
+
+/* Material's runtime wraps each table in a scroll container; stretch it too. */
+.md-content:has(.hero-split) .md-typeset__table {
+  display: block;
+  width: 100%;
+}
+
 /* ---------- Moose-themed 404. ---------- */
 
 .vamoose-404 {

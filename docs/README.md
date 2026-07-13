@@ -118,9 +118,9 @@ brew install dcadolph/tap/vamoose
 
 ## Start here { .section-head }
 
-| Guide                        | What's in it                                         &nbsp; |
-| ---------------------------- | ----------------------------------------------------------- |
-| [Quickstart](quickstart.md)  | Zero to your first approved hold in a few minutes.          |
-| [Concepts](concepts.md)      | How holds, approval, and workflows fit together.            |
-| [Commands](commands.md)      | Every command, flag, and environment variable.              |
-| [Workflows](workflows.md)    | Design your own, with branching, delays, and guards.        |
+| Guide                       | What's in it                                         |
+| --------------------------- | ---------------------------------------------------- |
+| [Quickstart](quickstart.md) | Zero to your first approved hold in a few minutes.   |
+| [Concepts](concepts.md)     | How holds, approval, and workflows fit together.     |
+| [Commands](commands.md)     | Every command, flag, and environment variable.       |
+| [Workflows](workflows.md)   | Design your own, with branching, delays, and guards. |
