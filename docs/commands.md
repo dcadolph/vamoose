@@ -177,9 +177,9 @@ Show the recorded run history: when each hold was created, approved, declined, o
 
 ### doctor
 
-`vamoose doctor`
+`vamoose doctor [--live] [--provider <name>] [--tz <zone>]`
 
-Check your configuration and report what is set up or missing: the selected provider's credentials, time zone, and the optional Slack and email backends for message steps.
+Check your configuration and report what is set up or missing: the selected provider's credentials, time zone, and the optional Slack, email, and webhook backends for message steps. With `--live` it also makes a real API call to the provider, confirming the token works by signing in and resolving your manager, so you can tell a genuine access problem from a missing setting. `--provider` checks a provider other than the default.
 
 ### version
 
@@ -237,6 +237,9 @@ Messaging (for `message` steps, optional):
 | `VAMOOSE_SMTP_USERNAME`    | SMTP username.                                                   |
 | `VAMOOSE_SMTP_PASSWORD`    | SMTP password.                                                   |
 | `VAMOOSE_SMTP_FROM`        | Sender address.                                                  |
+| `VAMOOSE_WEBHOOK_AUTH`     | `Authorization` header sent with a webhook-URL channel, when it needs one. |
+
+A `message` step routes by its channel: an `https` or `http` URL posts to that incoming webhook (Microsoft Teams, Google Chat, and similar), an address with `@` goes to email, anything else to Slack.
 
 The Slack server also reads `VAMOOSE_SLACK_SIGNING_SECRET` and, for install and per-user mode, `VAMOOSE_SLACK_CLIENT_ID`, `VAMOOSE_SLACK_CLIENT_SECRET`, and `VAMOOSE_SLACK_PUBLIC_URL`. See [Slack](slack.md). For a hosted server, `VAMOOSE_LOG_FORMAT=json` and `VAMOOSE_LOG_LEVEL` set structured logging, and the server serves `/metrics` (Prometheus) and `/health`. See [hosting](hosting.md).
 
