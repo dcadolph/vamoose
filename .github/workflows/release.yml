@@ -1,7 +1,8 @@
 name: release
 
-# Cross-builds vamoose on every v* tag, attaches the Homebrew-style archives and
-# checksums to the release, and (when a tap token is present) bumps the formula.
+# Cross-builds vamoose on every v* tag, attaches the macOS and Linux tarballs, the
+# Windows zips, and checksums to the release, and (when a tap token is present) bumps
+# the Homebrew formula.
 on:
   push:
     tags:
@@ -27,9 +28,6 @@ jobs:
       - name: Test
         run: go test ./...
 
-      - name: Install gox
-        run: go install github.com/mitchellh/gox@latest
-
       - name: Cross-build and package
         env:
           TAG: ${{ github.ref_name }}
@@ -42,21 +40,26 @@ jobs:
           set -euo pipefail
           VER="${TAG#v}"
           pkg="github.com/dcadolph/vamoose/cmd"
+          ldflags="-s -w -X '${pkg}.version=${VER}' -X '${pkg}.builtinGoogleClientID=${GOOGLE_CLIENT_ID}' -X '${pkg}.builtinGoogleClientSecret=${GOOGLE_CLIENT_SECRET}'"
           mkdir -p build dist
-          gox -osarch="darwin/amd64 darwin/arm64 linux/amd64 linux/arm64" \
-            -ldflags="-s -w -X '${pkg}.version=${VER}' -X '${pkg}.builtinGoogleClientID=${GOOGLE_CLIENT_ID}' -X '${pkg}.builtinGoogleClientSecret=${GOOGLE_CLIENT_SECRET}'" \
-            -output="build/vamoose_{{.OS}}_{{.Arch}}" .
-          for f in build/vamoose_*; do
-            base="${f#build/vamoose_}"
-            os="${base%%_*}"
-            arch="${base##*_}"
-            case "$os" in darwin) osl=Darwin ;; linux) osl=Linux ;; esac
+          # macOS and Linux ship as tarballs for Homebrew; Windows ships as zips, the
+          # convention there. All builds are CGO-free so they cross-compile anywhere.
+          for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            case "$os" in darwin) osl=Darwin ;; linux) osl=Linux ;; windows) osl=Windows ;; esac
             case "$arch" in amd64) al=x86_64 ;; arm64) al=arm64 ;; esac
-            cp "$f" build/vamoose
-            tar -C build -czf "dist/vamoose_${VER}_${osl}_${al}.tar.gz" vamoose
-            rm build/vamoose
+            bin=vamoose
+            [ "$os" = windows ] && bin=vamoose.exe
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "$ldflags" -o "build/$bin" .
+            if [ "$os" = windows ]; then
+              ( cd build && zip -q "../dist/vamoose_${VER}_${osl}_${al}.zip" "$bin" )
+            else
+              tar -C build -czf "dist/vamoose_${VER}_${osl}_${al}.tar.gz" "$bin"
+            fi
+            rm "build/$bin"
           done
-          ( cd dist && sha256sum *.tar.gz | tee checksums.txt )
+          ( cd dist && sha256sum vamoose_* | tee checksums.txt )
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -64,6 +67,7 @@ jobs:
           generate_release_notes: true
           files: |
             dist/*.tar.gz
+            dist/*.zip
             dist/checksums.txt
           fail_on_unmatched_files: true
 
