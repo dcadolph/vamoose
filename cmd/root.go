@@ -42,6 +42,7 @@ Commands:
   mcp       Serve vamoose to Claude over the Model Context Protocol (stdio).
   slack     Serve the vamoose Slack app: run vamoose from slash commands.
   app       Open a local web dashboard to run and watch workflows.
+  tray      Put the moose in the system tray (Windows, Linux; macOS uses "make tray").
   login     Sign in to your calendar provider and confirm access.
   whoami    Print the signed-in user, manager, and resolved team.
   team      Show or set your default team: team [list|set <email...>|clear].

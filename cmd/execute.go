@@ -52,6 +52,8 @@ func Execute(args []string) int {
 		return run(runSlack(ctx, rest))
 	case "app":
 		return run(runApp(ctx, rest))
+	case "tray":
+		return run(runTray(ctx, rest))
 	case "login":
 		return run(runLogin(ctx, rest))
 	case "whoami":

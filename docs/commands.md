@@ -156,6 +156,12 @@ Serve the vamoose Slack app: run vamoose from slash commands, with Approve and D
 
 Open a local web dashboard in your browser: run a workflow, author or edit one in a JSON editor (saved through the same validation as `workflows add`), act on watched holds (check, promote, cancel), manage recurring schedules, read the run history, and check your setup. It binds to loopback only and refuses non-loopback or cross-origin requests, so the UI is reachable just from your machine. On macOS, `make app` packages it as a `Vamoose.app` you can drag to Applications, and `make tray` builds a menu bar companion that shows watched holds with a badge, acts on them from a dropdown, and keeps the app server and daemon running for you.
 
+### tray
+
+`vamoose tray [--addr 127.0.0.1:8787] [--foreground]`
+
+Put the moose in the system tray on Windows or Linux: the tooltip counts the holds being watched, the dropdown checks, promotes, or cancels each one, shows recent history, and opens the dashboard. It starts `vamoose app` and `vamoose daemon` when they are not already running, and stops what it started when you quit. On Windows it detaches from the console by default; `--foreground` keeps it attached. Linux needs a tray that speaks the StatusNotifierItem protocol, which KDE, XFCE, and GNOME with the AppIndicator extension all do. On macOS use `make tray` for the native menu bar app.
+
 ## Info
 
 ### login
