@@ -116,23 +116,23 @@ brew install dcadolph/tap/vamoose
 
 </div>
 
-## Build it visually { .section-head }
+## Design it on a canvas { .section-head }
 
 <div class="shot-split" markdown>
 <div class="shot-copy" markdown>
-The dashboard ships a visual builder: every step is a card, and an approve step routes
-accepted, declined, and expired to their own branches, with the timeout right where the
-expired path starts. Cards wear chips for the branches that land on them, so the whole
-graph reads top to bottom.
+The dashboard ships a workflow canvas: every step is a node, and the branches are the
+wires. An approve step's outcomes leave from colored ports, accepted green, declined
+red, expired amber, and land where you point them: drag a port onto another node and
+that branch is rewired.
 
-Insert, reorder, and delete steps in place; rename one and every branch that pointed at
-it follows. The JSON stays one tab away, and both views save through the same
-validation as the CLI.
+Click a node to edit its fields in the side panel, drag nodes to arrange the graph, add
+steps from the toolbar. The JSON stays one tab away, and both views save through the
+same validation as the CLI.
 
 `vamoose app`, then open any workflow.
 </div>
 <div class="shot-frame" markdown>
-![The visual workflow builder](assets/vamoose-builder.png)
+![The workflow canvas](assets/vamoose-builder.png)
 </div>
 </div>
 

@@ -154,7 +154,7 @@ Serve the vamoose Slack app: run vamoose from slash commands, with Approve and D
 
 `vamoose app [--addr 127.0.0.1:8787] [--no-open]`
 
-Open a local web dashboard in your browser: run a workflow, build or edit one visually as step cards with branch routing (a JSON tab shows the same definition raw, and both save through the same validation as `workflows add`), act on watched holds (check, promote, cancel), manage recurring schedules, read the run history, and check your setup. It binds to loopback only and refuses non-loopback or cross-origin requests, so the UI is reachable just from your machine. On macOS, `make app` packages it as a `Vamoose.app` you can drag to Applications, and `make tray` builds a menu bar companion that shows watched holds with a badge, acts on them from a dropdown, and keeps the app server and daemon running for you.
+Open a local web dashboard in your browser: run a workflow, design one on a node canvas (steps are nodes, branches are wires you drag between ports; a JSON tab shows the same definition raw, and both save through the same validation as `workflows add`), act on watched holds (check, promote, cancel), manage recurring schedules, read the run history, and check your setup. It binds to loopback only and refuses non-loopback or cross-origin requests, so the UI is reachable just from your machine. On macOS, `make app` packages it as a `Vamoose.app` you can drag to Applications, and `make tray` builds a menu bar companion that shows watched holds with a badge, acts on them from a dropdown, and keeps the app server and daemon running for you.
 
 ### tray
 

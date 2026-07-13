@@ -45,7 +45,7 @@ calendar accept is the approval, and the daemon notifies your team the moment it
 
 1. **Declare.** A workflow is ordered steps in JSON: create a hold, gate on approval,
    branch on the outcome, wait, message a channel, file the leave. Time off ships built
-   in; author your own in a file, the dashboard's visual builder, or through an AI
+   in; author your own in a file, on the dashboard's workflow canvas, or through an AI
    agent.
 2. **Run.** Drive it from the terminal, Claude, Slack, or `vamoose app`, against
    Microsoft Graph, Google, iCloud, or any CalDAV host. Same workflow, any backend.
@@ -58,7 +58,7 @@ The built-in **pto** workflow is the flagship: hold shown **free**, manager appr
 accepting, team added as **optional attendees** so nobody's calendar gets blocked.
 `request`, `check`, and `promote` are fronts over its steps. See [Workflows](#workflows).
 
-<p align="center"><img src="assets/vamoose-builder.png" alt="The visual workflow builder" width="560"></p>
+<p align="center"><img src="assets/vamoose-builder.png" alt="The workflow canvas" width="720"></p>
 
 Four backends ship behind one provider interface: Microsoft Graph (Outlook,
 Microsoft 365, and Teams), Google Calendar, Apple iCloud, and any standard CalDAV host.

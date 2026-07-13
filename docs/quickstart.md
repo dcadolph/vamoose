@@ -93,7 +93,7 @@ vamoose daemon
 
 ## 6. Prefer clicking?
 
-`vamoose app` opens a local dashboard: run workflows, build them visually as step cards with branch routing, act on watched holds, manage schedules, and read the run history. On Windows and Linux, `vamoose tray` puts the moose in the system tray to act on holds from a dropdown and keep the daemon running for you. On macOS, `make tray` builds the native menu bar version.
+`vamoose app` opens a local dashboard: run workflows, design them on a node canvas with drag-to-wire branches, act on watched holds, manage schedules, and read the run history. On Windows and Linux, `vamoose tray` puts the moose in the system tray to act on holds from a dropdown and keep the daemon running for you. On macOS, `make tray` builds the native menu bar version.
 
 ## Where next
 

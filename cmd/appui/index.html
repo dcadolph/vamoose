@@ -143,62 +143,100 @@
   .toast { position:fixed; bottom:1.2rem; left:calc(50% + var(--side-w)/2); transform:translateX(-50%); background:var(--card-hi); border:1px solid var(--line-hi); border-radius:10px; padding:.6rem 1rem; box-shadow:var(--shadow); font-size:.9rem; display:none; z-index:60; }
   .toast.show { display:block; }
 
-  /* Visual workflow builder. */
-  .modal.builder { width:min(780px,100%); max-height:92vh; overflow:auto; }
-  .ed-head { display:flex; align-items:center; gap:.7rem; margin-bottom:.9rem; }
+  /* Workflow canvas: nodes on a dotted board, edges as colored beziers, a side panel
+     for the selected step, and the raw JSON one tab away. */
+  .modal.builder { width:min(1280px,96vw); height:min(860px,92vh); display:flex; flex-direction:column; }
+  .ed-head { display:flex; align-items:center; gap:.7rem; margin-bottom:.7rem; }
   .ed-head h3 { margin:0; }
   .ed-tabs { display:flex; gap:.3rem; margin-left:auto; }
   .ed-tab { padding:.22rem .7rem; font-size:.8rem; border-radius:8px; background:transparent; color:var(--dim); border:1px solid var(--line-hi); font-weight:600; }
   .ed-tab.active { background:var(--amber-soft); color:var(--amber); border-color:var(--amber-line); }
-  .vb-meta { display:grid; grid-template-columns:1fr 1.6fr; gap:.7rem; margin-bottom:.9rem; }
-  .vb-meta label { margin:.1rem 0 .28rem; }
-  .vb-steps { max-height:56vh; overflow:auto; padding:.15rem .15rem .4rem; }
-  .vb-card { background:var(--card); border:1px solid var(--line-hi); border-radius:12px; padding:.7rem .85rem .8rem; }
-  .vb-top { display:flex; align-items:center; gap:.5rem; }
-  .vb-verb { font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:.14rem .55rem; border-radius:1rem; background:rgba(255,255,255,.07); color:var(--fg); flex:none; }
+  #ed-canvas { flex:1; display:flex; gap:.8rem; min-height:0; }
+  .cv-wrap { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .cv-meta { display:grid; grid-template-columns:1fr 1.8fr; gap:.7rem; margin-bottom:.6rem; }
+  .cv-meta label { margin:0 0 .25rem; }
+  .cv-board { flex:1; position:relative; overflow:hidden; border:1px solid var(--line-hi); border-radius:12px;
+    background-color:#101113; background-image:radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);
+    background-size:22px 22px; cursor:grab; }
+  .cv-board.panning { cursor:grabbing; }
+  .cv-world { position:absolute; left:0; top:0; transform-origin:0 0; }
+  #cv-svg { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
+  .cv-edge { fill:none; stroke-width:2; opacity:.85; }
+  .cv-edge.o-accepted { stroke:var(--green); }
+  .cv-edge.o-declined { stroke:var(--red); }
+  .cv-edge.o-expired { stroke:var(--amber); }
+  .cv-edge.o-flow { stroke:#5b6067; }
+  .cv-edge.ghost { stroke:var(--amber); stroke-dasharray:6 5; opacity:.9; }
+  .cv-node { position:absolute; width:196px; background:var(--card); border:1px solid var(--line-hi);
+    border-radius:11px; padding:.5rem .65rem .55rem; cursor:grab; user-select:none; box-shadow:0 8px 22px rgba(0,0,0,.35); }
+  .cv-node:hover { border-color:rgba(255,255,255,.25); }
+  .cv-node.selected { border-color:var(--amber); box-shadow:0 0 0 1px var(--amber), 0 10px 26px rgba(0,0,0,.4); }
+  .cv-node.dragging { cursor:grabbing; opacity:.92; }
+  .cv-node-top { display:flex; align-items:center; gap:.45rem; }
+  .cv-node-id { font-family:var(--mono); font-size:.78rem; color:var(--fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cv-node-sub { color:var(--faint); font-size:.72rem; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cv-node.end { width:auto; padding:.35rem .8rem; border-radius:1rem; background:#17181b; color:var(--dim);
+    font-family:var(--mono); font-size:.78rem; cursor:default; }
+  .cv-port { position:absolute; right:-7px; width:13px; height:13px; border-radius:50%; background:#15161a;
+    border:2px solid #5b6067; cursor:crosshair; }
+  .cv-port.o-accepted { border-color:var(--green); }
+  .cv-port.o-declined { border-color:var(--red); }
+  .cv-port.o-expired { border-color:var(--amber); }
+  .cv-port:hover { transform:scale(1.25); background:#222; }
+  .cv-in { position:absolute; left:-7px; top:50%; margin-top:-6px; width:12px; height:12px; border-radius:50%;
+    background:#15161a; border:2px solid #5b6067; pointer-events:none; }
+  .vb-verb { font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:.1rem .5rem; border-radius:1rem; background:rgba(255,255,255,.07); color:var(--fg); flex:none; }
   .vb-verb.v-hold, .vb-verb.v-away, .vb-verb.v-event { background:var(--amber-soft); color:var(--amber); }
   .vb-verb.v-approve { background:rgba(110,168,216,.15); color:var(--blue); }
   .vb-verb.v-notify, .vb-verb.v-message { background:rgba(91,189,122,.13); color:var(--green); }
   .vb-verb.v-cancel { background:rgba(224,103,76,.14); color:var(--red); }
-  .vb-id { font-family:var(--mono); font-size:.8rem; background:transparent; border:1px solid transparent; color:var(--dim); width:14ch; padding:.15rem .4rem; border-radius:7px; }
-  .vb-id:hover, .vb-id:focus { border-color:var(--line-hi); color:var(--fg); }
+  .cv-toolbar { position:absolute; top:.7rem; left:.7rem; display:flex; gap:.4rem; z-index:5; }
+  .cv-zoom { position:absolute; right:.7rem; bottom:.7rem; display:flex; align-items:center; gap:.15rem; z-index:5;
+    background:rgba(20,21,23,.85); border:1px solid var(--line-hi); border-radius:9px; padding:.15rem .3rem; }
+  .cv-zoom button { background:transparent; border:0; color:var(--dim); padding:.15rem .5rem; font-size:.95rem; }
+  .cv-zoom button:hover { color:var(--fg); }
+  .cv-zoom span { color:var(--faint); font-size:.75rem; font-family:var(--mono); min-width:40px; text-align:center; }
+  .cv-menu { position:absolute; top:3rem; left:.7rem; z-index:6; display:flex; flex-direction:column; gap:.2rem;
+    background:var(--panel); border:1px solid var(--line-hi); border-radius:11px; padding:.45rem; box-shadow:var(--shadow); }
+  .cv-menu button { display:flex; gap:.6rem; align-items:baseline; background:transparent; border:0; color:var(--fg);
+    padding:.3rem .6rem; border-radius:8px; text-align:left; font-size:.86rem; }
+  .cv-menu button:hover { background:var(--amber-soft); color:var(--amber); }
+  .cv-menu button small { color:var(--faint); font-size:.72rem; }
+  .cv-panel { width:296px; flex:none; overflow-y:auto; border:1px solid var(--line-hi); border-radius:12px;
+    padding:.8rem .9rem; background:var(--card); }
+  .cv-panel-empty { color:var(--faint); font-size:.85rem; font-style:italic; padding:.4rem 0; }
+  .cv-panel-top { display:flex; align-items:center; gap:.5rem; margin-bottom:.3rem; }
+  .vb-id { font-family:var(--mono); font-size:.8rem; background:transparent; border:1px solid var(--line-hi); color:var(--fg); width:100%; padding:.3rem .5rem; border-radius:7px; }
   .vb-tools { margin-left:auto; display:flex; gap:.25rem; }
   .vb-tools button { padding:.14rem .5rem; font-size:.8rem; background:transparent; color:var(--faint); border:1px solid transparent; border-radius:7px; }
   .vb-tools button:hover { color:var(--fg); background:rgba(255,255,255,.06); }
-  .vb-tools button:disabled { opacity:.25; cursor:default; background:transparent; color:var(--faint); }
+  .vb-tools button:disabled { opacity:.25; cursor:default; }
   .vb-tools .vb-del:hover { color:var(--red); }
-  .vb-fields { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.55rem .7rem; margin-top:.55rem; }
+  .vb-fields { display:grid; grid-template-columns:1fr; gap:.55rem; margin-top:.6rem; }
   .vb-fields label { margin:0 0 .22rem; font-size:.74rem; }
   .vb-fields input, .vb-fields select { padding:.34rem .55rem; font-size:.86rem; border-radius:8px; }
-  .vb-check { display:flex; align-items:center; gap:.45rem; color:var(--dim); font-size:.86rem; align-self:end; padding-bottom:.35rem; }
+  .vb-check { display:flex; align-items:center; gap:.45rem; color:var(--dim); font-size:.86rem; }
   .vb-check input { width:auto; }
-  /* Branch rows share one grid so every outcome's select lines up on both edges,
-     with the expired timeout in a fixed rightmost column. */
-  .vb-branches { margin-top:.6rem; border-top:1px dashed var(--line-hi); padding-top:.55rem;
-    display:grid; grid-template-columns:80px 18px 1fr max-content; gap:.4rem .5rem; align-items:center; }
+  .vb-branches { margin-top:.7rem; border-top:1px dashed var(--line-hi); padding-top:.6rem;
+    display:grid; grid-template-columns:70px 1fr; gap:.45rem .5rem; align-items:center; }
   .vb-branch { display:contents; }
-  .vb-out { font-weight:640; font-size:.76rem; text-transform:uppercase; letter-spacing:.03em; }
+  .vb-out { font-weight:640; font-size:.74rem; text-transform:uppercase; letter-spacing:.03em; }
   .vb-out.o-accepted { color:var(--green); }
   .vb-out.o-declined { color:var(--red); }
   .vb-out.o-expired { color:var(--amber); }
-  .vb-branch select { width:100%; padding:.3rem .5rem; font-size:.85rem; }
-  .vb-branch input { width:92px; padding:.3rem .5rem; font-size:.85rem; font-family:var(--mono); }
-  .vb-arrow { color:var(--faint); }
-  .vb-in { display:flex; gap:.35rem; flex-wrap:wrap; margin:0 0 .3rem; }
+  .vb-branch select { width:100%; padding:.3rem .5rem; font-size:.84rem; }
+  .vb-branch input { width:100%; padding:.3rem .5rem; font-size:.84rem; font-family:var(--mono); }
+  .vb-in-chips { display:flex; gap:.35rem; flex-wrap:wrap; margin:.45rem 0 0; }
   .vb-chip { font-size:.68rem; padding:.08rem .5rem; border-radius:1rem; border:1px solid var(--line-hi); color:var(--dim); }
   .vb-chip.o-accepted { color:var(--green); border-color:rgba(91,189,122,.4); }
   .vb-chip.o-declined { color:var(--red); border-color:rgba(224,103,76,.4); }
   .vb-chip.o-expired { color:var(--amber); border-color:var(--amber-line); }
-  .vb-insert { display:flex; justify-content:center; padding:.18rem 0; }
-  .vb-insert > button { background:transparent; border:1px dashed var(--line-hi); color:var(--faint); border-radius:9px; padding:.08rem .8rem; font-size:.9rem; line-height:1.3; }
-  .vb-insert > button:hover { color:var(--amber); border-color:var(--amber-line); }
-  .vb-menu { display:flex; gap:.35rem; flex-wrap:wrap; justify-content:center; padding:.45rem; border:1px dashed var(--amber-line); border-radius:10px; margin:.18rem 0; }
-  .vb-menu button { font-size:.8rem; padding:.22rem .6rem; background:rgba(255,255,255,.04); color:var(--fg); border:1px solid var(--line-hi); border-radius:8px; }
-  .vb-menu button:hover { border-color:var(--amber-line); color:var(--amber); }
-  .vb-when { margin-top:.55rem; }
+  .vb-when { margin-top:.6rem; }
   .vb-when summary { cursor:pointer; color:var(--faint); font-size:.78rem; }
   .vb-when[open] summary { color:var(--dim); margin-bottom:.4rem; }
-  .vb-note { color:var(--faint); font-size:.78rem; margin-top:.5rem; }
+  .vb-note { color:var(--faint); font-size:.75rem; margin-top:.45rem; }
+  #ed-json { flex:1; display:flex; flex-direction:column; min-height:0; }
+  #ed-json textarea { flex:1; min-height:0; }
   .scrim { display:none; }
   @media (max-width:880px) {
     .sidebar { transform:translateX(-100%); box-shadow:var(--shadow); }
@@ -352,17 +390,31 @@
     <div class="ed-head">
       <h3 id="editor-title">New workflow</h3>
       <div class="ed-tabs">
-        <button class="ed-tab" id="tab-visual" onclick="setEdMode('visual')">Visual</button>
+        <button class="ed-tab" id="tab-visual" onclick="setEdMode('visual')">Canvas</button>
         <button class="ed-tab" id="tab-json" onclick="setEdMode('json')">JSON</button>
       </div>
     </div>
-    <div id="ed-visual" style="display:none">
-      <div class="vb-meta">
-        <div><label>Name (becomes the file name)</label><input id="vb-name" placeholder="my-workflow"></div>
-        <div><label>Description</label><input id="vb-desc" placeholder="What this does."></div>
+    <div id="ed-canvas" style="display:none">
+      <div class="cv-wrap">
+        <div class="cv-meta">
+          <div><label>Name (becomes the file name)</label><input id="vb-name" placeholder="my-workflow"></div>
+          <div><label>Description</label><input id="vb-desc" placeholder="What this does."></div>
+        </div>
+        <div class="cv-board" id="cv-board">
+          <div class="cv-toolbar">
+            <button class="btn-ghost btn-sm" id="cv-add">+ Step</button>
+          </div>
+          <div id="cv-addmenu" class="cv-menu" style="display:none"></div>
+          <div class="cv-world" id="cv-world"></div>
+          <div class="cv-zoom">
+            <button id="cv-zoom-out" title="Zoom out">−</button>
+            <span id="cv-zoom-label">100%</span>
+            <button id="cv-zoom-in" title="Zoom in">+</button>
+            <button id="cv-zoom-fit" title="Fit">⤢</button>
+          </div>
+        </div>
       </div>
-      <div class="vb-steps" id="vb-steps"></div>
-      <div class="vb-note">Steps run top to bottom. An approve step branches on its outcome; saving validates the whole definition.</div>
+      <div class="cv-panel" id="cv-panel"></div>
     </div>
     <div id="ed-json" style="display:none">
       <label>Definition (JSON; the <code>name</code> becomes the file name)</label>
@@ -542,7 +594,10 @@ const VERBS = { hold:"Creates the hold", approve:"Waits for an approver", notify
 const CREATORS = ["hold","away","event"];
 const OUTCOMES = ["accepted","declined","expired"];
 const FALLBACK_LABEL = { accepted:"(next step)", declined:"(stop)", expired:"(no timeout)" };
-let edMode = "json", edModel = null, edInsertAt = -1;
+let edMode = "json", edModel = null;
+// Canvas state: selection tracks the step object so reorders and deletes follow it, and
+// node positions key on step objects so they survive re-renders and index shifts.
+let selStep = null, cvPos = new Map(), cvView = { x: 0, y: 0, s: 1 }, cvDrag = null;
 
 function starterModel() {
   return { name:"my-workflow", description:"What this does.", steps:[
@@ -604,7 +659,7 @@ function targetOptions(selfIdx, current) {
   return opts.map(t => `<option value="${esc(t.id)}"${t.id === current ? " selected" : ""}>${esc(t.id)}</option>`).join("");
 }
 
-// incomingChips labels a card with the explicit jumps that land on it.
+// incomingChips labels the panel with the explicit jumps that land on the step.
 function incomingChips(idx) {
   const me = edModel.steps[idx].id;
   if (!me) return "";
@@ -615,7 +670,7 @@ function incomingChips(idx) {
     }
     if (s.next === me) chips.push(`<span class="vb-chip">↳ from ${esc(s.id || "step " + (i + 1))}</span>`);
   });
-  return chips.length ? `<div class="vb-in">${chips.join("")}</div>` : "";
+  return chips.length ? `<div class="vb-in-chips">${chips.join("")}</div>` : "";
 }
 
 function fieldBox(idx, field, label, value, placeholder, mono) {
@@ -627,51 +682,357 @@ function selectBox(idx, field, label, value, options) {
   return `<div><label>${label}</label><select data-si="${idx}" data-f="${field}">${opts}</select></div>`;
 }
 
-function renderStepCard(s, idx) {
+// newStep seeds a just-added step with the fields its verb needs to be useful.
+function newStep(verb) {
+  const s = { verb, id: uniqueStepId(verb) };
+  if (verb === "approve" && !edModel.steps.some(x => x.verb === "approve")) s.manager = true;
+  if (verb === "notify") s.team = "optional";
+  if (verb === "wait") s.for = "48h";
+  if (verb === "hold") s.showAs = "free";
+  return s;
+}
+
+// graphEdges lists the run-time jumps between steps, mirroring the engine's Next
+// semantics: an approve routes by outcome (accepted falls through, declined stops,
+// expired needs the timeout), everything else follows next or falls through.
+function graphEdges() {
+  const steps = edModel.steps;
+  const resolve = t => t === "end" ? "end" : steps.findIndex(x => x.id === t);
+  const edges = [];
+  steps.forEach((s, i) => {
+    if (s.verb === "approve") {
+      const on = s.on || {};
+      const acc = on.accepted !== undefined ? resolve(on.accepted) : (i + 1 < steps.length ? i + 1 : -1);
+      if (acc !== -1) edges.push({ from: i, to: acc, outcome: "accepted" });
+      if (on.declined !== undefined) {
+        const dec = resolve(on.declined);
+        if (dec !== -1) edges.push({ from: i, to: dec, outcome: "declined" });
+      }
+      if (s.timeout && on.expired !== undefined) {
+        const ex = resolve(on.expired);
+        if (ex !== -1) edges.push({ from: i, to: ex, outcome: "expired" });
+      }
+    } else {
+      const nxt = s.next ? resolve(s.next) : (i + 1 < steps.length ? i + 1 : -1);
+      if (nxt !== -1) edges.push({ from: i, to: nxt, outcome: "" });
+    }
+  });
+  return edges;
+}
+
+// layoutCanvas assigns fresh positions: columns by longest-path depth from the creating
+// step, rows in order of appearance, with a terminal end node when anything targets end.
+function layoutCanvas() {
+  const n = edModel.steps.length;
+  const edges = graphEdges();
+  const depth = Array(n).fill(0);
+  for (let pass = 0; pass < n; pass++) {
+    for (const e of edges) {
+      if (typeof e.to === "number" && depth[e.to] < depth[e.from] + 1) depth[e.to] = depth[e.from] + 1;
+    }
+  }
+  const hasEnd = edges.some(e => e.to === "end");
+  const rows = {};
+  const auto = new Map();
+  edModel.steps.forEach((s, i) => {
+    const d = depth[i];
+    rows[d] = rows[d] || 0;
+    auto.set(s, { x: 60 + d * 268, y: 56 + rows[d] * 126 });
+    rows[d]++;
+  });
+  if (hasEnd) auto.set("end", { x: 60 + (Math.max(0, ...depth) + 1) * 268, y: 56 });
+  return { auto, edges, hasEnd };
+}
+
+// nodeSummary is the one-liner under a node's id.
+function nodeSummary(s) {
+  switch (s.verb) {
+    case "approve": return s.manager ? "asks the manager" : (s.approver || "asks an approver");
+    case "message": return (s.channel || "channel") + (s.subject ? " · " + s.subject : "");
+    case "wait": return "for " + (s.for || "…");
+    case "note": case "event": return s.subject || "on your calendar";
+    case "hold": case "away": return "show as " + (s.showAs || (s.verb === "away" ? "oof" : "free"));
+    case "notify": return "adds the team";
+    case "leave": return "files with HR";
+    case "cancel": return "deletes the hold";
+    default: return "";
+  }
+}
+
+function renderCanvas() {
+  $("vb-name").value = edModel.name || "";
+  $("vb-desc").value = edModel.description || "";
+  const { auto, edges, hasEnd } = layoutCanvas();
+  edModel.steps.forEach(s => { if (!cvPos.has(s)) cvPos.set(s, auto.get(s)); });
+  if (hasEnd && !cvPos.has("end")) cvPos.set("end", auto.get("end"));
+  const selIdx = edModel.steps.indexOf(selStep);
+  let html = `<svg id="cv-svg"></svg>`;
+  edModel.steps.forEach((s, i) => {
+    const p = cvPos.get(s);
+    const ports = s.verb === "approve"
+      ? OUTCOMES.map((o, k) => (o === "expired" && !s.timeout && !(s.on || {}).expired)
+          ? `<span class="cv-port o-${o}" data-port="${o}" data-si="${i}" style="top:${9 + k * 17}px;opacity:.45" title="expired (drag to set a timeout branch)"></span>`
+          : `<span class="cv-port o-${o}" data-port="${o}" data-si="${i}" style="top:${9 + k * 17}px" title="${o}"></span>`).join("")
+      : `<span class="cv-port" data-port="" data-si="${i}" style="top:50%;margin-top:-7px" title="then"></span>`;
+    html += `<div class="cv-node${i === selIdx ? " selected" : ""}" data-node="${i}" style="left:${p.x}px;top:${p.y}px">
+      ${i > 0 ? '<span class="cv-in"></span>' : ""}
+      <div class="cv-node-top"><span class="vb-verb v-${esc(s.verb)}">${esc(s.verb)}</span>
+      <span class="cv-node-id">${esc(s.id || "step " + (i + 1))}</span></div>
+      <div class="cv-node-sub">${esc(nodeSummary(s))}</div>${ports}</div>`;
+  });
+  if (hasEnd) {
+    const p = cvPos.get("end");
+    html += `<div class="cv-node end" data-node="end" style="left:${p.x}px;top:${p.y}px">end</div>`;
+  }
+  $("cv-world").innerHTML = html;
+  drawEdges(edges);
+  renderPanel();
+}
+
+// nodeRect reads a node's world-space box from the DOM, after render.
+function nodeRect(key) {
+  const el = $("cv-world").querySelector(`[data-node="${key}"]`);
+  if (!el) return null;
+  return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, el };
+}
+
+// portXY is the world-space center of a node's outcome port.
+function portXY(i, outcome) {
+  const r = nodeRect(i);
+  if (!r) return { x: 0, y: 0 };
+  const el = r.el.querySelector(`[data-port="${outcome}"]`);
+  if (!el) return { x: r.x + r.w, y: r.y + r.h / 2 };
+  return { x: r.x + el.offsetLeft + el.offsetWidth / 2, y: r.y + el.offsetTop + el.offsetHeight / 2 };
+}
+
+function edgePath(a, b) {
+  const dx = Math.max(46, Math.abs(b.x - a.x) / 2);
+  return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`;
+}
+
+function drawEdges(edges) {
+  const svg = $("cv-svg");
+  let paths = "", maxX = 800, maxY = 400;
+  for (const e of edges) {
+    const t = nodeRect(e.to === "end" ? "end" : e.to);
+    if (!t) continue;
+    const a = portXY(e.from, e.outcome);
+    const b = { x: t.x - 1, y: t.y + t.h / 2 };
+    paths += `<path class="cv-edge o-${e.outcome || "flow"}" d="${edgePath(a, b)}"></path>`;
+    maxX = Math.max(maxX, a.x, b.x);
+    maxY = Math.max(maxY, a.y, b.y);
+  }
+  $("cv-world").querySelectorAll(".cv-node").forEach(el => {
+    maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+    maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+  });
+  svg.setAttribute("width", maxX + 240);
+  svg.setAttribute("height", maxY + 240);
+  svg.innerHTML = paths;
+}
+
+function applyView() {
+  $("cv-world").style.transform = `translate(${cvView.x}px,${cvView.y}px) scale(${cvView.s})`;
+  $("cv-zoom-label").textContent = Math.round(cvView.s * 100) + "%";
+}
+
+// cvFit zooms so the whole graph is visible and centers it on the board.
+function cvFit() {
+  const board = $("cv-board").getBoundingClientRect();
+  let maxX = 400, maxY = 240;
+  $("cv-world").querySelectorAll(".cv-node").forEach(el => {
+    maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+    maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+  });
+  const s = Math.min(1.15, Math.max(0.35, Math.min((board.width - 50) / maxX, (board.height - 50) / maxY)));
+  cvView = {
+    x: Math.max(16, (board.width - maxX * s) / 2),
+    y: Math.max(14, (board.height - maxY * s) / 2),
+    s,
+  };
+  applyView();
+}
+
+// dropRefsTo removes every branch and next that points at the given id.
+function dropRefsTo(id) {
+  let dropped = false;
+  for (const x of edModel.steps) {
+    if (x.next === id) { delete x.next; dropped = true; }
+    for (const k of Object.keys(x.on || {})) if (x.on[k] === id) { delete x.on[k]; dropped = true; }
+    if (x.on && !Object.keys(x.on).length) delete x.on;
+  }
+  if (dropped) toast("Branches to " + id + " now fall through");
+}
+
+// setBranch rewires one outcome (or the plain next) of step i to target, which is a
+// step index, "end", or "" to fall through. Ports drag into this, and the panel's
+// selects call it too, so both paths share the timeout coupling.
+function setBranch(i, outcome, target) {
+  const s = edModel.steps[i];
+  let id = target;
+  if (typeof target === "number") {
+    if (target === i) return;
+    const t = edModel.steps[target];
+    if (!t.id) t.id = uniqueStepId(t.verb);
+    id = t.id;
+  }
+  if (outcome === "") {
+    if (id) s.next = id; else delete s.next;
+  } else {
+    s.on = s.on || {};
+    if (id) s.on[outcome] = id; else delete s.on[outcome];
+    if (!Object.keys(s.on).length) delete s.on;
+    if (outcome === "expired") {
+      if (id && !s.timeout) s.timeout = "72h";
+      if (!id) delete s.timeout;
+    }
+  }
+  renderCanvas();
+}
+
+// ---- Canvas pointer machinery: drag nodes, drag ports to rewire, pan the board. ----
+
+const cvBoard = () => $("cv-board");
+
+function worldPoint(e) {
+  const r = cvBoard().getBoundingClientRect();
+  return { x: (e.clientX - r.left - cvView.x) / cvView.s, y: (e.clientY - r.top - cvView.y) / cvView.s };
+}
+
+$("cv-board").addEventListener("pointerdown", (e) => {
+  if (e.target.closest(".cv-toolbar") || e.target.closest(".cv-zoom") || e.target.closest(".cv-menu")) return;
+  const port = e.target.closest(".cv-port");
+  const node = e.target.closest(".cv-node");
+  cvBoard().setPointerCapture(e.pointerId);
+  if (port) {
+    cvDrag = { type: "port", si: Number(port.dataset.si), outcome: port.dataset.port };
+    const svg = $("cv-svg");
+    const ghost = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    ghost.setAttribute("class", "cv-edge ghost");
+    svg.appendChild(ghost);
+    cvDrag.ghost = ghost;
+    e.preventDefault();
+    return;
+  }
+  if (node && node.dataset.node !== "end") {
+    const i = Number(node.dataset.node);
+    cvDrag = { type: "node", step: edModel.steps[i], el: node, sx: e.clientX, sy: e.clientY,
+      ox: node.offsetLeft, oy: node.offsetTop, moved: false };
+    return;
+  }
+  cvDrag = { type: "pan", sx: e.clientX, sy: e.clientY, ox: cvView.x, oy: cvView.y };
+  cvBoard().classList.add("panning");
+});
+
+$("cv-board").addEventListener("pointermove", (e) => {
+  if (!cvDrag) return;
+  if (cvDrag.type === "pan") {
+    cvView.x = cvDrag.ox + (e.clientX - cvDrag.sx);
+    cvView.y = cvDrag.oy + (e.clientY - cvDrag.sy);
+    applyView();
+    return;
+  }
+  if (cvDrag.type === "node") {
+    const dx = (e.clientX - cvDrag.sx) / cvView.s, dy = (e.clientY - cvDrag.sy) / cvView.s;
+    if (Math.abs(dx) + Math.abs(dy) > 3) cvDrag.moved = true;
+    const x = Math.max(0, cvDrag.ox + dx), y = Math.max(0, cvDrag.oy + dy);
+    cvDrag.el.style.left = x + "px";
+    cvDrag.el.style.top = y + "px";
+    cvDrag.el.classList.add("dragging");
+    cvPos.set(cvDrag.step, { x, y });
+    drawEdges(graphEdges());
+    return;
+  }
+  if (cvDrag.type === "port") {
+    const a = portXY(cvDrag.si, cvDrag.outcome);
+    const b = worldPoint(e);
+    cvDrag.ghost.setAttribute("d", edgePath(a, b));
+  }
+});
+
+$("cv-board").addEventListener("pointerup", (e) => {
+  const d = cvDrag;
+  cvDrag = null;
+  cvBoard().classList.remove("panning");
+  if (!d) return;
+  if (d.type === "node") {
+    d.el.classList.remove("dragging");
+    if (!d.moved) { selStep = d.step; renderCanvas(); }
+    return;
+  }
+  if (d.type === "port") {
+    d.ghost.remove();
+    // The ghost is pointer-events:none, so elementFromPoint sees what is underneath.
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const node = hit && hit.closest ? hit.closest(".cv-node") : null;
+    if (!node) { setBranch(d.si, d.outcome, ""); return; }
+    const key = node.dataset.node;
+    setBranch(d.si, d.outcome, key === "end" ? "end" : Number(key));
+  }
+});
+
+$("cv-zoom-in").addEventListener("click", () => { cvView.s = Math.min(1.6, cvView.s + 0.15); applyView(); });
+$("cv-zoom-out").addEventListener("click", () => { cvView.s = Math.max(0.35, cvView.s - 0.15); applyView(); });
+$("cv-zoom-fit").addEventListener("click", cvFit);
+
+// The add menu lists verbs; a fresh workflow starts from a creating verb.
+$("cv-add").addEventListener("click", () => {
+  const menu = $("cv-addmenu");
+  if (menu.style.display !== "none") { menu.style.display = "none"; return; }
+  const creating = !edModel.steps.length;
+  const verbs = Object.entries(VERBS).filter(([v]) => creating ? CREATORS.includes(v) : !CREATORS.includes(v));
+  menu.innerHTML = verbs.map(([v, hint]) =>
+    `<button data-add="${v}"><span class="vb-verb v-${esc(v)}">${esc(v)}</span><small>${esc(hint)}</small></button>`).join("");
+  menu.style.display = "flex";
+});
+
+$("cv-addmenu").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-add]");
+  if (!b) return;
+  const s = newStep(b.dataset.add);
+  edModel.steps.push(s);
+  selStep = s;
+  $("cv-addmenu").style.display = "none";
+  renderCanvas();
+});
+
+// ---- Side panel: the selected step's fields, sharing setBranch with the ports. ----
+
+function renderPanel() {
+  const panel = $("cv-panel");
+  const idx = edModel.steps.indexOf(selStep);
+  if (idx < 0) {
+    panel.innerHTML = `<div class="cv-panel-empty">Select a node to edit it, drag a colored port onto another node to rewire that branch, or use + Step to add one.</div>`;
+    return;
+  }
+  const s = edModel.steps[idx];
   const fields = [];
   if (CREATORS.includes(s.verb)) {
     fields.push(selectBox(idx, "showAs", "Show as", s.showAs, [["", "verb default"], ["free", "free"], ["tentative", "tentative"], ["busy", "busy"], ["oof", "out of office"]]));
   }
   if (s.verb === "approve") {
+    fields.push(`<div class="vb-check"><input type="checkbox" id="mgr-p" data-si="${idx}" data-f="manager"${s.manager ? " checked" : ""}><label for="mgr-p" style="margin:0">Ask the directory manager</label></div>`);
     fields.push(fieldBox(idx, "approver", "Approver email (later links of a chain)", s.approver, "director@work.com"));
-    fields.push(`<div class="vb-check"><input type="checkbox" id="mgr-${idx}" data-si="${idx}" data-f="manager"${s.manager ? " checked" : ""}><label for="mgr-${idx}" style="margin:0">Ask the directory manager</label></div>`);
+    fields.push(fieldBox(idx, "timeout", "Timeout before the expired branch", s.timeout, "72h", true));
   }
   if (["note", "event", "message"].includes(s.verb)) {
     fields.push(fieldBox(idx, "subject", s.verb === "message" ? "Message text" : "Subject", s.subject, s.verb === "message" ? "Team: out next week" : "Out: beach week"));
   }
-  if (s.verb === "message") {
-    fields.push(fieldBox(idx, "channel", "Channel (Slack id/name, or an email)", s.channel, "#team"));
-  }
-  if (s.verb === "wait") {
-    fields.push(fieldBox(idx, "for", "Wait for (Go duration)", s.for, "48h", true));
-  }
+  if (s.verb === "message") fields.push(fieldBox(idx, "channel", "Channel (Slack id/name, or an email)", s.channel, "#team"));
+  if (s.verb === "wait") fields.push(fieldBox(idx, "for", "Wait for (Go duration)", s.for, "48h", true));
 
-  // The step after this one: approve steps route by outcome instead.
   let branches = "";
-  if (s.verb === "approve") {
-    branches = `<div class="vb-branches">` + OUTCOMES.map(o => {
-      const cur = (s.on || {})[o] || "";
-      // Every row fills the grid's four columns, so the selects align across rows.
-      const timeoutBox = o === "expired"
-        ? `<input data-si="${idx}" data-f="timeout" value="${esc(s.timeout || "")}" placeholder="72h" title="How long before the expired branch runs">` : "<span></span>";
-      return `<div class="vb-branch"><span class="vb-out o-${o}">${o}</span><span class="vb-arrow">→</span>
-        <select data-si="${idx}" data-branch="${o}">
-          <option value="">${FALLBACK_LABEL[o]}</option>
-          <option value="end"${cur === "end" ? " selected" : ""}>end</option>
-          ${targetOptions(idx, cur)}
-        </select>${timeoutBox}</div>`;
-    }).join("") + `</div>`;
-  } else {
-    const cur = s.next || "";
-    branches = `<div class="vb-branches"><div class="vb-branch"><span class="vb-out">then</span><span class="vb-arrow">→</span>
-      <select data-si="${idx}" data-f="next">
-        <option value="">(next step)</option>
-        <option value="end"${cur === "end" ? " selected" : ""}>end</option>
-        ${targetOptions(idx, cur)}
-      </select><span></span></div></div>`;
-  }
+  const rows = s.verb === "approve"
+    ? OUTCOMES.map(o => ({ label: o, cls: "o-" + o, outcome: o, cur: (s.on || {})[o] || "" }))
+    : [{ label: "then", cls: "", outcome: "", cur: s.next || "" }];
+  branches = `<div class="vb-branches">` + rows.map(r =>
+    `<div class="vb-branch"><span class="vb-out ${r.cls}">${r.label}</span>
+      <select data-si="${idx}" data-branch2="${r.outcome}">
+        <option value="">${r.outcome ? FALLBACK_LABEL[r.outcome] : "(next step)"}</option>
+        <option value="end"${r.cur === "end" ? " selected" : ""}>end</option>
+        ${targetOptions(idx, r.cur)}
+      </select></div>`).join("") + `</div>`;
 
-  // When guards gate any step that is not creating and not itself a gate.
   let when = "";
   if (!CREATORS.includes(s.verb) && s.verb !== "approve" && s.verb !== "wait") {
     const w = s.when || {};
@@ -685,122 +1046,78 @@ function renderStepCard(s, idx) {
   }
 
   const last = edModel.steps.length - 1;
-  return `<div class="vb-card">${incomingChips(idx)}
-    <div class="vb-top">
+  panel.innerHTML = `
+    <div class="cv-panel-top">
       <span class="vb-verb v-${esc(s.verb)}">${esc(s.verb)}</span>
-      <input class="vb-id" data-si="${idx}" data-f="id" value="${esc(s.id || "")}" placeholder="step id" title="Step id, the name branches target">
       <div class="vb-tools">
-        <button data-move="-1" data-si="${idx}" title="Move up"${idx <= 1 ? " disabled" : ""}>↑</button>
-        <button data-move="1" data-si="${idx}" title="Move down"${idx === 0 || idx === last ? " disabled" : ""}>↓</button>
+        <button data-move="-1" data-si="${idx}" title="Earlier in fall-through order"${idx <= 1 ? " disabled" : ""}>↑</button>
+        <button data-move="1" data-si="${idx}" title="Later in fall-through order"${idx === 0 || idx === last ? " disabled" : ""}>↓</button>
         <button class="vb-del" data-del="${idx}" title="Delete step">✕</button>
       </div>
     </div>
+    <input class="vb-id" data-si="${idx}" data-f="id" value="${esc(s.id || "")}" placeholder="step id" title="Step id, the name branches target">
+    ${incomingChips(idx)}
     ${fields.length ? `<div class="vb-fields">${fields.join("")}</div>` : ""}
-    ${branches}${when}</div>`;
+    ${branches}${when}
+    <div class="vb-note">Fall-through order is the step order; branches override it. Saving validates everything.</div>`;
 }
 
-function renderBuilder() {
-  $("vb-name").value = edModel.name || "";
-  $("vb-desc").value = edModel.description || "";
-  const parts = [];
-  edModel.steps.forEach((s, i) => {
-    parts.push(renderStepCard(s, i));
-    parts.push(insertPoint(i + 1));
-  });
-  if (!edModel.steps.length) parts.push(insertPoint(0));
-  $("vb-steps").innerHTML = parts.join("");
-}
-
-function insertPoint(pos) {
-  if (edInsertAt === pos) {
-    const creating = !edModel.steps.length;
-    const verbs = Object.entries(VERBS).filter(([v]) => creating ? CREATORS.includes(v) : !CREATORS.includes(v));
-    return `<div class="vb-menu">${verbs.map(([v, hint]) =>
-      `<button data-add="${v}" data-pos="${pos}" title="${esc(hint)}">${esc(v)}</button>`).join("")}
-      <button data-add="" data-pos="-1" title="Close">✕</button></div>`;
-  }
-  return `<div class="vb-insert"><button data-ins="${pos}" title="Insert a step here">+</button></div>`;
-}
-
-// newStep seeds a just-added step with the fields its verb needs to be useful.
-function newStep(verb) {
-  const s = { verb, id: uniqueStepId(verb) };
-  if (verb === "approve" && !edModel.steps.some(x => x.verb === "approve")) s.manager = true;
-  if (verb === "notify") s.team = "optional";
-  if (verb === "wait") s.for = "48h";
-  if (verb === "hold") s.showAs = "free";
-  return s;
-}
-
-$("vb-steps").addEventListener("click", (e) => {
+$("cv-panel").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
-  if (b.dataset.ins !== undefined) { edInsertAt = Number(b.dataset.ins); renderBuilder(); return; }
-  if (b.dataset.add !== undefined) {
-    const pos = Number(b.dataset.pos);
-    if (b.dataset.add && pos >= 0) edModel.steps.splice(pos, 0, newStep(b.dataset.add));
-    edInsertAt = -1; renderBuilder(); return;
-  }
   if (b.dataset.del !== undefined) {
     const idx = Number(b.dataset.del);
     const dead = edModel.steps[idx].id;
     edModel.steps.splice(idx, 1);
-    if (dead) {
-      let dropped = false;
-      for (const s of edModel.steps) {
-        if (s.next === dead) { delete s.next; dropped = true; }
-        for (const k of Object.keys(s.on || {})) if (s.on[k] === dead) { delete s.on[k]; dropped = true; }
-      }
-      if (dropped) toast("Branches to " + dead + " now fall through");
-    }
-    edInsertAt = -1; renderBuilder(); return;
+    if (dead) dropRefsTo(dead);
+    selStep = null;
+    renderCanvas();
+    return;
   }
   if (b.dataset.move !== undefined && !b.disabled) {
     const idx = Number(b.dataset.si), to = idx + Number(b.dataset.move);
     [edModel.steps[idx], edModel.steps[to]] = [edModel.steps[to], edModel.steps[idx]];
-    renderBuilder();
+    renderCanvas();
   }
 });
 
-$("vb-steps").addEventListener("change", (e) => {
+$("cv-panel").addEventListener("change", (e) => {
   const el = e.target.closest("[data-si]");
   if (!el) return;
-  const s = edModel.steps[Number(el.dataset.si)];
-  if (el.dataset.branch) {
-    const o = el.dataset.branch;
-    s.on = s.on || {};
-    if (el.value) s.on[o] = el.value; else delete s.on[o];
-    if (!Object.keys(s.on).length) delete s.on;
-    if (o === "expired") {
-      if (el.value && !s.timeout) s.timeout = "72h";
-      if (!el.value) delete s.timeout;
-    }
-    renderBuilder(); return;
+  const i = Number(el.dataset.si);
+  const s = edModel.steps[i];
+  if (el.dataset.branch2 !== undefined) {
+    setBranch(i, el.dataset.branch2, el.value);
+    return;
   }
   const f = el.dataset.f;
   if (f === "id") {
     const next = el.value.trim();
-    if (next && edModel.steps.some((x, i) => i !== Number(el.dataset.si) && x.id === next)) {
-      toast("Step id " + next + " is already taken"); renderBuilder(); return;
+    if (next && edModel.steps.some((x, k) => k !== i && x.id === next)) {
+      toast("Step id " + next + " is already taken");
+      renderCanvas();
+      return;
     }
     if (s.id && next && next !== s.id) renameStepRefs(s.id, next);
-    if (s.id && !next) {
-      // Clearing the id would leave branches pointing at nothing; drop those edges.
-      let dropped = false;
-      for (const x of edModel.steps) {
-        if (x.next === s.id) { delete x.next; dropped = true; }
-        for (const k of Object.keys(x.on || {})) if (x.on[k] === s.id) { delete x.on[k]; dropped = true; }
-      }
-      if (dropped) toast("Branches to " + s.id + " now fall through");
-    }
+    if (s.id && !next) dropRefsTo(s.id);
     if (next) s.id = next; else delete s.id;
-    renderBuilder(); return;
+    renderCanvas();
+    return;
   }
-  if (f === "manager") { if (el.checked) s.manager = true; else delete s.manager; return; }
+  if (f === "manager") {
+    if (el.checked) s.manager = true; else delete s.manager;
+    renderCanvas();
+    return;
+  }
   if (f === "timeout") {
     if (el.value.trim()) s.timeout = el.value.trim();
-    else { delete s.timeout; if (s.on) { delete s.on.expired; if (!Object.keys(s.on).length) delete s.on; } toast("Cleared the expired branch with its timeout"); }
-    renderBuilder(); return;
+    else {
+      delete s.timeout;
+      if (s.on) { delete s.on.expired; if (!Object.keys(s.on).length) delete s.on; }
+      toast("Cleared the expired branch with its timeout");
+    }
+    renderCanvas();
+    return;
   }
   if (f && f.startsWith("when.")) {
     const key = f.slice(5);
@@ -811,12 +1128,24 @@ $("vb-steps").addEventListener("change", (e) => {
     if (!Object.keys(s.when).length) delete s.when;
     return;
   }
-  if (f === "next") { if (el.value) s.next = el.value; else delete s.next; renderBuilder(); return; }
-  if (f) { const v = el.value.trim(); if (v) s[f] = v; else delete s[f]; }
+  if (f) {
+    const v = el.value.trim();
+    if (v) s[f] = v; else delete s[f];
+    renderCanvas();
+  }
 });
 
 $("vb-name").addEventListener("change", () => { edModel.name = $("vb-name").value.trim(); });
 $("vb-desc").addEventListener("change", () => { edModel.description = $("vb-desc").value.trim(); });
+
+// enterCanvas resets view state for a freshly parsed model and draws it fitted.
+function enterCanvas() {
+  cvPos = new Map();
+  selStep = null;
+  cvView = { x: 18, y: 14, s: 1 };
+  renderCanvas();
+  cvFit();
+}
 
 function setEdMode(mode) {
   const err = $("editor-err");
@@ -830,19 +1159,28 @@ function setEdMode(mode) {
     let m;
     try { m = JSON.parse($("editor-text").value); }
     catch (e) { err.style.display = "block"; err.textContent = "Fix the JSON first: " + e.message; return; }
-    if (!canBuild(m)) { err.style.display = "block"; err.textContent = "This definition uses shapes the visual builder does not render; keep editing it as JSON."; return; }
-    edModel = m; edInsertAt = -1; renderBuilder();
+    if (!canBuild(m)) { err.style.display = "block"; err.textContent = "This definition uses shapes the canvas does not render; keep editing it as JSON."; return; }
+    edModel = m;
+    edMode = mode;
+    toggleEdTabs();
+    enterCanvas();
+    return;
   }
   edMode = mode;
-  $("tab-visual").classList.toggle("active", mode === "visual");
-  $("tab-json").classList.toggle("active", mode === "json");
-  $("ed-visual").style.display = mode === "visual" ? "block" : "none";
-  $("ed-json").style.display = mode === "json" ? "block" : "none";
+  toggleEdTabs();
+}
+
+// toggleEdTabs shows the active editor surface. The canvas fit runs after the board is
+// visible, since a hidden board has no size to fit into.
+function toggleEdTabs() {
+  $("tab-visual").classList.toggle("active", edMode === "visual");
+  $("tab-json").classList.toggle("active", edMode === "json");
+  $("ed-canvas").style.display = edMode === "visual" ? "flex" : "none";
+  $("ed-json").style.display = edMode === "json" ? "flex" : "none";
 }
 
 async function openEditor(name) {
   $("editor-err").style.display = "none"; $("editor-err").textContent = "";
-  edInsertAt = -1;
   let text = "";
   if (name === null) {
     $("editor-title").textContent = "New workflow";
@@ -857,14 +1195,23 @@ async function openEditor(name) {
     } catch (e) { toast(e.message); return; }
   }
   $("editor-text").value = text;
+  $("editor-overlay").classList.add("open");
   let m = null;
   try { m = JSON.parse(text); } catch {}
-  if (m && canBuild(m)) { edModel = m; edMode = "visual"; renderBuilder(); setEdMode("visual"); }
-  else { edMode = "json"; setEdMode("json"); toast("Shown as JSON: the builder does not render this definition"); }
-  $("editor-overlay").classList.add("open");
+  if (m && canBuild(m)) {
+    edModel = m;
+    edMode = "visual";
+    toggleEdTabs();
+    enterCanvas();
+  } else {
+    edMode = "json";
+    toggleEdTabs();
+    toast("Shown as JSON: the canvas does not render this definition");
+  }
 }
 function closeEditor() {
   $("editor-overlay").classList.remove("open");
+  $("cv-addmenu").style.display = "none";
   if (location.hash.startsWith("#edit=")) history.replaceState(null, "", "#workflows");
 }
 $("editor-overlay").addEventListener("click", (e) => { if (e.target === $("editor-overlay")) closeEditor(); });
