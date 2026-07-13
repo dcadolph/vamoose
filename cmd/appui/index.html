@@ -167,20 +167,23 @@
   .vb-tools button:hover { color:var(--fg); background:rgba(255,255,255,.06); }
   .vb-tools button:disabled { opacity:.25; cursor:default; background:transparent; color:var(--faint); }
   .vb-tools .vb-del:hover { color:var(--red); }
-  .vb-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.55rem .7rem; margin-top:.55rem; }
+  .vb-fields { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.55rem .7rem; margin-top:.55rem; }
   .vb-fields label { margin:0 0 .22rem; font-size:.74rem; }
   .vb-fields input, .vb-fields select { padding:.34rem .55rem; font-size:.86rem; border-radius:8px; }
   .vb-check { display:flex; align-items:center; gap:.45rem; color:var(--dim); font-size:.86rem; align-self:end; padding-bottom:.35rem; }
   .vb-check input { width:auto; }
-  .vb-branches { margin-top:.6rem; border-top:1px dashed var(--line-hi); padding-top:.55rem; display:flex; flex-direction:column; gap:.4rem; }
-  .vb-branch { display:flex; align-items:center; gap:.5rem; font-size:.85rem; }
-  .vb-out { width:80px; flex:none; font-weight:640; font-size:.76rem; text-transform:uppercase; letter-spacing:.03em; }
+  /* Branch rows share one grid so every outcome's select lines up on both edges,
+     with the expired timeout in a fixed rightmost column. */
+  .vb-branches { margin-top:.6rem; border-top:1px dashed var(--line-hi); padding-top:.55rem;
+    display:grid; grid-template-columns:80px 18px 1fr max-content; gap:.4rem .5rem; align-items:center; }
+  .vb-branch { display:contents; }
+  .vb-out { font-weight:640; font-size:.76rem; text-transform:uppercase; letter-spacing:.03em; }
   .vb-out.o-accepted { color:var(--green); }
   .vb-out.o-declined { color:var(--red); }
   .vb-out.o-expired { color:var(--amber); }
-  .vb-branch select { flex:1; padding:.3rem .5rem; font-size:.85rem; }
-  .vb-branch input { width:92px; flex:none; padding:.3rem .5rem; font-size:.85rem; font-family:var(--mono); }
-  .vb-arrow { color:var(--faint); flex:none; }
+  .vb-branch select { width:100%; padding:.3rem .5rem; font-size:.85rem; }
+  .vb-branch input { width:92px; padding:.3rem .5rem; font-size:.85rem; font-family:var(--mono); }
+  .vb-arrow { color:var(--faint); }
   .vb-in { display:flex; gap:.35rem; flex-wrap:wrap; margin:0 0 .3rem; }
   .vb-chip { font-size:.68rem; padding:.08rem .5rem; border-radius:1rem; border:1px solid var(--line-hi); color:var(--dim); }
   .vb-chip.o-accepted { color:var(--green); border-color:rgba(91,189,122,.4); }
@@ -648,8 +651,9 @@ function renderStepCard(s, idx) {
   if (s.verb === "approve") {
     branches = `<div class="vb-branches">` + OUTCOMES.map(o => {
       const cur = (s.on || {})[o] || "";
+      // Every row fills the grid's four columns, so the selects align across rows.
       const timeoutBox = o === "expired"
-        ? `<input data-si="${idx}" data-f="timeout" value="${esc(s.timeout || "")}" placeholder="72h" title="How long before the expired branch runs">` : "";
+        ? `<input data-si="${idx}" data-f="timeout" value="${esc(s.timeout || "")}" placeholder="72h" title="How long before the expired branch runs">` : "<span></span>";
       return `<div class="vb-branch"><span class="vb-out o-${o}">${o}</span><span class="vb-arrow">→</span>
         <select data-si="${idx}" data-branch="${o}">
           <option value="">${FALLBACK_LABEL[o]}</option>
@@ -664,7 +668,7 @@ function renderStepCard(s, idx) {
         <option value="">(next step)</option>
         <option value="end"${cur === "end" ? " selected" : ""}>end</option>
         ${targetOptions(idx, cur)}
-      </select></div></div>`;
+      </select><span></span></div></div>`;
   }
 
   // When guards gate any step that is not creating and not itself a gate.

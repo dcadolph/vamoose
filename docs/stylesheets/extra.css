@@ -393,6 +393,37 @@
   height: 1.7rem;
 }
 
+/* ---------- Visual builder showcase: copy beside a tall dashboard screenshot. ---------- */
+
+.shot-split {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 2.6rem;
+  align-items: center;
+  margin: 1.3rem 0 .6rem;
+}
+
+.shot-split .shot-copy {
+  font-size: .98rem;
+  line-height: 1.65;
+}
+
+.shot-split .shot-frame img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: .8rem;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .5);
+}
+
+@media (max-width: 820px) {
+  .shot-split {
+    grid-template-columns: 1fr;
+    gap: 1.4rem;
+  }
+}
+
 /* ---------- Landing tables span the content width. Material renders tables as a
    shrink-to-fit inline block, which looks stranded on the wide landing grid, so the
    page holding the hero stretches them edge to edge instead. ---------- */
