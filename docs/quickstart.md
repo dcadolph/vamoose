@@ -20,6 +20,10 @@ Or build from source with Go 1.26 or newer:
 go install github.com/dcadolph/vamoose@latest
 ```
 
+On Windows, download the zip for your architecture from the
+[releases page](https://github.com/dcadolph/vamoose/releases) and put `vamoose.exe` on your
+`PATH`.
+
 ## 2. Sign in
 
 vamoose works with Microsoft Graph (Outlook, Microsoft 365, Teams), Google Calendar, Apple iCloud, and any standard CalDAV host. Google is the quickest to try, and it needs no project of your own: vamoose ships with a built-in OAuth client, so you just sign in.

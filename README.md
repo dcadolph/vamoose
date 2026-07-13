@@ -91,6 +91,10 @@ Or with Go 1.26 or newer:
 go install github.com/dcadolph/vamoose@latest
 ```
 
+On Windows, download the zip for your architecture from the
+[releases page](https://github.com/dcadolph/vamoose/releases) and put `vamoose.exe` on your
+`PATH`, or use `go install`.
+
 New to vamoose? The [Quickstart](docs/quickstart.md) takes you from zero to a first approved
 hold in a few minutes.
 
