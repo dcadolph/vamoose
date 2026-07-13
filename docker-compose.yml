@@ -4,6 +4,8 @@
 # Generate a secret key once with: openssl rand -base64 32
 services:
   vamoose:
+    # The published image; `docker compose build` still builds from source when wanted.
+    image: ghcr.io/dcadolph/vamoose:latest
     build: .
     restart: unless-stopped
     ports:

@@ -10,8 +10,17 @@ Zero to your first approved time-off hold in a few minutes.
 
 ## 1. Install
 
+macOS and Linux:
+
 ```sh
 brew install dcadolph/tap/vamoose
+```
+
+Windows:
+
+```powershell
+scoop bucket add vamoose https://github.com/dcadolph/scoop-vamoose
+scoop install vamoose
 ```
 
 Or build from source with Go 1.26 or newer:
@@ -20,9 +29,8 @@ Or build from source with Go 1.26 or newer:
 go install github.com/dcadolph/vamoose@latest
 ```
 
-On Windows, download the zip for your architecture from the
-[releases page](https://github.com/dcadolph/vamoose/releases) and put `vamoose.exe` on your
-`PATH`.
+Prebuilt zips and tarballs for every platform are on the
+[releases page](https://github.com/dcadolph/vamoose/releases).
 
 ## 2. Sign in
 
