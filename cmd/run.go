@@ -232,6 +232,10 @@ func runWorkflowOn(ctx context.Context, prov calendar.Provider, providerName str
 	recordAudit(ctx, deps.recorder, audit.Event{
 		Workflow: wf.Name, Provider: providerName, HoldID: created.ID, Action: audit.ActionCreated,
 	})
+	// Record time off, not meetings, for team coverage checks.
+	if create.Verb != workflow.VerbEvent {
+		recordCoverage(ctx, prov, created)
+	}
 	return runSteps(ctx, prov, deps, providerName, wf, wf.Next(0, ""), created, opt.Watch)
 }
 
