@@ -59,12 +59,13 @@ Create a time-off hold shown free and invite the manager to approve it. Runs the
 
 ### off
 
-`vamoose off <date phrase>` (or `--start`/`--end`)
+`vamoose off <date phrase> [--half am|pm]` (or `--start`/`--end`)
 
-Friendly front for request. Understands `today`, `tomorrow`, `next week`, and weekday names.
+Friendly front for request. Understands `today`, `tomorrow`, `next week`, and weekday names. Reports the working days in the window, skipping weekends and configured holidays. `--half am` or `--half pm` books only the morning or the afternoon of a single day.
 
 ```sh
 vamoose off next week --subject "Out: beach week"
+vamoose off tomorrow --half pm --subject "Half day"
 ```
 
 ### check
@@ -85,13 +86,25 @@ Add the team as optional attendees once approved. `--force` promotes even withou
 
 Delete the hold, notify its attendees, and stop watching it.
 
+### balance
+
+`vamoose balance [--as-of YYYY-MM-DD]`
+
+Show your remaining time off, read from the configured HR system (BambooHR or a balance webhook). `--as-of` checks the balance as of a date rather than today.
+
+### coverage
+
+`vamoose coverage <date phrase>` (or `--start`/`--end`)
+
+Show who is off in a window, from time off booked through vamoose. Useful before booking or approving more. Defaults to next week.
+
 ## Quick actions
 
 ### away
 
-`vamoose away --start <start> --end <end> [--subject]`
+`vamoose away --start <start> --end <end> [--subject] [--half am|pm]`
 
-Mark yourself out of office over a range. No approval, no fanout.
+Mark yourself out of office over a range. No approval, no fanout. `--half am` or `--half pm` marks only the morning or afternoon of the start day.
 
 ### event
 
@@ -240,6 +253,25 @@ Messaging (for `message` steps, optional):
 | `VAMOOSE_WEBHOOK_AUTH`     | `Authorization` header sent with a webhook-URL channel, when it needs one. |
 
 A `message` step routes by its channel: an `https` or `http` URL posts to that incoming webhook (Microsoft Teams, Google Chat, and similar), an address with `@` goes to email, anything else to Slack.
+
+Time off and coverage (optional):
+
+| Variable                | Purpose                                                       &nbsp; |
+| ----------------------- | -------------------------------------------------------------------- |
+| `VAMOOSE_WEEKEND`       | Comma-separated non-working weekdays. Default `sat,sun`.             |
+| `VAMOOSE_HOLIDAYS`      | Comma-separated `YYYY-MM-DD` holidays, excluded from working-day counts. |
+| `VAMOOSE_MAX_TEAM_OFF`  | Warn on `off` when this many people already overlap the window.     |
+
+Leave and balance (optional, for the `leave` step and `vamoose balance`):
+
+| Variable                       | Purpose                                               &nbsp; |
+| ------------------------------ | ------------------------------------------------------------ |
+| `VAMOOSE_BAMBOOHR_SUBDOMAIN`   | BambooHR company subdomain.                                  |
+| `VAMOOSE_BAMBOOHR_API_KEY`     | BambooHR API key.                                            |
+| `VAMOOSE_BAMBOOHR_EMPLOYEE_ID` | Employee id whose leave to file or balance to read.          |
+| `VAMOOSE_LEAVE_WEBHOOK_URL`    | Post an approved leave here instead of BambooHR.             |
+| `VAMOOSE_BALANCE_WEBHOOK_URL`  | Read balances here instead of BambooHR.                      |
+| `VAMOOSE_HRIS_EMPLOYEE_ID`     | Generic employee id, overrides the BambooHR one.             |
 
 The Slack server also reads `VAMOOSE_SLACK_SIGNING_SECRET` and, for install and per-user mode, `VAMOOSE_SLACK_CLIENT_ID`, `VAMOOSE_SLACK_CLIENT_SECRET`, and `VAMOOSE_SLACK_PUBLIC_URL`. See [Slack](slack.md). For a hosted server, `VAMOOSE_LOG_FORMAT=json` and `VAMOOSE_LOG_LEVEL` set structured logging, and the server serves `/metrics` (Prometheus) and `/health`. See [hosting](hosting.md).
 
