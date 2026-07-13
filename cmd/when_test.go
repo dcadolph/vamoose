@@ -6,6 +6,60 @@ import (
 	"time"
 )
 
+// TestHalfDayWindow covers the morning and afternoon windows, the aliases, and an
+// invalid portion.
+func TestHalfDayWindow(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	day := time.Date(2026, 8, 3, 0, 0, 0, 0, loc)
+	tests := []struct {
+		Portion   string
+		WantStart string
+		WantEnd   string
+		WantErr   bool
+	}{
+		{Portion: "am", WantStart: "09:00", WantEnd: "13:00"},
+		{Portion: "morning", WantStart: "09:00", WantEnd: "13:00"},
+		{Portion: "pm", WantStart: "13:00", WantEnd: "17:00"},
+		{Portion: "afternoon", WantStart: "13:00", WantEnd: "17:00"},
+		{Portion: "evening", WantErr: true},
+	}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			s, e, err := halfDayWindow(day, loc, test.Portion)
+			if (err != nil) != test.WantErr {
+				t.Fatalf("err = %v, wantErr %v", err, test.WantErr)
+			}
+			if test.WantErr {
+				return
+			}
+			if got := s.Format("15:04"); got != test.WantStart {
+				t.Errorf("start = %s, want %s", got, test.WantStart)
+			}
+			if got := e.Format("15:04"); got != test.WantEnd {
+				t.Errorf("end = %s, want %s", got, test.WantEnd)
+			}
+		})
+	}
+}
+
+// TestApplyHalfDay confirms a single day is narrowed and a multi-day range is rejected.
+func TestApplyHalfDay(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
+	if _, _, err := applyHalfDay(start, start.AddDate(0, 0, 3), time.UTC, "am"); err == nil {
+		t.Error("want an error for a multi-day range")
+	}
+	s, e, err := applyHalfDay(start, start.AddDate(0, 0, 1), time.UTC, "pm")
+	if err != nil {
+		t.Fatalf("single day should be accepted: %v", err)
+	}
+	if s.Format("15:04") != "13:00" || e.Format("15:04") != "17:00" {
+		t.Errorf("pm window = %s-%s, want 13:00-17:00", s.Format("15:04"), e.Format("15:04"))
+	}
+}
+
 func TestParseWindow(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
