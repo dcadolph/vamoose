@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dcadolph/vamoose",
+  "description": "Calendar workflow engine for time off, approvals, and quick actions over Microsoft Graph, Google Calendar, Apple iCloud, or any CalDAV host.",
+  "repository": {
+    "url": "https://github.com/dcadolph/vamoose",
+    "source": "github"
+  },
+  "version": "0.32.0",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/dcadolph/vamoose:0.32.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "description": "Serve vamoose over the Model Context Protocol on stdio."
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "VAMOOSE_PROVIDER",
+          "description": "Calendar provider: graph, google, icloud, or caldav.",
+          "isRequired": false
+        },
+        {
+          "name": "VAMOOSE_TIMEZONE",
+          "description": "IANA time zone for event times, such as America/Chicago.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

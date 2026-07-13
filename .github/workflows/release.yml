@@ -11,6 +11,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
   release:
@@ -155,6 +156,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/vamoose.rb
+          # A rerun of this job regenerates identical content; do not fail on it.
+          if git diff --cached --quiet; then
+            echo "formula already at ${VER}"
+            exit 0
+          fi
           git commit -m "Update vamoose to ${VER}"
           # Another formula's release can push to the shared tap between our clone and
           # push, so rebase and retry instead of failing on a non-fast-forward.
@@ -219,6 +225,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add bucket/vamoose.json
+          # A rerun of this job regenerates identical content; do not fail on it.
+          if git diff --cached --quiet; then
+            echo "bucket already at ${VER}"
+            exit 0
+          fi
           git commit -m "Update vamoose to ${VER}"
           for attempt in 1 2 3; do
             if git push; then
@@ -230,3 +241,17 @@ jobs:
             fi
             git pull --rebase
           done
+
+      - name: Publish to the MCP registry
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VER="${TAG#v}"
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          # Point the manifest at this release's image before publishing.
+          jq --arg v "$VER" \
+            '.version = $v | .packages[0].identifier = "ghcr.io/dcadolph/vamoose:v" + $v' \
+            server.json > server.json.tmp && mv server.json.tmp server.json
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
