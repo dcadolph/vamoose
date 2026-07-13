@@ -38,6 +38,8 @@ func Execute(args []string) int {
 		return run(runAway(ctx, rest))
 	case "balance":
 		return run(runBalance(ctx, rest))
+	case "coverage":
+		return run(runCoverage(ctx, rest))
 	case "event":
 		return run(runEvent(ctx, rest))
 	case "daemon":

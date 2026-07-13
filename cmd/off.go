@@ -68,6 +68,7 @@ func runOff(ctx context.Context, args []string) error {
 			fmt.Fprintln(os.Stdout, "Heads up: that window has no working days (all weekend or holidays).")
 		}
 	}
+	warnCoverage(startAt, endAt)
 
 	return createHold(ctx, holdRequest{
 		Provider: *provider,

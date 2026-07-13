@@ -38,6 +38,7 @@ func runCancel(ctx context.Context, args []string) error {
 // when it was the last created hold. Best-effort: the cancellation already ran.
 func forgetHold(ref holdRef) {
 	_ = removeWatch(ref.Provider, ref.ID)
+	forgetCoverage(ref.ID)
 	if s, err := loadState(); err == nil && s.LastHold == ref {
 		_ = saveState(state{})
 	}
