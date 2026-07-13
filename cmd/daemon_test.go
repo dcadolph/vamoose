@@ -676,12 +676,10 @@ func TestPollAllPrune(t *testing.T) {
 	}
 }
 
-// TestWatchStore exercises the watch list on disk against an isolated HOME.
+// TestWatchStore exercises the watch list on disk against an isolated config dir.
 // It cannot run in parallel because it sets process environment variables.
 func TestWatchStore(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	isolateConfig(t)
 
 	if w, err := loadWatches(); err != nil || w != nil {
 		t.Fatalf("loadWatches on empty = %v, %v; want nil, nil", w, err)

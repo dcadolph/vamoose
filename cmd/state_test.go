@@ -1,16 +1,13 @@
 package cmd
 
 import (
-	"path/filepath"
 	"testing"
 )
 
-// TestStateRoundTrip exercises hold state on disk against an isolated HOME.
+// TestStateRoundTrip exercises hold state on disk against an isolated config dir.
 // It cannot run in parallel because it sets process environment variables.
 func TestStateRoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	isolateConfig(t)
 
 	if s, err := loadState(); err != nil || s.LastHold.ID != "" {
 		t.Fatalf("loadState on empty = %+v, %v; want zero, nil", s, err)
@@ -31,9 +28,7 @@ func TestStateRoundTrip(t *testing.T) {
 // TestResolveHold covers explicit ids, the cached hold, and the empty case.
 // It cannot run in parallel because it sets process environment variables.
 func TestResolveHold(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	isolateConfig(t)
 	t.Setenv("VAMOOSE_PROVIDER", "")
 
 	// An explicit id with no flag or env resolves to the default provider.

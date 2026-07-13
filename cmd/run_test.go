@@ -20,6 +20,11 @@ func isolateConfig(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	// Windows resolves os.UserConfigDir from AppData, not HOME or XDG, so isolate it
+	// too or every test on Windows shares the machine's real config directory.
+	t.Setenv("AppData", filepath.Join(dir, "appdata"))
+	t.Setenv("LocalAppData", filepath.Join(dir, "localappdata"))
+	t.Setenv("USERPROFILE", dir)
 }
 
 // testWindow is a fixed all-day window for workflow execution tests.
