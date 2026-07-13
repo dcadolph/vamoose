@@ -20,6 +20,7 @@ func runAway(ctx context.Context, args []string) error {
 		subject  = fs.String("subject", "Out of office", "Event subject")
 		provider = fs.String("provider", "", "Calendar provider; overrides VAMOOSE_PROVIDER (default graph)")
 		tzFlag   = fs.String("tz", "", "IANA time zone for event times")
+		half     = fs.String("half", "", "Half day only: am (morning) or pm (afternoon)")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -31,6 +32,14 @@ func runAway(ctx context.Context, args []string) error {
 	startAt, endAt, allDay, err := parseWindow(*start, *end)
 	if err != nil {
 		return fmt.Errorf("away: %w", err)
+	}
+	if *half != "" {
+		loc := timeLocation(resolveTimeZone(*tzFlag))
+		startAt, endAt, err = applyHalfDay(startAt, endAt, loc, *half)
+		if err != nil {
+			return fmt.Errorf("away: %w", err)
+		}
+		allDay = false
 	}
 	prov, err := newProvider(resolveProvider(*provider), resolveTimeZone(*tzFlag))
 	if err != nil {

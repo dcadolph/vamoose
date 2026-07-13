@@ -21,6 +21,7 @@ func runOff(ctx context.Context, args []string) error {
 		manager  = fs.String("manager", "", "Manager email; resolved from the directory when empty")
 		provider = fs.String("provider", "", "Calendar provider; overrides VAMOOSE_PROVIDER (default graph)")
 		tzFlag   = fs.String("tz", "", "IANA time zone for event times")
+		half     = fs.String("half", "", "Half day only: am (morning) or pm (afternoon)")
 		watch    = fs.Bool("watch", false, "Add the hold to the daemon watch list for auto-promote on approval")
 		dryRun   = fs.Bool("dry-run", false, "Print what would be sent without calling the calendar")
 	)
@@ -37,7 +38,19 @@ func runOff(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("off: %w", err)
 	}
-	if *start == "" && *end == "" {
+	if *half != "" {
+		loc := timeLocation(resolveTimeZone(*tzFlag))
+		startAt, endAt, err = applyHalfDay(startAt, endAt, loc, *half)
+		if err != nil {
+			return fmt.Errorf("off: %w", err)
+		}
+		allDay = false
+	}
+	switch {
+	case *half != "":
+		fmt.Fprintf(os.Stdout, "Reading %q as the %s of %s.\n",
+			phrase, portionLabel(*half), startAt.Format("Mon 2006-01-02"))
+	case *start == "" && *end == "":
 		fmt.Fprintf(os.Stdout, "Reading %q as %s through %s.\n",
 			phrase, startAt.Format("Mon 2006-01-02"), endAt.AddDate(0, 0, -1).Format("Mon 2006-01-02"))
 	}

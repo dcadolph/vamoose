@@ -56,6 +56,57 @@ func resolveWindow(start, end, phrase string) (startAt, endAt time.Time, allDay 
 	}
 }
 
+// Workday hours used to build a half-day hold. Morning runs from the start hour to the
+// midday hour, afternoon from the midday hour to the end hour.
+const (
+	workdayStartHour = 9
+	workdayMidHour   = 13
+	workdayEndHour   = 17
+)
+
+// timeLocation loads the IANA zone, falling back to UTC when it does not load, so a
+// half-day window is built in the same zone the calendar labels the event with.
+func timeLocation(tz string) *time.Location {
+	if loc, err := time.LoadLocation(tz); err == nil {
+		return loc
+	}
+	return time.UTC
+}
+
+// halfDayWindow returns the timed window for the morning ("am") or afternoon ("pm") of
+// day's date, in loc. A half-day hold is a real timed block, not an all-day event, so it
+// shows the person out for only part of the day.
+func halfDayWindow(day time.Time, loc *time.Location, portion string) (start, end time.Time, err error) {
+	y, m, d := day.In(loc).Date()
+	at := func(hour int) time.Time { return time.Date(y, m, d, hour, 0, 0, 0, loc) }
+	switch portion {
+	case "am", "morning":
+		return at(workdayStartHour), at(workdayMidHour), nil
+	case "pm", "afternoon":
+		return at(workdayMidHour), at(workdayEndHour), nil
+	default:
+		return time.Time{}, time.Time{}, fmt.Errorf("half must be am or pm, got %q", portion)
+	}
+}
+
+// portionLabel returns a human phrase for a half-day portion.
+func portionLabel(portion string) string {
+	if portion == "am" || portion == "morning" {
+		return "morning"
+	}
+	return "afternoon"
+}
+
+// applyHalfDay narrows a window to the given half of its start day, returning a timed
+// window in loc. It errors when the window spans more than one day, since a half day
+// applies to a single day.
+func applyHalfDay(startAt, endAt time.Time, loc *time.Location, portion string) (start, end time.Time, err error) {
+	if endAt.Sub(startAt) > 24*time.Hour {
+		return time.Time{}, time.Time{}, fmt.Errorf("a half day applies to a single day, not a range")
+	}
+	return halfDayWindow(startAt, loc, portion)
+}
+
 // weekdays maps lowercase weekday names to their time.Weekday.
 var weekdays = map[string]time.Weekday{
 	"sunday":    time.Sunday,
