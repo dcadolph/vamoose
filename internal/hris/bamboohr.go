@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	urlpkg "net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -72,7 +73,7 @@ func (f *BambooHRFiler) FileLeave(ctx context.Context, leave Leave) (string, err
 		return "", err
 	}
 	url := fmt.Sprintf("%s/api/gateway.php/%s/v1/employees/%s/time_off/request/",
-		f.baseURL, f.subdomain, leave.EmployeeID)
+		f.baseURL, f.subdomain, urlpkg.PathEscape(leave.EmployeeID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
 	if err != nil {
 		return "", err
@@ -133,7 +134,7 @@ func (r *BambooHRBalanceReader) Balance(ctx context.Context, employeeID string, 
 		end = time.Now()
 	}
 	url := fmt.Sprintf("%s/api/gateway.php/%s/v1/employees/%s/time_off/calculator/?end=%s",
-		r.baseURL, r.subdomain, employeeID, end.Format(dateLayout))
+		r.baseURL, r.subdomain, urlpkg.PathEscape(employeeID), end.Format(dateLayout))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -160,7 +161,12 @@ func (r *BambooHRBalanceReader) Balance(ctx context.Context, employeeID string, 
 	}
 	out := make([]Balance, 0, len(raw))
 	for _, b := range raw {
-		avail, _ := strconv.ParseFloat(b.Balance, 64)
+		avail, perr := strconv.ParseFloat(b.Balance, 64)
+		if perr != nil {
+			// Skip a balance we cannot read as a number rather than report a
+			// misleading zero.
+			continue
+		}
 		out = append(out, Balance{TypeID: b.TimeOffType, Name: b.Name, Unit: b.Units, Available: avail})
 	}
 	return out, nil

@@ -163,6 +163,7 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 			remaining = append(remaining, updated)
 		case pollDeclined:
 			logger.Printf("%s: declined; no longer watching", label(w))
+			forgetCoverage(w.HoldID)
 		case pollExpired:
 			logger.Printf("%s: expired; ran the timeout branch", label(w))
 		case pollPending:
@@ -173,6 +174,7 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 			remaining = append(remaining, updated)
 		case pollGone:
 			logger.Printf("%s: hold no longer exists; no longer watching", label(w))
+			forgetCoverage(w.HoldID)
 		}
 	}
 	// This end-of-pass save records each hold's final state. Crash-safety across it comes
