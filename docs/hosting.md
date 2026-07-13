@@ -20,7 +20,13 @@ Set it as `VAMOOSE_SECRET_KEY`. Without it, the store falls back to a `0600` fil
 
 ## Run with Docker
 
-The repository ships a `Dockerfile` and a `docker-compose.yml`. Put your settings in a `.env` file next to the compose file:
+Every release publishes a multi-arch image to GitHub Container Registry, so hosting is a pull, not a build:
+
+```sh
+docker run --rm ghcr.io/dcadolph/vamoose:latest version
+```
+
+The repository also ships the `Dockerfile` behind that image and a `docker-compose.yml` that uses it. Put your settings in a `.env` file next to the compose file:
 
 ```sh
 VAMOOSE_SECRET_KEY=<from openssl rand -base64 32>

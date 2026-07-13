@@ -1,8 +1,8 @@
 name: release
 
 # Cross-builds vamoose on every v* tag, attaches the macOS and Linux tarballs, the
-# Windows zips, and checksums to the release, and (when a tap token is present) bumps
-# the Homebrew formula.
+# Windows zips, and checksums to the release, publishes the Docker image to GHCR, and
+# (when a tap token is present) bumps the Homebrew formula and the Scoop bucket.
 on:
   push:
     tags:
@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   release:
@@ -70,6 +71,31 @@ jobs:
             dist/*.zip
             dist/checksums.txt
           fail_on_unmatched_files: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          tags: |
+            ghcr.io/dcadolph/vamoose:${{ github.ref_name }}
+            ghcr.io/dcadolph/vamoose:latest
 
       - name: Bump Homebrew formula
         env:
@@ -138,6 +164,68 @@ jobs:
             fi
             if [ "$attempt" = 3 ]; then
               echo "tap push failed after retries" >&2
+              exit 1
+            fi
+            git pull --rebase
+          done
+
+      - name: Bump Scoop bucket
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAP_TOKEN:-}" ]; then
+            echo "HOMEBREW_TAP_TOKEN not set; skipping scoop bump"
+            exit 0
+          fi
+          VER="${TAG#v}"
+          wa=$(sha256sum "dist/vamoose_${VER}_Windows_arm64.zip" | cut -d' ' -f1)
+          wi=$(sha256sum "dist/vamoose_${VER}_Windows_x86_64.zip" | cut -d' ' -f1)
+          base="https://github.com/dcadolph/vamoose/releases/download/v${VER}"
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/dcadolph/scoop-vamoose.git" scoop
+          cat > scoop/bucket/vamoose.json <<EOF
+          {
+              "version": "${VER}",
+              "description": "Calendar workflow engine for time off, approvals, and quick actions",
+              "homepage": "https://vamoose.dev",
+              "license": "BUSL-1.1",
+              "architecture": {
+                  "64bit": {
+                      "url": "${base}/vamoose_${VER}_Windows_x86_64.zip",
+                      "hash": "${wi}"
+                  },
+                  "arm64": {
+                      "url": "${base}/vamoose_${VER}_Windows_arm64.zip",
+                      "hash": "${wa}"
+                  }
+              },
+              "bin": "vamoose.exe",
+              "checkver": {
+                  "github": "https://github.com/dcadolph/vamoose"
+              },
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "https://github.com/dcadolph/vamoose/releases/download/v\$version/vamoose_\$version_Windows_x86_64.zip"
+                      },
+                      "arm64": {
+                          "url": "https://github.com/dcadolph/vamoose/releases/download/v\$version/vamoose_\$version_Windows_arm64.zip"
+                      }
+                  }
+              }
+          }
+          EOF
+          cd scoop
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/vamoose.json
+          git commit -m "Update vamoose to ${VER}"
+          for attempt in 1 2 3; do
+            if git push; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "scoop push failed after retries" >&2
               exit 1
             fi
             git pull --rebase

@@ -81,8 +81,23 @@ earns its keep the moment you have more than one account:
 
 ## Install
 
+macOS and Linux:
+
 ```sh
 brew install dcadolph/tap/vamoose
+```
+
+Windows:
+
+```powershell
+scoop bucket add vamoose https://github.com/dcadolph/scoop-vamoose
+scoop install vamoose
+```
+
+Docker (for [hosting](docs/hosting.md)):
+
+```sh
+docker run --rm ghcr.io/dcadolph/vamoose:latest version
 ```
 
 Or with Go 1.26 or newer:
@@ -91,9 +106,8 @@ Or with Go 1.26 or newer:
 go install github.com/dcadolph/vamoose@latest
 ```
 
-On Windows, download the zip for your architecture from the
-[releases page](https://github.com/dcadolph/vamoose/releases) and put `vamoose.exe` on your
-`PATH`, or use `go install`.
+Zips and tarballs for every platform are on the
+[releases page](https://github.com/dcadolph/vamoose/releases).
 
 New to vamoose? The [Quickstart](docs/quickstart.md) takes you from zero to a first approved
 hold in a few minutes.
