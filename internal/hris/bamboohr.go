@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -90,6 +91,79 @@ func (f *BambooHRFiler) FileLeave(ctx context.Context, leave Leave) (string, err
 		return "", fmt.Errorf("bamboohr: file leave: status %d: %s", resp.StatusCode, string(respBody))
 	}
 	return requestID(respBody, resp.Header.Get("Location")), nil
+}
+
+// BambooHRBalanceReader reads time-off balances from BambooHR's calculator endpoint.
+type BambooHRBalanceReader struct {
+	// subdomain is the BambooHR company domain.
+	subdomain string
+	// apiKey authenticates as the basic-auth user; the password is ignored by BambooHR.
+	apiKey string
+	// httpClient performs the request.
+	httpClient *http.Client
+	// baseURL is the API root, overridable for tests.
+	baseURL string
+}
+
+// NewBambooHRBalanceReader returns a balance reader for the company subdomain and API key.
+func NewBambooHRBalanceReader(subdomain, apiKey string) *BambooHRBalanceReader {
+	return &BambooHRBalanceReader{
+		subdomain:  subdomain,
+		apiKey:     apiKey,
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+		baseURL:    "https://api.bamboohr.com",
+	}
+}
+
+// WithBaseURL overrides the API root, for tests.
+func (r *BambooHRBalanceReader) WithBaseURL(u string) *BambooHRBalanceReader {
+	r.baseURL = u
+	return r
+}
+
+// Balance reads the employee's time-off balances as of asOf, defaulting to today, from
+// BambooHR's time-off calculator. BambooHR reports each balance as a string, which this
+// parses to a number.
+func (r *BambooHRBalanceReader) Balance(ctx context.Context, employeeID string, asOf time.Time) ([]Balance, error) {
+	if employeeID == "" {
+		return nil, fmt.Errorf("bamboohr: employee id is required")
+	}
+	end := asOf
+	if end.IsZero() {
+		end = time.Now()
+	}
+	url := fmt.Sprintf("%s/api/gateway.php/%s/v1/employees/%s/time_off/calculator/?end=%s",
+		r.baseURL, r.subdomain, employeeID, end.Format(dateLayout))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Basic "+basicAuth(r.apiKey, "x"))
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxRespBody))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("bamboohr: balance: status %d: %s", resp.StatusCode, string(body))
+	}
+	var raw []struct {
+		TimeOffType string `json:"timeOffType"`
+		Name        string `json:"name"`
+		Units       string `json:"units"`
+		Balance     string `json:"balance"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("bamboohr: balance: parse: %w", err)
+	}
+	out := make([]Balance, 0, len(raw))
+	for _, b := range raw {
+		avail, _ := strconv.ParseFloat(b.Balance, 64)
+		out = append(out, Balance{TypeID: b.TimeOffType, Name: b.Name, Unit: b.Units, Available: avail})
+	}
+	return out, nil
 }
 
 // requestID pulls the created request id from the JSON body's id field, which HR systems
