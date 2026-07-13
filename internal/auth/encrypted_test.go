@@ -17,6 +17,11 @@ func TestEncryptedStore(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	// Windows resolves os.UserConfigDir from AppData, not HOME or XDG, so isolate it
+	// too or the test writes sealed tokens into the machine's real config directory.
+	t.Setenv("AppData", filepath.Join(dir, "appdata"))
+	t.Setenv("LocalAppData", filepath.Join(dir, "localappdata"))
+	t.Setenv("USERPROFILE", dir)
 	key, err := secret.GenerateKey()
 	if err != nil {
 		t.Fatal(err)

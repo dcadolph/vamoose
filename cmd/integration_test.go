@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -21,9 +20,7 @@ import (
 // to accepted, then auto-promote the directory team. It exercises the real
 // provider, the daemon's advanceRun, and promoteHold together, with no account.
 func TestGraphApprovalFlow(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	isolateConfig(t)
 
 	type att struct{ Email, Type string }
 	var (

@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -79,12 +78,10 @@ func TestPersonLabel(t *testing.T) {
 	}
 }
 
-// TestTeamConfigRoundTrip exercises the on-disk config against an isolated HOME.
+// TestTeamConfigRoundTrip exercises the on-disk config against an isolated config dir.
 // It cannot run in parallel because it sets process environment variables.
 func TestTeamConfigRoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	isolateConfig(t)
 
 	if got, err := loadTeamConfig(); err != nil || got != nil {
 		t.Fatalf("loadTeamConfig on empty = %v, %v; want nil, nil", got, err)

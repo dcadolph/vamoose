@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -21,9 +20,7 @@ import (
 // to accepted, then auto-promote the configured team. Google has no directory,
 // so the team comes from config. No account required.
 func TestGoogleApprovalFlow(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	isolateConfig(t)
 
 	if err := saveTeamConfig([]string{"peer@x.com"}); err != nil {
 		t.Fatalf("saveTeamConfig: %v", err)
