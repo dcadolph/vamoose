@@ -244,7 +244,10 @@ func fireSchedules(ctx context.Context, now time.Time, schedules []scheduleItem,
 	out := make([]scheduleItem, 0, len(schedules))
 	for _, s := range schedules {
 		if s.NextRun.IsZero() || !s.NextRun.After(now) {
-			if err := run(ctx, s); err != nil {
+			runCtx, cancel := context.WithTimeout(ctx, pollItemTimeout)
+			err := run(runCtx, s)
+			cancel()
+			if err != nil {
 				logger.Printf("schedule %q: %v", s.Workflow, err)
 			} else {
 				logger.Printf("schedule %q: ran", s.Workflow)

@@ -24,6 +24,10 @@ const (
 	defaultInterval = time.Minute
 	// minInterval is the shortest allowed polling cadence, to avoid hammering.
 	minInterval = 10 * time.Second
+	// pollItemTimeout bounds one watched hold's advance and one scheduled run. Without
+	// it, a single stuck provider call, such as a token refresh that falls into an
+	// interactive device-code poll, stalls every other watch for the daemon's lifetime.
+	pollItemTimeout = 2 * time.Minute
 )
 
 // pollResult is the outcome of polling a single watched hold.
@@ -151,7 +155,10 @@ func pollAll(ctx context.Context, logger *log.Logger, prune bool, warned map[str
 			remaining = append(remaining, w)
 			continue
 		}
-		switch res, updated, aerr := advanceRun(ctx, prov, w); res {
+		itemCtx, cancel := context.WithTimeout(ctx, pollItemTimeout)
+		res, updated, aerr := advanceRun(itemCtx, prov, w)
+		cancel()
+		switch res {
 		case pollApproved:
 			logger.Printf("%s: approved and advanced", label(w))
 		case pollAdvanced:

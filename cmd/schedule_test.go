@@ -89,6 +89,29 @@ func TestFireSchedules(t *testing.T) {
 	}
 }
 
+// TestFireSchedulesBoundsRun confirms each run gets a deadline, so a stuck provider
+// call cannot stall the daemon's poll loop for its lifetime.
+func TestFireSchedulesBoundsRun(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC)
+	var deadline time.Time
+	var ok bool
+	runner := func(ctx context.Context, _ scheduleItem) error {
+		deadline, ok = ctx.Deadline()
+		return nil
+	}
+	logger := log.New(io.Discard, "", 0)
+	schedules := []scheduleItem{{Workflow: "due", Every: "168h", NextRun: now.Add(-time.Hour)}}
+	fireSchedules(context.Background(), now, schedules, runner, logger)
+
+	if !ok {
+		t.Fatal("runner context has no deadline; a stuck run would block the daemon forever")
+	}
+	if remaining := time.Until(deadline); remaining > pollItemTimeout {
+		t.Errorf("deadline %v away, want at most %v", remaining, pollItemTimeout)
+	}
+}
+
 // TestFireSchedulesZeroNextRun confirms a schedule with a zero next run, such as from a
 // hand-edited file, fires once and is normalized rather than staying dead forever.
 func TestFireSchedulesZeroNextRun(t *testing.T) {
