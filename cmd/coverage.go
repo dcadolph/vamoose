@@ -80,6 +80,24 @@ func coverageLedger() (*coverage.Ledger, error) {
 	return coverage.NewLedger(path), nil
 }
 
+// appCoverage returns who is off in the next four weeks, for the dashboard's Watching
+// page. A nil slice is returned as empty so the JSON is always an array.
+func appCoverage() (any, error) {
+	ledger, err := coverageLedger()
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	entries, err := ledger.Overlapping(now, now.AddDate(0, 0, 28), "")
+	if err != nil {
+		return nil, err
+	}
+	if entries == nil {
+		entries = []coverage.Entry{}
+	}
+	return entries, nil
+}
+
 // recordCoverage adds a created hold to the coverage ledger, best-effort, so team coverage
 // checks see time off booked through vamoose. A failure is not fatal to the request.
 func recordCoverage(ctx context.Context, prov calendar.Provider, hold calendar.Hold) {

@@ -53,6 +53,8 @@ The fixed time-off tools:
 | `promote_to_team`   | Add the team as optional attendees once approved.                 |
 | `cancel_hold`       | Cancel a hold and notify its attendees.                           |
 | `set_away`          | Mark yourself out of office over a range, no approval.            |
+| `leave_balance`     | Show remaining time off from the configured HR system.            |
+| `team_coverage`     | Show who already has time off booked in a window.                 |
 | `create_event`      | Create a quick event, optionally inviting attendees.              |
 
 The workflow engine, so an agent can drive any workflow, not just time off:

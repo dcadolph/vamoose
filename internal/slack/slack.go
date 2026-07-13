@@ -275,8 +275,8 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 // through a verified approval button, so a slash command cannot bypass the approver.
 func allowedSubcommand(name string) bool {
 	switch name {
-	case "off", "away", "event", "request", "run", "workflows", "check", "schedule",
-		"team", "calendars", "doctor", "whoami", "help", "version":
+	case "off", "away", "balance", "coverage", "event", "request", "run", "workflows",
+		"check", "schedule", "team", "calendars", "doctor", "whoami", "help", "version":
 		return true
 	default:
 		return false

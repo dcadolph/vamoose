@@ -11,7 +11,7 @@ Run vamoose from Slack. `/vamoose off next week` creates the hold on your calend
 
 ## How it works
 
-- `/vamoose <command>` runs the vamoose CLI command and replies with its output. Calendar and workflow commands work: `off`, `request`, `away`, `event`, `run`, `workflows`, `check`, `schedule`, `team`, `calendars`, `doctor`. Server and host commands (`daemon`, `slack`, `mcp`, `login`) and the approval actions (`promote`, `cancel`) are not reachable from a slash command; approvals happen only through the buttons.
+- `/vamoose <command>` runs the vamoose CLI command and replies with its output. Calendar and workflow commands work: `off`, `request`, `away`, `event`, `run`, `workflows`, `check`, `schedule`, `balance`, `coverage`, `team`, `calendars`, `doctor`. Server and host commands (`daemon`, `slack`, `mcp`, `login`) and the approval actions (`promote`, `cancel`) are not reachable from a slash command; approvals happen only through the buttons.
 - When a command creates a hold awaiting approval, the reply carries **Approve** and **Decline** buttons. Approve runs `promote` to notify the team. Decline runs `cancel`. Only the approver the hold was sent to can use the buttons, and the button value is signed, so a click cannot be forged or made by anyone else.
 - Every request is verified against the signing secret, so only Slack can drive it.
 
