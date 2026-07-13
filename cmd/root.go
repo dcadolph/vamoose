@@ -33,6 +33,7 @@ Commands:
   promote   Add your team as optional attendees once approved.
   cancel    Cancel a hold and notify its attendees.
   away      Mark yourself out of office over a date range.
+  balance   Show your remaining time off from the configured HR system.
   event     Create a quick calendar event, optionally inviting others.
   daemon    Poll watched holds and auto-promote them when the manager approves.
   schedule  Rerun a workflow on an interval: schedule [add|list|remove].

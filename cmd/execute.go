@@ -36,6 +36,8 @@ func Execute(args []string) int {
 		return run(runCancel(ctx, rest))
 	case "away":
 		return run(runAway(ctx, rest))
+	case "balance":
+		return run(runBalance(ctx, rest))
 	case "event":
 		return run(runEvent(ctx, rest))
 	case "daemon":
