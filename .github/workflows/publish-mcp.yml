@@ -1,0 +1,33 @@
+# Publishes vamoose to the MCP registry on demand, for a release whose tag-run publish
+# step failed after the release itself succeeded. The regular path stays the release
+# workflow; this one reads server.json from main and points it at the given version.
+name: publish-mcp
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish, without the v prefix"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish to the MCP registry
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          jq --arg v "$VER" \
+            '.version = $v | .packages[0].identifier = "ghcr.io/dcadolph/vamoose:v" + $v' \
+            server.json > server.json.tmp && mv server.json.tmp server.json
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

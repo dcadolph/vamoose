@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.dcadolph/vamoose",
-  "description": "Calendar workflow engine for time off, approvals, and quick actions over Microsoft Graph, Google Calendar, Apple iCloud, or any CalDAV host.",
+  "description": "Calendar workflow engine for time off, approvals, and quick actions on any calendar backend.",
   "repository": {
     "url": "https://github.com/dcadolph/vamoose",
     "source": "github"
