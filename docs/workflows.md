@@ -49,7 +49,7 @@ Drop a JSON file in `~/.config/vamoose/workflows/<name>.json`, pipe it to `vamoo
 | `when`   | any but the first | Guard that skips the step unless its conditions hold. See Guards.    |
 | `next`   | any               | The step id to run next, or `end`. Defaults to the following step.   |
 | `subject`| note, event, message, leave | Event title, message text, or the note on a filed leave.  |
-| `channel`| message           | Where a message step posts, such as a Slack channel. Required.       |
+| `channel`| message           | Where a message posts: a Slack channel, an email address, or a webhook URL. Required. |
 | `for`    | wait              | How long a wait step pauses, as a duration like `48h`. Required.     |
 
 ## Verbs
@@ -225,7 +225,15 @@ export VAMOOSE_SMTP_PASSWORD=...
 export VAMOOSE_SMTP_FROM=vamoose@example.com
 ```
 
-When both are set, a message routes by its channel: an address containing `@` goes to email, anything else to Slack. So one workflow can post to a Slack channel and also email a list.
+For anything else, set the channel to an incoming webhook URL and the message is posted there as a JSON body, so Microsoft Teams, Google Chat, Mattermost, and similar services work with no extra setup:
+
+```json
+{ "verb": "message", "channel": "https://example.webhook.office.com/webhookb2/..." }
+```
+
+Set `VAMOOSE_WEBHOOK_AUTH` when the webhook needs an `Authorization` header; most carry their secret in the URL and need none.
+
+A message routes by its channel: an `https` or `http` URL is posted to as a webhook, an address containing `@` goes to email, anything else to Slack. So one workflow can post to a Slack channel, email a list, and hit a Teams webhook, each from its own step.
 
 The built-in `pto-announce` approves time off, announces it to a channel, then notifies the team:
 
