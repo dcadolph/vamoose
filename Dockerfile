@@ -16,7 +16,8 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/dcadolph/vamoose/cmd.ve
 FROM alpine:3.20
 LABEL org.opencontainers.image.source="https://github.com/dcadolph/vamoose" \
       org.opencontainers.image.description="Calendar workflow engine for time off, approvals, and quick actions" \
-      org.opencontainers.image.licenses="BUSL-1.1"
+      org.opencontainers.image.licenses="BUSL-1.1" \
+      io.modelcontextprotocol.server.name="io.github.dcadolph/vamoose"
 RUN apk add --no-cache ca-certificates tzdata \
  && adduser -D -u 10001 vamoose
 COPY --from=build /out/vamoose /usr/local/bin/vamoose
