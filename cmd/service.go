@@ -108,6 +108,8 @@ func renderService(w io.Writer, goos string, m serviceManifest) error {
 		return launchdTmpl.Execute(w, m)
 	case "linux":
 		return systemdTmpl.Execute(w, m)
+	case "windows":
+		return fmt.Errorf("no service manifest for Windows; run 'vamoose daemon' in a terminal, or add a Task Scheduler task that starts it at logon")
 	default:
 		return fmt.Errorf("unsupported platform %q; run 'vamoose daemon' manually", goos)
 	}

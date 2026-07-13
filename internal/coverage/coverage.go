@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/util"
@@ -61,15 +60,11 @@ func (l *Ledger) withFileLock(fn func() error) error {
 	if err := os.MkdirAll(filepath.Dir(l.path), 0o700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(l.path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	release, err := util.LockFile(l.path+".lock", true)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		return err
-	}
-	defer func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) }()
+	defer release()
 	return fn()
 }
 

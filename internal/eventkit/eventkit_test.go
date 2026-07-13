@@ -4,13 +4,24 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dcadolph/vamoose/internal/calendar"
 )
 
+// skipOnWindows skips tests that fake the helper with a shell script, which does not
+// execute on Windows. The helper itself is a macOS bridge, so nothing is lost.
+func skipOnWindows(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake helper is a shell script; the real helper is macOS-only")
+	}
+}
+
 // TestStatus runs Status against a fake helper script and checks the mapping.
 func TestStatus(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	helper := filepath.Join(dir, "vamoose-eventkit")
 	script := "#!/bin/sh\n" +
@@ -36,6 +47,7 @@ func TestStatus(t *testing.T) {
 // from a uid matched in two calendars, the stronger response wins regardless of order, so
 // a stale non-reply cannot mask a real accept.
 func TestStatusDuplicatePrefersStronger(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	helper := filepath.Join(dir, "vamoose-eventkit")
 	// boss appears pending-then-accepted; peer appears accepted-then-pending.
