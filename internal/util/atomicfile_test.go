@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -46,7 +47,9 @@ func TestWriteFileAtomic(t *testing.T) {
 			if err != nil {
 				t.Fatalf("stat: %v", err)
 			}
-			if info.Mode().Perm() != test.Perm {
+			// Windows maps POSIX permission bits onto its read-only attribute, so the
+			// exact mode does not round-trip there.
+			if runtime.GOOS != "windows" && info.Mode().Perm() != test.Perm {
 				t.Errorf("perm = %v, want %v", info.Mode().Perm(), test.Perm)
 			}
 			entries, err := os.ReadDir(dir)

@@ -15,6 +15,7 @@ import (
 
 	"github.com/dcadolph/vamoose/internal/audit"
 	"github.com/dcadolph/vamoose/internal/calendar"
+	"github.com/dcadolph/vamoose/internal/util"
 	"github.com/dcadolph/vamoose/internal/workflow"
 )
 
@@ -110,17 +111,12 @@ func acquireDaemonLock() (func(), error) {
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	release, err := util.LockFile(lockPath, false)
 	if err != nil {
-		return nil, err
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		_ = f.Close()
 		return nil, fmt.Errorf("another vamoose daemon is already advancing these watches (lock %s)", lockPath)
 	}
 	return func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
+		release()
 		_ = os.Remove(lockPath)
 	}, nil
 }
