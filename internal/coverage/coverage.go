@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/dcadolph/vamoose/internal/util"
@@ -52,6 +53,26 @@ func NewLedger(path string) *Ledger {
 	return &Ledger{path: path, now: time.Now}
 }
 
+// withFileLock runs fn while holding an exclusive lock on a sibling lock file, so a
+// read-modify-write is safe across processes: the CLI recording a hold and the daemon
+// removing a declined one cannot lose each other's update. The critical sections are
+// short and never touch the network, so a blocking lock is fine.
+func (l *Ledger) withFileLock(fn func() error) error {
+	if err := os.MkdirAll(filepath.Dir(l.path), 0o700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(l.path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	defer func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) }()
+	return fn()
+}
+
 // Record adds an entry and drops any whose end is before now, so the file stays bounded
 // to current and future time off. A zero-length or inverted window is rejected.
 func (l *Ledger) Record(e Entry) error {
@@ -60,19 +81,21 @@ func (l *Ledger) Record(e Entry) error {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	entries, err := l.load()
-	if err != nil {
-		return err
-	}
-	now := l.now()
-	kept := make([]Entry, 0, len(entries)+1)
-	for _, existing := range entries {
-		if existing.End.After(now) {
-			kept = append(kept, existing)
+	return l.withFileLock(func() error {
+		entries, err := l.load()
+		if err != nil {
+			return err
 		}
-	}
-	kept = append(kept, e)
-	return l.store(kept)
+		now := l.now()
+		kept := make([]Entry, 0, len(entries)+1)
+		for _, existing := range entries {
+			if existing.End.After(now) {
+				kept = append(kept, existing)
+			}
+		}
+		kept = append(kept, e)
+		return l.store(kept)
+	})
 }
 
 // Remove drops the entry with the given hold id, if present. A cancel calls it so a
@@ -83,20 +106,22 @@ func (l *Ledger) Remove(holdID string) error {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	entries, err := l.load()
-	if err != nil {
-		return err
-	}
-	kept := make([]Entry, 0, len(entries))
-	for _, e := range entries {
-		if e.HoldID != holdID {
-			kept = append(kept, e)
+	return l.withFileLock(func() error {
+		entries, err := l.load()
+		if err != nil {
+			return err
 		}
-	}
-	if len(kept) == len(entries) {
-		return nil
-	}
-	return l.store(kept)
+		kept := make([]Entry, 0, len(entries))
+		for _, e := range entries {
+			if e.HoldID != holdID {
+				kept = append(kept, e)
+			}
+		}
+		if len(kept) == len(entries) {
+			return nil
+		}
+		return l.store(kept)
+	})
 }
 
 // Overlapping returns the entries whose window intersects [start, end), excluding the
