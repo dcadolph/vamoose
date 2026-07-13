@@ -89,6 +89,14 @@ func halfDayWindow(day time.Time, loc *time.Location, portion string) (start, en
 	}
 }
 
+// workdayPhrase renders a working-day count for a human message.
+func workdayPhrase(n int) string {
+	if n == 1 {
+		return "1 working day"
+	}
+	return fmt.Sprintf("%d working days", n)
+}
+
 // portionLabel returns a human phrase for a half-day portion.
 func portionLabel(portion string) string {
 	if portion == "am" || portion == "morning" {

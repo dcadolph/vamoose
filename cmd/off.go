@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/dcadolph/vamoose/internal/workdays"
 )
 
 // runOff creates a time-off hold from a natural date phrase or explicit dates,
@@ -46,13 +48,25 @@ func runOff(ctx context.Context, args []string) error {
 		}
 		allDay = false
 	}
+	wd, err := workdays.FromEnv(os.Getenv)
+	if err != nil {
+		return fmt.Errorf("off: %w", err)
+	}
 	switch {
 	case *half != "":
-		fmt.Fprintf(os.Stdout, "Reading %q as the %s of %s.\n",
+		fmt.Fprintf(os.Stdout, "Reading %q as the %s of %s (half a working day).\n",
 			phrase, portionLabel(*half), startAt.Format("Mon 2006-01-02"))
-	case *start == "" && *end == "":
-		fmt.Fprintf(os.Stdout, "Reading %q as %s through %s.\n",
-			phrase, startAt.Format("Mon 2006-01-02"), endAt.AddDate(0, 0, -1).Format("Mon 2006-01-02"))
+	case allDay:
+		n := wd.Count(startAt, endAt)
+		if *start == "" && *end == "" {
+			fmt.Fprintf(os.Stdout, "Reading %q as %s through %s (%s).\n",
+				phrase, startAt.Format("Mon 2006-01-02"), endAt.AddDate(0, 0, -1).Format("Mon 2006-01-02"), workdayPhrase(n))
+		} else {
+			fmt.Fprintf(os.Stdout, "That is %s.\n", workdayPhrase(n))
+		}
+		if n == 0 {
+			fmt.Fprintln(os.Stdout, "Heads up: that window has no working days (all weekend or holidays).")
+		}
 	}
 
 	return createHold(ctx, holdRequest{
